@@ -12,6 +12,7 @@ from typing import List, Dict, Optional
 from models.card import Card
 from models.collection import Collection, CollectionCard
 from utils.csv_handler import CSVHandler
+from utils.clipboard_handler import ClipboardHandler
 
 class CollectionTab:
     """Collection management interface"""
@@ -20,6 +21,7 @@ class CollectionTab:
         self.parent = parent
         self.collection = Collection()
         self.filtered_cards = []
+        self.clipboard_handler = ClipboardHandler()  # Clipboard functionality
         
         self.create_widgets()
         self.load_collection()
@@ -101,6 +103,7 @@ class CollectionTab:
         buttons_frame.pack(fill=tk.X, padx=5, pady=5)
         
         ttk.Button(buttons_frame, text="Import CSV", command=self.import_collection).pack(fill=tk.X, pady=2)
+        ttk.Button(buttons_frame, text="Import Clipboard", command=self.import_cards_clipboard).pack(fill=tk.X, pady=2)
         ttk.Button(buttons_frame, text="Export CSV", command=self.export_collection).pack(fill=tk.X, pady=2)
         ttk.Button(buttons_frame, text="Add Card", command=self.add_card).pack(fill=tk.X, pady=2)
     
@@ -257,6 +260,57 @@ class CollectionTab:
                 messagebox.showinfo("Success", "Collection imported successfully!")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to import collection: {str(e)}")
+    
+    def import_cards_clipboard(self):
+        """Import cards from clipboard to collection"""
+        try:
+            cards = self.clipboard_handler.import_cards_from_clipboard()
+            if cards:
+                # Check clipboard format
+                content = self.clipboard_handler.get_clipboard_content()
+                format_type = self.clipboard_handler.detect_format(content)
+                format_desc = self.clipboard_handler.get_format_description(format_type)
+                
+                # Ask user to confirm import
+                result = messagebox.askyesno(
+                    "Import Cards from Clipboard", 
+                    f"Found {len(cards)} cards to import.\n"
+                    f"Format detected: {format_desc}\n\n"
+                    f"Add these cards to your collection?"
+                )
+                
+                if result:
+                    # Add cards to collection
+                    added_count = 0
+                    updated_count = 0
+                    
+                    for card, quantity in cards:
+                        # Check if card already exists in collection
+                        if card.name in self.collection.cards:
+                            # Update existing card quantity
+                            self.collection.cards[card.name].quantity += quantity
+                            updated_count += 1
+                        else:
+                            # Add new card to collection
+                            self.collection.add_card(card, quantity)
+                            added_count += 1
+                    
+                    self.apply_filters()
+                    self.refresh_display()
+                    self.save_collection()
+                    
+                    messagebox.showinfo("Success", 
+                        f"Imported {len(cards)} card entries from clipboard!\n"
+                        f"{added_count} new unique cards added.\n"
+                        f"{updated_count} existing cards updated.")
+            else:
+                content = self.clipboard_handler.get_clipboard_content()
+                if not content:
+                    messagebox.showwarning("Warning", "Clipboard is empty")
+                else:
+                    messagebox.showerror("Error", "Could not parse clipboard content as card list")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to import from clipboard: {str(e)}")
     
     def export_collection(self):
         """Export collection to CSV file"""

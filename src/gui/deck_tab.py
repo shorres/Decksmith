@@ -12,6 +12,7 @@ from typing import List, Dict, Optional
 from models.card import Card
 from models.deck import Deck, DeckCard
 from utils.csv_handler import CSVHandler
+from utils.clipboard_handler import ClipboardHandler
 
 class DeckTab:
     """Deck management interface"""
@@ -22,6 +23,7 @@ class DeckTab:
         self.current_deck = None
         self.current_deck_index = 0
         self.ai_add_card_callback = None  # Callback for AI recommendations
+        self.clipboard_handler = ClipboardHandler()  # Clipboard functionality
         
         self.create_widgets()
         self.load_decks()
@@ -97,8 +99,10 @@ class DeckTab:
         
         ttk.Button(buttons_frame, text="Import CSV", command=self.import_deck_csv).pack(fill=tk.X, pady=1)
         ttk.Button(buttons_frame, text="Import Arena", command=self.import_deck_arena).pack(fill=tk.X, pady=1)
+        ttk.Button(buttons_frame, text="Import Clipboard", command=self.import_deck_clipboard).pack(fill=tk.X, pady=1)
         ttk.Button(buttons_frame, text="Export CSV", command=self.export_deck_csv).pack(fill=tk.X, pady=1)
         ttk.Button(buttons_frame, text="Export Arena", command=self.export_deck_arena).pack(fill=tk.X, pady=1)
+        ttk.Button(buttons_frame, text="Copy to Clipboard", command=self.export_deck_clipboard).pack(fill=tk.X, pady=1)
     
     def create_deck_contents(self, parent):
         """Create the deck contents display"""
@@ -533,6 +537,72 @@ class DeckTab:
                 messagebox.showinfo("Success", "Deck exported successfully!")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to export deck: {str(e)}")
+    
+    def import_deck_clipboard(self):
+        """Import deck from clipboard"""
+        try:
+            deck = self.clipboard_handler.import_deck_from_clipboard()
+            if deck:
+                # Check clipboard format
+                content = self.clipboard_handler.get_clipboard_content()
+                format_type = self.clipboard_handler.detect_format(content)
+                format_desc = self.clipboard_handler.get_format_description(format_type)
+                
+                # Ask user to confirm import
+                result = messagebox.askyesno(
+                    "Import Deck from Clipboard", 
+                    f"Found deck with {deck.get_total_cards()} total cards.\n"
+                    f"Format detected: {format_desc}\n\n"
+                    f"Import this deck?"
+                )
+                
+                if result:
+                    self.decks.append(deck)
+                    self.refresh_deck_list()
+                    self.deck_listbox.selection_clear(0, tk.END)
+                    self.deck_listbox.selection_set(len(self.decks) - 1)
+                    self.on_deck_select()
+                    self.save_decks()
+                    messagebox.showinfo("Success", f"Imported deck '{deck.name}' from clipboard!")
+            else:
+                content = self.clipboard_handler.get_clipboard_content()
+                if not content:
+                    messagebox.showwarning("Warning", "Clipboard is empty")
+                else:
+                    messagebox.showerror("Error", "Could not parse clipboard content as a deck list")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to import from clipboard: {str(e)}")
+    
+    def export_deck_clipboard(self):
+        """Export current deck to clipboard"""
+        if not self.current_deck:
+            messagebox.showwarning("Warning", "No deck selected")
+            return
+        
+        # Ask user for format preference
+        from tkinter import simpledialog
+        format_choice = messagebox.askyesnocancel(
+            "Export Format",
+            "Choose export format:\n\n"
+            "Yes = Arena format (with set codes)\n"
+            "No = Simple format (card names only)\n"
+            "Cancel = Cancel export"
+        )
+        
+        if format_choice is None:  # Cancel
+            return
+        
+        format_type = "arena" if format_choice else "simple"
+        
+        try:
+            success = self.clipboard_handler.export_deck_to_clipboard(self.current_deck, format_type)
+            if success:
+                format_desc = "Arena format" if format_choice else "Simple format"
+                messagebox.showinfo("Success", f"Deck copied to clipboard in {format_desc}!")
+            else:
+                messagebox.showerror("Error", "Failed to copy deck to clipboard")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export to clipboard: {str(e)}")
     
     def load_decks(self):
         """Load decks from files"""
