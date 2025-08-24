@@ -1,0 +1,477 @@
+"""
+Collection management tab for the MTG Arena Deck Manager
+"""
+
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox, simpledialog
+import json
+import os
+from datetime import datetime
+from typing import List, Dict, Optional
+
+from models.card import Card
+from models.collection import Collection, CollectionCard
+from utils.csv_handler import CSVHandler
+
+class CollectionTab:
+    """Collection management interface"""
+    
+    def __init__(self, parent):
+        self.parent = parent
+        self.collection = Collection()
+        self.filtered_cards = []
+        
+        self.create_widgets()
+        self.load_collection()
+        self.refresh_display()
+    
+    def create_widgets(self):
+        """Create the collection tab widgets"""
+        self.frame = ttk.Frame(self.parent)
+        
+        # Create main paned window
+        paned = ttk.PanedWindow(self.frame, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Left panel - filters and stats
+        left_frame = ttk.Frame(paned)
+        paned.add(left_frame, weight=1)
+        
+        # Right panel - card list
+        right_frame = ttk.Frame(paned)
+        paned.add(right_frame, weight=3)
+        
+        self.create_filter_panel(left_frame)
+        self.create_card_list(right_frame)
+    
+    def create_filter_panel(self, parent):
+        """Create the filter and statistics panel"""
+        # Filters frame
+        filters_frame = ttk.LabelFrame(parent, text="Filters")
+        filters_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Name filter
+        ttk.Label(filters_frame, text="Card Name:").pack(anchor=tk.W, padx=5)
+        self.name_var = tk.StringVar()
+        name_entry = ttk.Entry(filters_frame, textvariable=self.name_var)
+        name_entry.pack(fill=tk.X, padx=5, pady=2)
+        name_entry.bind('<KeyRelease>', self.on_filter_change)
+        
+        # Color filter
+        ttk.Label(filters_frame, text="Colors:").pack(anchor=tk.W, padx=5, pady=(10,0))
+        colors_frame = ttk.Frame(filters_frame)
+        colors_frame.pack(fill=tk.X, padx=5, pady=2)
+        
+        self.color_vars = {}
+        colors = [("W", "White"), ("U", "Blue"), ("B", "Black"), ("R", "Red"), ("G", "Green")]
+        for i, (code, name) in enumerate(colors):
+            var = tk.BooleanVar()
+            self.color_vars[code] = var
+            cb = ttk.Checkbutton(colors_frame, text=code, variable=var, command=self.on_filter_change)
+            cb.grid(row=i//3, column=i%3, sticky=tk.W)
+        
+        # Type filter
+        ttk.Label(filters_frame, text="Card Type:").pack(anchor=tk.W, padx=5, pady=(10,0))
+        self.type_var = tk.StringVar()
+        type_combo = ttk.Combobox(filters_frame, textvariable=self.type_var)
+        type_combo['values'] = ('', 'Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land')
+        type_combo.pack(fill=tk.X, padx=5, pady=2)
+        type_combo.bind('<<ComboboxSelected>>', self.on_filter_change)
+        
+        # Rarity filter
+        ttk.Label(filters_frame, text="Rarity:").pack(anchor=tk.W, padx=5, pady=(10,0))
+        self.rarity_var = tk.StringVar()
+        rarity_combo = ttk.Combobox(filters_frame, textvariable=self.rarity_var)
+        rarity_combo['values'] = ('', 'Common', 'Uncommon', 'Rare', 'Mythic Rare')
+        rarity_combo.pack(fill=tk.X, padx=5, pady=2)
+        rarity_combo.bind('<<ComboboxSelected>>', self.on_filter_change)
+        
+        # Clear filters button
+        ttk.Button(filters_frame, text="Clear Filters", command=self.clear_filters).pack(pady=10)
+        
+        # Statistics frame
+        stats_frame = ttk.LabelFrame(parent, text="Collection Statistics")
+        stats_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        self.stats_text = tk.Text(stats_frame, height=8, width=20)
+        self.stats_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Import/Export buttons
+        buttons_frame = ttk.Frame(parent)
+        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(buttons_frame, text="Import CSV", command=self.import_collection).pack(fill=tk.X, pady=2)
+        ttk.Button(buttons_frame, text="Export CSV", command=self.export_collection).pack(fill=tk.X, pady=2)
+        ttk.Button(buttons_frame, text="Add Card", command=self.add_card).pack(fill=tk.X, pady=2)
+    
+    def create_card_list(self, parent):
+        """Create the card list display"""
+        list_frame = ttk.LabelFrame(parent, text="Cards")
+        list_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Treeview for card list
+        columns = ('Name', 'Type', 'Rarity', 'Colors', 'CMC', 'Quantity', 'Foil')
+        self.tree = ttk.Treeview(list_frame, columns=columns, show='headings')
+        
+        # Configure columns
+        self.tree.heading('Name', text='Card Name')
+        self.tree.heading('Type', text='Type')
+        self.tree.heading('Rarity', text='Rarity')
+        self.tree.heading('Colors', text='Colors')
+        self.tree.heading('CMC', text='CMC')
+        self.tree.heading('Quantity', text='Qty')
+        self.tree.heading('Foil', text='Foil')
+        
+        self.tree.column('Name', width=200)
+        self.tree.column('Type', width=120)
+        self.tree.column('Rarity', width=80)
+        self.tree.column('Colors', width=80)
+        self.tree.column('CMC', width=50)
+        self.tree.column('Quantity', width=50)
+        self.tree.column('Foil', width=50)
+        
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Context menu
+        self.create_context_menu()
+        self.tree.bind("<Button-3>", self.show_context_menu)
+    
+    def create_context_menu(self):
+        """Create context menu for card list"""
+        self.context_menu = tk.Menu(self.frame, tearoff=0)
+        self.context_menu.add_command(label="Edit Quantity", command=self.edit_quantity)
+        self.context_menu.add_command(label="Remove Card", command=self.remove_card)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="View Details", command=self.view_card_details)
+    
+    def show_context_menu(self, event):
+        """Show context menu"""
+        item = self.tree.identify_row(event.y)
+        if item:
+            self.tree.selection_set(item)
+            self.context_menu.post(event.x_root, event.y_root)
+    
+    def on_filter_change(self, event=None):
+        """Handle filter changes"""
+        self.apply_filters()
+        self.refresh_display()
+    
+    def apply_filters(self):
+        """Apply current filters to card list"""
+        filters = {}
+        
+        # Name filter
+        if self.name_var.get().strip():
+            filters['name'] = self.name_var.get().strip()
+        
+        # Color filter
+        selected_colors = [color for color, var in self.color_vars.items() if var.get()]
+        if selected_colors:
+            filters['colors'] = selected_colors
+        
+        # Type filter
+        if self.type_var.get():
+            filters['card_type'] = self.type_var.get()
+        
+        # Rarity filter
+        if self.rarity_var.get():
+            filters['rarity'] = self.rarity_var.get()
+        
+        self.filtered_cards = self.collection.filter_cards(**filters)
+    
+    def clear_filters(self):
+        """Clear all filters"""
+        self.name_var.set("")
+        for var in self.color_vars.values():
+            var.set(False)
+        self.type_var.set("")
+        self.rarity_var.set("")
+        self.on_filter_change()
+    
+    def refresh_display(self):
+        """Refresh the card list display"""
+        # Clear existing items
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        
+        # Add filtered cards
+        for collection_card in self.filtered_cards:
+            card = collection_card.card
+            values = (
+                card.name,
+                card.card_type,
+                card.rarity,
+                ','.join(card.colors),
+                card.converted_mana_cost,
+                collection_card.quantity,
+                collection_card.quantity_foil
+            )
+            self.tree.insert('', 'end', values=values)
+        
+        # Update statistics
+        self.update_statistics()
+    
+    def update_statistics(self):
+        """Update collection statistics display"""
+        stats = self.collection.get_completion_stats()
+        
+        stats_text = f"Total Cards: {stats['total_cards']}\\n"
+        stats_text += f"Unique Cards: {stats['unique_cards']}\\n\\n"
+        stats_text += f"Commons: {stats['commons']}\\n"
+        stats_text += f"Uncommons: {stats['uncommons']}\\n"
+        stats_text += f"Rares: {stats['rares']}\\n"
+        stats_text += f"Mythics: {stats['mythics']}\\n\\n"
+        
+        # Add color distribution
+        color_dist = {}
+        for collection_card in self.collection.cards.values():
+            for color in collection_card.card.colors:
+                color_dist[color] = color_dist.get(color, 0) + collection_card.quantity
+        
+        if color_dist:
+            stats_text += "Color Distribution:\\n"
+            for color, count in sorted(color_dist.items()):
+                stats_text += f"  {color}: {count}\\n"
+        
+        self.stats_text.delete(1.0, tk.END)
+        self.stats_text.insert(1.0, stats_text)
+    
+    def import_collection(self):
+        """Import collection from CSV file"""
+        filename = filedialog.askopenfilename(
+            title="Import Collection",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        
+        if filename:
+            try:
+                self.collection = CSVHandler.import_collection_from_csv(filename)
+                self.apply_filters()
+                self.refresh_display()
+                messagebox.showinfo("Success", "Collection imported successfully!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to import collection: {str(e)}")
+    
+    def export_collection(self):
+        """Export collection to CSV file"""
+        filename = filedialog.asksaveasfilename(
+            title="Export Collection",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        
+        if filename:
+            try:
+                CSVHandler.export_collection_to_csv(self.collection, filename)
+                messagebox.showinfo("Success", "Collection exported successfully!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export collection: {str(e)}")
+    
+    def add_card(self):
+        """Add a new card to the collection"""
+        dialog = AddCardDialog(self.frame)
+        if dialog.result:
+            card_data, quantity, foil = dialog.result
+            card = Card(**card_data)
+            self.collection.add_card(card, quantity, foil)
+            self.apply_filters()
+            self.refresh_display()
+    
+    def edit_quantity(self):
+        """Edit the quantity of selected card"""
+        selection = self.tree.selection()
+        if not selection:
+            return
+        
+        item = selection[0]
+        card_name = self.tree.item(item)['values'][0]
+        current_qty = self.tree.item(item)['values'][5]
+        current_foil = self.tree.item(item)['values'][6]
+        
+        new_qty = simpledialog.askinteger("Edit Quantity", f"Quantity for {card_name}:", initialvalue=int(current_qty), minvalue=0)
+        if new_qty is not None:
+            new_foil = simpledialog.askinteger("Edit Foil Quantity", f"Foil quantity for {card_name}:", initialvalue=int(current_foil), minvalue=0)
+            if new_foil is not None:
+                # Update the collection
+                if card_name in self.collection.cards:
+                    self.collection.cards[card_name].quantity = new_qty
+                    self.collection.cards[card_name].quantity_foil = new_foil
+                    if new_qty == 0 and new_foil == 0:
+                        del self.collection.cards[card_name]
+                
+                self.apply_filters()
+                self.refresh_display()
+    
+    def remove_card(self):
+        """Remove selected card from collection"""
+        selection = self.tree.selection()
+        if not selection:
+            return
+        
+        item = selection[0]
+        card_name = self.tree.item(item)['values'][0]
+        
+        if messagebox.askyesno("Confirm", f"Remove {card_name} from collection?"):
+            if card_name in self.collection.cards:
+                del self.collection.cards[card_name]
+                self.apply_filters()
+                self.refresh_display()
+    
+    def view_card_details(self):
+        """View detailed information about selected card"""
+        selection = self.tree.selection()
+        if not selection:
+            return
+        
+        item = selection[0]
+        card_name = self.tree.item(item)['values'][0]
+        
+        if card_name in self.collection.cards:
+            card = self.collection.cards[card_name].card
+            details = f"Name: {card.name}\\n"
+            details += f"Mana Cost: {card.mana_cost}\\n"
+            details += f"CMC: {card.converted_mana_cost}\\n"
+            details += f"Type: {card.card_type}\\n"
+            details += f"Rarity: {card.rarity}\\n"
+            details += f"Colors: {', '.join(card.colors)}\\n"
+            if card.power is not None and card.toughness is not None:
+                details += f"P/T: {card.power}/{card.toughness}\\n"
+            if card.text:
+                details += f"\\nText: {card.text}"
+            
+            messagebox.showinfo(f"Card Details - {card_name}", details)
+    
+    def load_collection(self):
+        """Load collection from file if it exists"""
+        collection_file = os.path.join("data", "collections", "default.json")
+        if os.path.exists(collection_file):
+            try:
+                with open(collection_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                self.collection = Collection.from_dict(data)
+                self.apply_filters()
+            except Exception as e:
+                print(f"Failed to load collection: {e}")
+    
+    def save_collection(self):
+        """Save collection to file"""
+        os.makedirs(os.path.join("data", "collections"), exist_ok=True)
+        collection_file = os.path.join("data", "collections", "default.json")
+        try:
+            with open(collection_file, 'w', encoding='utf-8') as f:
+                json.dump(self.collection.to_dict(), f, indent=2)
+        except Exception as e:
+            print(f"Failed to save collection: {e}")
+
+class AddCardDialog:
+    """Dialog for adding new cards to collection"""
+    
+    def __init__(self, parent):
+        self.result = None
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Add Card")
+        self.dialog.geometry("400x500")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        self.create_widgets()
+        self.dialog.wait_window()
+    
+    def create_widgets(self):
+        """Create dialog widgets"""
+        main_frame = ttk.Frame(self.dialog)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Card name
+        ttk.Label(main_frame, text="Card Name:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.name_var = tk.StringVar()
+        ttk.Entry(main_frame, textvariable=self.name_var).grid(row=0, column=1, sticky="ew", pady=2)
+        
+        # Mana cost
+        ttk.Label(main_frame, text="Mana Cost:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        self.mana_cost_var = tk.StringVar()
+        ttk.Entry(main_frame, textvariable=self.mana_cost_var).grid(row=1, column=1, sticky="ew", pady=2)
+        
+        # CMC
+        ttk.Label(main_frame, text="CMC:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        self.cmc_var = tk.IntVar()
+        ttk.Entry(main_frame, textvariable=self.cmc_var).grid(row=2, column=1, sticky="ew", pady=2)
+        
+        # Card type
+        ttk.Label(main_frame, text="Card Type:").grid(row=3, column=0, sticky=tk.W, pady=2)
+        self.type_var = tk.StringVar()
+        ttk.Entry(main_frame, textvariable=self.type_var).grid(row=3, column=1, sticky="ew", pady=2)
+        
+        # Creature type
+        ttk.Label(main_frame, text="Creature Type:").grid(row=4, column=0, sticky=tk.W, pady=2)
+        self.creature_type_var = tk.StringVar()
+        ttk.Entry(main_frame, textvariable=self.creature_type_var).grid(row=4, column=1, sticky="ew", pady=2)
+        
+        # Rarity
+        ttk.Label(main_frame, text="Rarity:").grid(row=5, column=0, sticky=tk.W, pady=2)
+        self.rarity_var = tk.StringVar(value="Common")
+        rarity_combo = ttk.Combobox(main_frame, textvariable=self.rarity_var)
+        rarity_combo['values'] = ('Common', 'Uncommon', 'Rare', 'Mythic Rare')
+        rarity_combo.grid(row=5, column=1, sticky="ew", pady=2)
+        
+        # Colors
+        ttk.Label(main_frame, text="Colors:").grid(row=6, column=0, sticky=tk.W, pady=2)
+        colors_frame = ttk.Frame(main_frame)
+        colors_frame.grid(row=6, column=1, sticky="ew", pady=2)
+        
+        self.color_vars = {}
+        colors = [("W", "White"), ("U", "Blue"), ("B", "Black"), ("R", "Red"), ("G", "Green")]
+        for i, (code, name) in enumerate(colors):
+            var = tk.BooleanVar()
+            self.color_vars[code] = var
+            ttk.Checkbutton(colors_frame, text=code, variable=var).grid(row=0, column=i)
+        
+        # Quantity
+        ttk.Label(main_frame, text="Quantity:").grid(row=7, column=0, sticky=tk.W, pady=2)
+        self.quantity_var = tk.IntVar(value=1)
+        ttk.Entry(main_frame, textvariable=self.quantity_var).grid(row=7, column=1, sticky="ew", pady=2)
+        
+        # Foil
+        self.foil_var = tk.BooleanVar()
+        ttk.Checkbutton(main_frame, text="Foil", variable=self.foil_var).grid(row=8, column=1, sticky=tk.W, pady=2)
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=9, column=0, columnspan=2, pady=20)
+        
+        ttk.Button(button_frame, text="Add", command=self.ok_clicked).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT, padx=5)
+        
+        # Configure column weights
+        main_frame.columnconfigure(1, weight=1)
+    
+    def ok_clicked(self):
+        """Handle OK button click"""
+        if not self.name_var.get().strip():
+            messagebox.showerror("Error", "Card name is required")
+            return
+        
+        colors = [color for color, var in self.color_vars.items() if var.get()]
+        
+        card_data = {
+            'name': self.name_var.get().strip(),
+            'mana_cost': self.mana_cost_var.get(),
+            'converted_mana_cost': self.cmc_var.get(),
+            'card_type': self.type_var.get(),
+            'creature_type': self.creature_type_var.get(),
+            'rarity': self.rarity_var.get(),
+            'colors': colors
+        }
+        
+        self.result = (card_data, self.quantity_var.get(), self.foil_var.get())
+        self.dialog.destroy()
+    
+    def cancel_clicked(self):
+        """Handle Cancel button click"""
+        self.dialog.destroy()
