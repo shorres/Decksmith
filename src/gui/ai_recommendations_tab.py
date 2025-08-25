@@ -201,7 +201,7 @@ class AIRecommendationsTab:
         ttk.Label(control_frame, text="Format:").pack(side=tk.LEFT, padx=(20, 5))
         self.format_var = tk.StringVar(value="Standard")
         format_combo = ttk.Combobox(control_frame, textvariable=self.format_var, width=12)
-        format_combo['values'] = ('Standard', 'Historic', 'Explorer', 'Pioneer', 'Modern', 'Legacy')
+        format_combo['values'] = ('Standard', 'Historic', 'Explorer', 'Pioneer', 'Modern', 'Legacy', 'Commander', 'EDH', 'Brawl')
         format_combo.pack(side=tk.LEFT, padx=5)
         
         # Loading indicator
@@ -220,9 +220,9 @@ class AIRecommendationsTab:
         
         # Configure columns
         self.rec_tree.heading('Card', text='Card Name')
-        self.rec_tree.heading('Confidence', text='Source')
-        self.rec_tree.heading('Synergy', text='Popularity')
-        self.rec_tree.heading('Popularity', text='Usage')
+        self.rec_tree.heading('Confidence', text='Confidence')
+        self.rec_tree.heading('Synergy', text='Synergy')
+        self.rec_tree.heading('Popularity', text='Meta Usage')
         self.rec_tree.heading('Archetype Fit', text='Arch Fit')
         self.rec_tree.heading('Reasons', text='Reasons/Notes')
         
@@ -275,11 +275,13 @@ class AIRecommendationsTab:
     def create_rec_context_menu(self):
         """Create context menu for recommendations"""
         self.rec_context_menu = tk.Menu(self.frame, tearoff=0)
-        self.rec_context_menu.add_command(label="Add to Mainboard", command=self.add_to_mainboard)
-        self.rec_context_menu.add_command(label="Add to Sideboard", command=self.add_to_sideboard)
+        self.rec_context_menu.add_command(label="🏠 Add to Mainboard", command=self.add_to_mainboard)
+        self.rec_context_menu.add_command(label="📋 Add to Sideboard", command=self.add_to_sideboard)
         self.rec_context_menu.add_separator()
-        self.rec_context_menu.add_command(label="View Card Details", command=self.view_card_details)
-        self.rec_context_menu.add_command(label="Why This Card?", command=self.explain_recommendation)
+        self.rec_context_menu.add_command(label="🔍 View Card Details", command=self.view_card_details)
+        self.rec_context_menu.add_command(label="❓ Why This Card?", command=self.explain_recommendation)
+        self.rec_context_menu.add_separator()
+        self.rec_context_menu.add_command(label="🎯 Similar Cards", command=self.find_similar_cards)
     
     def show_rec_context_menu(self, event):
         """Show context menu for recommendations"""
@@ -662,22 +664,105 @@ class AIRecommendationsTab:
     
     def _add_selected_card(self, sideboard=False):
         """Add selected card to deck"""
+        recommendation, card_name = self._get_selected_recommendation()
+        if not recommendation:
+            messagebox.showwarning("Warning", "No recommendation selected or found")
+            return
+        
+        # Get quantity from user
+        from tkinter import simpledialog
+        quantity = simpledialog.askinteger(
+            "Add Card", 
+            f"How many copies of {card_name}?",
+            initialvalue=1, minvalue=1, maxvalue=4
+        )
+        
+        if quantity and self.add_card_callback:
+            # For enhanced recommendations, we need to create a basic card object
+            if hasattr(recommendation, 'card_name') and not hasattr(recommendation, 'card'):
+                # Enhanced recommendation - create minimal card object
+                from models.card import Card
+                card = Card(
+                    name=recommendation.card_name,
+                    mana_cost=getattr(recommendation, 'mana_cost', ''),
+                    card_type=getattr(recommendation, 'card_type', ''),
+                    rarity=getattr(recommendation, 'rarity', 'common')
+                )
+            else:
+                # Basic recommendation with card object
+                card = recommendation.card
+            
+            try:
+                success = self.add_card_callback(card, quantity, sideboard)
+                if success:
+                    location = "sideboard" if sideboard else "mainboard"
+                    messagebox.showinfo("Card Added", f"Added {quantity}x {card_name} to {location}")
+                    
+                    # Refresh recommendations after adding
+                    self.get_recommendations()
+                else:
+                    messagebox.showerror("Error", f"Failed to add card - no active deck")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to add card: {str(e)}")
+        elif quantity:
+            # No callback available - show info message
+            location = "sideboard" if sideboard else "mainboard"
+            messagebox.showinfo("Info", f"Would add {quantity}x {card_name} to {location}")
+    
+    def find_similar_cards(self):
+        """Find similar cards to the selected recommendation"""
+        recommendation, card_name = self._get_selected_recommendation()
+        if not recommendation:
+            messagebox.showwarning("Warning", "No recommendation selected")
+            return
+        
+        # Simple implementation - could be enhanced with actual similarity search
+        similar_info = f"Finding cards similar to {card_name}...\n\n"
+        similar_info += "This feature could show:\n"
+        similar_info += "• Cards with similar mana costs\n"
+        similar_info += "• Cards with similar effects\n"
+        similar_info += "• Cards from the same archetype\n"
+        similar_info += "• Alternative options\n\n"
+        similar_info += "Consider implementing full Scryfall similarity search for better results."
+        
+        messagebox.showinfo("Similar Cards", similar_info)
+    
+    def _get_selected_recommendation(self):
+        """Get the selected recommendation from the tree"""
         selection = self.rec_tree.selection()
         if not selection:
-            return
+            return None, None
         
         item = selection[0]
-        card_name = self.rec_tree.item(item)['values'][0]
+        card_display_name = self.rec_tree.item(item)['values'][0]
         
-        # Find the recommendation
+        # Extract clean card name by removing icons and ownership info
+        import re
+        # Remove icons and ownership info: "✅ Lightning Bolt (Owned)" -> "Lightning Bolt"
+        clean_name = re.sub(r'^[🔨🔧💎👑✅❌⚠️]\s*', '', card_display_name)
+        clean_name = re.sub(r'\s*\([^)]*\).*$', '', clean_name)
+        clean_name = re.sub(r'\s*[✓❌⚠️]\s*$', '', clean_name)
+        clean_name = clean_name.strip()
+        
+        # Find the recommendation - check both current recommendation lists
         recommendation = None
-        for rec in self.current_recommendations:
-            if rec.card.name == card_name:
-                recommendation = rec
-                break
         
-        if not recommendation:
-            return
+        # First check enhanced recommendations
+        if hasattr(self, 'current_smart_recommendations') and self.current_smart_recommendations:
+            for rec in self.current_smart_recommendations:
+                if rec.card_name.lower() == clean_name.lower():
+                    recommendation = rec
+                    break
+        
+        # Fallback to basic recommendations
+        if not recommendation and hasattr(self, 'current_recommendations') and self.current_recommendations:
+            for rec in self.current_recommendations:
+                card_name = rec.card.name if hasattr(rec, 'card') and hasattr(rec.card, 'name') else getattr(rec, 'name', '')
+                if card_name.lower() == clean_name.lower():
+                    recommendation = rec
+                    break
+        
+        return recommendation, clean_name
         
         # Get quantity from user
         from tkinter import simpledialog
@@ -708,66 +793,115 @@ class AIRecommendationsTab:
     
     def view_card_details(self, event=None):
         """View detailed information about selected card"""
-        selection = self.rec_tree.selection()
-        if not selection:
+        recommendation, card_name = self._get_selected_recommendation()
+        if not recommendation or not card_name:
+            messagebox.showwarning("Warning", "No recommendation selected")
             return
         
-        item = selection[0]
-        card_name = self.rec_tree.item(item)['values'][0]
+        details = ""  # Initialize details variable
         
-        # Find the recommendation
-        recommendation = None
-        for rec in self.current_recommendations:
-            if rec.card.name == card_name:
-                recommendation = rec
-                break
-        
-        if recommendation:
+        # Build card details based on recommendation type
+        if hasattr(recommendation, 'card_name'):
+            # Enhanced recommendation with Scryfall data
+            details = f"🎴 CARD DETAILS: {recommendation.card_name}\n"
+            details += "=" * 50 + "\n\n"
+            details += f"💰 Mana Cost: {getattr(recommendation, 'mana_cost', 'Unknown')}\n"
+            details += f"🎭 Type: {getattr(recommendation, 'card_type', 'Unknown')}\n"
+            details += f"💎 Rarity: {getattr(recommendation, 'rarity', 'Unknown').title()}\n"
+            
+            if hasattr(recommendation, 'power_toughness') and recommendation.power_toughness:
+                details += f"⚔️ Power/Toughness: {recommendation.power_toughness}\n"
+            
+            if hasattr(recommendation, 'oracle_text') and recommendation.oracle_text:
+                details += f"\n📜 Oracle Text:\n{recommendation.oracle_text}\n"
+            
+            if hasattr(recommendation, 'keywords') and recommendation.keywords:
+                details += f"\n🏷️ Keywords: {', '.join(recommendation.keywords)}\n"
+            
+            if hasattr(recommendation, 'legality') and recommendation.legality:
+                details += f"\n⚖️ Format Legality:\n"
+                for format_name, status in recommendation.legality.items():
+                    if status == "legal":
+                        details += f"  ✅ {format_name.title()}: Legal\n"
+                    elif status == "not_legal":
+                        details += f"  ❌ {format_name.title()}: Not Legal\n"
+                    elif status == "restricted":
+                        details += f"  ⚠️ {format_name.title()}: Restricted\n"
+            
+            # AI Analysis for enhanced recommendations
+            details += f"\n🤖 AI RECOMMENDATION ANALYSIS:\n"
+            details += f"🎯 Confidence: {recommendation.confidence:.1%}\n"
+            details += f"🔗 Synergy Score: {recommendation.synergy_score:.1%}\n"
+            details += f"📈 Meta Score: {recommendation.meta_score:.1%}\n"
+            details += f"🎲 Deck Fit: {recommendation.deck_fit:.1%}\n"
+            details += f"💡 Cost Consideration: {recommendation.cost_consideration.replace('_', ' ').title()}\n"
+            
+        elif hasattr(recommendation, 'card'):
+            # Basic recommendation with card object
             card = recommendation.card
-            details = f"Card: {card.name}\\n"
-            details += f"Mana Cost: {card.mana_cost}\\n"
-            details += f"CMC: {card.converted_mana_cost}\\n"
-            details += f"Type: {card.card_type}\\n"
-            details += f"Rarity: {card.rarity}\\n"
-            details += f"Colors: {', '.join(card.colors)}\\n"
+            details = f"🎴 CARD DETAILS: {card.name}\n"
+            details += "=" * 50 + "\n\n"
+            details += f"💰 Mana Cost: {card.mana_cost}\n"
+            details += f"🔢 CMC: {card.converted_mana_cost}\n"
+            details += f"🎭 Type: {card.card_type}\n"
+            details += f"💎 Rarity: {card.rarity}\n"
+            details += f"🎨 Colors: {', '.join(card.colors) if card.colors else 'Colorless'}\n"
+            
             if card.power is not None and card.toughness is not None:
-                details += f"P/T: {card.power}/{card.toughness}\\n"
-            details += f"\\nText: {card.text}\\n"
+                details += f"⚔️ Power/Toughness: {card.power}/{card.toughness}\n"
             
-            # Add AI analysis
-            details += f"\\nAI Analysis:\\n"
-            details += f"Confidence: {recommendation.confidence:.1%}\\n"
-            details += f"Synergy Score: {recommendation.synergy_score:.1%}\\n"
-            details += f"Popularity: {recommendation.popularity_score:.1%}\\n"
-            details += f"Archetype Fit: {recommendation.archetype_fit:.1%}\\n"
+            details += f"\n📜 Oracle Text:\n{card.text}\n"
             
-            messagebox.showinfo(f"Card Details - {card_name}", details)
+            # AI Analysis for basic recommendations
+            details += f"\n🤖 AI RECOMMENDATION ANALYSIS:\n"
+            details += f"🎯 Confidence: {getattr(recommendation, 'confidence', 0):.1%}\n"
+            details += f"🔗 Synergy Score: {getattr(recommendation, 'synergy_score', 0):.1%}\n"
+            details += f"📊 Popularity: {getattr(recommendation, 'popularity_score', 0):.1%}\n"
+            details += f"🎲 Archetype Fit: {getattr(recommendation, 'archetype_fit', 0):.1%}\n"
+        else:
+            # Fallback for unknown recommendation format
+            details = f"🎴 CARD DETAILS: {card_name}\n"
+            details += "=" * 50 + "\n\n"
+            details += "⚠️ Limited information available for this recommendation.\n"
+        
+        messagebox.showinfo(f"Card Details", details)
     
     def explain_recommendation(self):
         """Explain why a card is recommended"""
-        selection = self.rec_tree.selection()
-        if not selection:
+        recommendation, card_name = self._get_selected_recommendation()
+        if not recommendation or not card_name:
+            messagebox.showwarning("Warning", "No recommendation selected")
             return
         
-        item = selection[0]
-        card_name = self.rec_tree.item(item)['values'][0]
+        explanation = f"🤔 WHY IS {card_name.upper()} RECOMMENDED?\n"
+        explanation += "=" * 49 + "\n\n"
         
-        # Find the recommendation
-        recommendation = None
-        for rec in self.current_recommendations:
-            if rec.card.name == card_name:
-                recommendation = rec
-                break
-        
-        if recommendation:
-            explanation = f"Why {card_name} is recommended:\\n\\n"
+        if hasattr(recommendation, 'reasons') and recommendation.reasons:
+            explanation += "💡 RECOMMENDATION REASONS:\n"
             for i, reason in enumerate(recommendation.reasons, 1):
-                explanation += f"{i}. {reason}\\n"
-            
-            explanation += f"\\nDetailed Scores:\\n"
-            explanation += f"• Overall Confidence: {recommendation.confidence:.1%}\\n"
-            explanation += f"• Synergy with current deck: {recommendation.synergy_score:.1%}\\n"
-            explanation += f"• Meta popularity: {recommendation.popularity_score:.1%}\\n"
-            explanation += f"• Archetype alignment: {recommendation.archetype_fit:.1%}\\n"
-            
-            messagebox.showinfo(f"Recommendation Explanation", explanation)
+                explanation += f"  {i}. {reason}\n"
+        else:
+            explanation += "💡 No specific reasons available for this recommendation.\n"
+        
+        explanation += f"\n📊 DETAILED SCORING BREAKDOWN:\n"
+        
+        if hasattr(recommendation, 'card_name'):
+            # Enhanced recommendation scoring
+            explanation += f"🎯 Overall Confidence: {recommendation.confidence:.1%}\n"
+            explanation += f"   └─ How sure the AI is about this recommendation\n\n"
+            explanation += f"🔗 Synergy Score: {recommendation.synergy_score:.1%}\n" 
+            explanation += f"   └─ How well it works with your current cards\n\n"
+            explanation += f"📈 Meta Score: {recommendation.meta_score:.1%}\n"
+            explanation += f"   └─ How popular/successful this card is in the current meta\n\n"
+            explanation += f"🎲 Deck Fit: {recommendation.deck_fit:.1%}\n"
+            explanation += f"   └─ How well it fits your deck's strategy and archetype\n\n"
+            explanation += f"💰 Cost: {recommendation.cost_consideration.replace('_', ' ').title()}\n"
+            explanation += f"   └─ Acquisition difficulty (owned/craft required)\n"
+        else:
+            # Basic recommendation scoring
+            explanation += f"🎯 Overall Confidence: {getattr(recommendation, 'confidence', 0):.1%}\n"
+            explanation += f"🔗 Synergy with deck: {getattr(recommendation, 'synergy_score', 0):.1%}\n"
+            explanation += f"📊 Meta popularity: {getattr(recommendation, 'popularity_score', 0):.1%}\n"
+            explanation += f"🎲 Archetype alignment: {getattr(recommendation, 'archetype_fit', 0):.1%}\n"
+        
+        messagebox.showinfo("Recommendation Explanation", explanation)
