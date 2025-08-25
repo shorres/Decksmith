@@ -37,6 +37,21 @@ class PerformanceOptimizer:
         self.update_queued[widget_id] = timer
         timer.start()
     
+    def freeze_ui_updates(self, freeze=True):
+        """Freeze UI updates during tab switches to prevent theme recalculation"""
+        self.ui_frozen = getattr(self, 'ui_frozen', False)
+        old_state = self.ui_frozen
+        self.ui_frozen = freeze
+        return old_state
+    
+    def with_frozen_ui(self, callback):
+        """Execute callback with UI updates frozen"""
+        old_state = self.freeze_ui_updates(True)
+        try:
+            return callback()
+        finally:
+            self.freeze_ui_updates(old_state)
+    
     def clear_queued_updates(self):
         """Clear all queued updates (useful when switching tabs)"""
         for timer in self.update_queued.values():
@@ -44,25 +59,34 @@ class PerformanceOptimizer:
         self.update_queued.clear()
 
 class LazyTreeView:
-    """Optimized tree view that only updates when necessary"""
+    """Optimized tree view that minimizes theme redraws"""
     
     def __init__(self, tree_widget):
         self.tree = tree_widget
         self._cached_data = None
         self._data_hash = None
         self.visible = True
+        self._freeze_updates = False  # New: prevent updates during theme operations
+        
+    def freeze_updates(self, freeze=True):
+        """Temporarily freeze updates to prevent theme recalculation"""
+        self._freeze_updates = freeze
         
     def update_data(self, data, force_refresh=False):
-        """Update tree data only if it has changed"""
+        """Update tree data only if it has changed and updates aren't frozen"""
+        if self._freeze_updates and not force_refresh:
+            return True  # Skip update while frozen
+            
         new_hash = hash(str(data)) if data else None
         
         if not force_refresh and new_hash == self._data_hash and self.visible:
-            return  # No changes, skip update
+            return True  # No changes, skip update
         
         self._data_hash = new_hash
         self._cached_data = data
         
         if self.visible:
+            return False  # Indicate that update is needed
             self._refresh_display()
     
     def _refresh_display(self):

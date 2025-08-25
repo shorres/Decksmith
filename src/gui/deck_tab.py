@@ -34,10 +34,15 @@ class DeckTab:
         self.refresh_display()
     
     def on_tab_focus(self):
-        """Called when the deck tab gets focus - optimized with debouncing"""
+        """Called when the deck tab gets focus - optimized with minimal theme redraw"""
         optimizer = get_performance_optimizer()
-        if optimizer.debounce_tab_switch(self._perform_tab_focus, "Deck Tab"):
-            self._perform_tab_focus()
+        
+        # Use frozen UI to prevent theme recalculation during tab switch
+        def _tab_focus_work():
+            if optimizer.debounce_tab_switch(self._perform_tab_focus, "Deck Tab"):
+                self._perform_tab_focus()
+        
+        optimizer.with_frozen_ui(_tab_focus_work)
     
     def _perform_tab_focus(self):
         """Internal method to perform the actual tab focus update"""
@@ -517,7 +522,13 @@ class DeckTab:
         self.update_statistics()
     
     def refresh_deck_contents(self):
-        """Refresh the deck contents display with lazy loading optimization"""
+        """Refresh the deck contents display with theme-aware lazy loading optimization"""
+        optimizer = get_performance_optimizer()
+        
+        # Skip updates if UI is frozen (during tab switches)
+        if getattr(optimizer, 'ui_frozen', False):
+            return
+            
         if not self.current_deck:
             # Clear trees if no deck
             for item in self.mainboard_tree.get_children():

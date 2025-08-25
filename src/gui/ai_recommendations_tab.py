@@ -148,12 +148,15 @@ class AIRecommendationsTab:
             self.analysis_status_label.config(text="")
     
     def on_tab_focus(self):
-        """Called when the AI recommendations tab gets focus - optimized with debouncing"""
+        """Called when the AI recommendations tab gets focus - optimized with minimal theme redraw"""
         optimizer = get_performance_optimizer()
         
-        # Debounce rapid tab switches
-        if optimizer.debounce_tab_switch(self.update_deck_header, "AI Recommendations"):
-            self._delayed_tab_update()
+        # Use frozen UI to prevent theme recalculation during tab switch
+        def _tab_focus_work():
+            if optimizer.debounce_tab_switch(self._delayed_tab_update, "AI Recommendations"):
+                self._delayed_tab_update()
+        
+        optimizer.with_frozen_ui(_tab_focus_work)
     
     def _delayed_tab_update(self):
         """Delayed tab update to reduce switching lag"""
@@ -675,9 +678,13 @@ class AIRecommendationsTab:
         thread.start()
     
     def display_enhanced_recommendations(self):
-        """Display the enhanced AI recommendations with Scryfall data using lazy loading"""
+        """Display the enhanced AI recommendations with theme-aware lazy loading"""
         optimizer = get_performance_optimizer()
         
+        # Skip updates if UI is frozen (during tab switches)
+        if getattr(optimizer, 'ui_frozen', False):
+            return
+            
         # Use lazy tree view for efficient updates
         lazy_tree = LazyTreeView(self.rec_tree)
         

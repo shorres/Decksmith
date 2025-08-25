@@ -32,10 +32,15 @@ class CollectionTab:
         self.refresh_display()
     
     def on_tab_focus(self):
-        """Called when the collection tab gets focus - optimized with debouncing"""
+        """Called when the collection tab gets focus - optimized with minimal theme redraw"""
         optimizer = get_performance_optimizer()
-        if optimizer.debounce_tab_switch(self._perform_tab_focus, "Collection Tab"):
-            self._perform_tab_focus()
+        
+        # Use frozen UI to prevent theme recalculation during tab switch
+        def _tab_focus_work():
+            if optimizer.debounce_tab_switch(self._perform_tab_focus, "Collection Tab"):
+                self._perform_tab_focus()
+        
+        optimizer.with_frozen_ui(_tab_focus_work)
     
     def _perform_tab_focus(self):
         """Internal method to perform the actual tab focus update"""
@@ -237,7 +242,13 @@ class CollectionTab:
         self.on_filter_change()
     
     def refresh_display(self):
-        """Refresh the card list display with lazy loading optimization"""
+        """Refresh the card list display with theme-aware lazy loading optimization"""
+        optimizer = get_performance_optimizer()
+        
+        # Skip updates if UI is frozen (during tab switches)
+        if getattr(optimizer, 'ui_frozen', False):
+            return
+            
         # Use lazy tree view for efficient updates
         lazy_tree = LazyTreeView(self.tree)
         
