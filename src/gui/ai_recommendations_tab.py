@@ -7,10 +7,7 @@ from tkinter import ttk, messagebox
 from typing import List, Dict, Optional
 import threading
 
-from models.deck import Deck
-from models.collection import Collection
-from utils.ai_recommendations import CardRecommendationEngine, CardRecommendation
-from utils.smart_recommendations import IntelligentRecommendationEngine, SmartRecommendation
+from utils.ai_recommendations import CardRecommendationEngine
 from utils.enhanced_recommendations_sync import get_smart_recommendations
 from .sun_valley_theme import get_theme_manager
 
@@ -23,14 +20,11 @@ class AIRecommendationsTab:
         self.get_collection = get_collection_func
         self.add_card_callback = add_card_callback
         self.recommendation_engine = CardRecommendationEngine()
-        self.smart_engine = IntelligentRecommendationEngine()
-        self.current_recommendations = []
         self.current_smart_recommendations = []
         self.sort_column = 'confidence'  # Default sort by confidence
         self.sort_reverse = True  # Highest confidence first
         self.current_page = 0  # Current page for pagination
         self.items_per_page = 50  # Items per page
-        self.show_lands = True  # Toggle for land visibility
         
         self.create_widgets()
     
@@ -597,143 +591,6 @@ class AIRecommendationsTab:
         thread.daemon = True
         thread.start()
     
-    def display_recommendations(self):
-        """Display the current recommendations"""
-        # Clear existing items
-        for item in self.rec_tree.get_children():
-            self.rec_tree.delete(item)
-        
-        if not self.current_recommendations:
-            self.update_total_count(0, 0)
-            return
-        
-        # Filter by minimum confidence
-        min_confidence = self.min_confidence_var.get()
-        filtered_recs = [r for r in self.current_recommendations if r.confidence >= min_confidence]
-        
-        # Filter by land visibility if toggled off (for legacy recommendations)
-        if hasattr(self, 'show_lands_var') and not self.show_lands_var.get():
-            # For legacy recommendations, we need to check the card type differently
-            filtered_recs = [r for r in filtered_recs 
-                           if not (hasattr(r, 'card') and hasattr(r.card, 'type_line') and 
-                                  "Land" in r.card.type_line)]
-        
-        # Update total count display
-        total_before_filters = len(self.current_recommendations)
-        total_after_filters = len(filtered_recs)
-        self.update_total_count(total_before_filters, total_after_filters)
-        
-        # Sort recommendations
-        sort_key_map = {
-            'name': lambda r: (r.card.name if hasattr(r, 'card') and hasattr(r.card, 'name') else getattr(r, 'name', 'Unknown')).lower(),
-            'confidence': lambda r: getattr(r, 'confidence', 0),
-            'synergy': lambda r: getattr(r, 'synergy_score', 0),
-            'meta': lambda r: getattr(r, 'popularity_score', 0),
-            'fit': lambda r: getattr(r, 'archetype_fit', 0),
-            'reasons': lambda r: len(getattr(r, 'reasons', []))
-        }
-        
-        if self.sort_column in sort_key_map:
-            filtered_recs.sort(key=sort_key_map[self.sort_column], reverse=self.sort_reverse)
-        
-        # Limit by show count with validation
-        try:
-            show_count = self.rec_count_var.get()
-            if show_count <= 0:
-                show_count = 50  # Default fallback
-        except (tk.TclError, ValueError):
-            show_count = 50  # Default fallback
-        limited_recs = filtered_recs[:show_count]
-        
-        # Get collection to check ownership
-        collection = self.get_collection()
-        
-        # Simple ownership check function
-        def check_card_ownership(card_name):
-            if not collection or not hasattr(collection, 'cards'):
-                return False, 0
-            
-            if card_name in collection.cards:
-                collection_card = collection.cards[card_name]
-                return True, collection_card.quantity + collection_card.quantity_foil
-            
-            # Try case-insensitive search
-            for name, collection_card in collection.cards.items():
-                if name.lower() == card_name.lower():
-                    return True, collection_card.quantity + collection_card.quantity_foil
-            
-            return False, 0
-        
-        # Separate owned and craftable recommendations
-        owned_recs = []
-        craftable_recs = []
-        
-        for rec in limited_recs:
-            # Get card name from recommendation
-            card_name = rec.card.name if hasattr(rec, 'card') and hasattr(rec.card, 'name') else getattr(rec, 'name', 'Unknown')
-            is_owned, quantity = check_card_ownership(card_name)
-            
-            if is_owned and quantity > 0:
-                owned_recs.append((rec, quantity))
-            else:
-                craftable_recs.append(rec)
-        
-        # Add owned cards first (with green highlighting)
-        for rec, owned_qty in owned_recs:
-            card_name = rec.card.name if hasattr(rec, 'card') and hasattr(rec.card, 'name') else getattr(rec, 'name', 'Unknown')
-            reasons_text = "; ".join(getattr(rec, 'reasons', ['No reasons available'])[:2])
-            if len(getattr(rec, 'reasons', [])) > 2:
-                reasons_text += f" (+{len(rec.reasons)-2} more)"
-            
-            values = (
-                f"✅ {card_name} (Own: {owned_qty})",
-                f"{getattr(rec, 'confidence', 0):.1%}",
-                f"{getattr(rec, 'synergy_score', 0):.1%}",
-                f"{getattr(rec, 'popularity_score', 0):.1%}",
-                f"{getattr(rec, 'archetype_fit', 0):.1%}",
-                reasons_text
-            )
-            
-            self.rec_tree.insert('', 'end', values=values, tags=('owned',))
-        
-        # Add craftable cards (with different highlighting)
-        for rec in craftable_recs:
-            card_name = rec.card.name if hasattr(rec, 'card') and hasattr(rec.card, 'name') else getattr(rec, 'name', 'Unknown')
-            reasons_text = "; ".join(getattr(rec, 'reasons', ['No reasons available'])[:2])
-            if len(getattr(rec, 'reasons', [])) > 2:
-                reasons_text += f" (+{len(rec.reasons)-2} more)"
-            
-            values = (
-                f"🔨 {card_name} (Need to craft)",
-                f"{getattr(rec, 'confidence', 0):.1%}",
-                f"{getattr(rec, 'synergy_score', 0):.1%}",
-                f"{getattr(rec, 'popularity_score', 0):.1%}",
-                f"{getattr(rec, 'archetype_fit', 0):.1%}",
-                reasons_text
-            )
-            
-            self.rec_tree.insert('', 'end', values=values, tags=('craftable',))
-        
-        # Configure tag colors with minimal contrast for better readability
-        try:
-            import sv_ttk
-            theme = sv_ttk.get_theme()
-            if theme == "dark":
-                # Dark theme - no background, just colored text for distinction
-                self.rec_tree.tag_configure('owned', foreground='#90ee90')
-                self.rec_tree.tag_configure('craftable', foreground='#ffd700')
-            else:
-                # Light theme - very subtle background highlighting
-                self.rec_tree.tag_configure('owned', background='#f9fff9', foreground='#006400')
-                self.rec_tree.tag_configure('craftable', background='#fffef9', foreground='#b8860b')
-        except:
-            # Fallback - no background, just text color
-            self.rec_tree.tag_configure('owned', foreground='#006400')
-            self.rec_tree.tag_configure('craftable', foreground='#b8860b')
-        
-        # Update column headers to show sort indicators
-        self.update_column_headers()
-    
     def display_enhanced_recommendations(self):
         """Display the enhanced AI recommendations with Scryfall data"""
         # Clear existing items
@@ -872,76 +729,6 @@ class AIRecommendationsTab:
             self.rec_tree.tag_configure('owned', foreground='#006400')
             self.rec_tree.tag_configure('craftable', foreground='#b8860b')
     
-    def display_smart_recommendations(self):
-        """Display the smart AI recommendations"""
-        # Clear existing items
-        for item in self.rec_tree.get_children():
-            self.rec_tree.delete(item)
-        
-        if not self.current_smart_recommendations:
-            self.update_total_count(0, 0)
-            return
-        
-        # Apply filters (confidence and land visibility)
-        min_confidence = self.min_confidence_var.get()
-        filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
-        
-        # Filter by land visibility if toggled off
-        if hasattr(self, 'show_lands_var') and not self.show_lands_var.get():
-            filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
-        
-        # Update total count display
-        total_before_filters = len(self.current_smart_recommendations)
-        total_after_filters = len(filtered_recs)
-        self.update_total_count(total_before_filters, total_after_filters)
-        
-        # Display smart recommendations with ownership info
-        for rec in filtered_recs:
-            # Determine ownership status and display
-            if rec.cost_consideration == "owned":
-                card_display = f"✅ {rec.card_name} (Owned)"
-                tag = 'owned'
-            else:
-                craft_icon = {"common_craft": "🔨", "uncommon_craft": "🔧", "rare_craft": "💎", "mythic_craft": "👑"}.get(rec.cost_consideration, "🔨")
-                card_display = f"{craft_icon} {rec.card_name} (Craft: {rec.rarity.title()})"
-                tag = 'craftable'
-            
-            # Format reasons for display
-            reasons_text = "; ".join(rec.reasons[:2])
-            if len(rec.reasons) > 2:
-                reasons_text += f" (+{len(rec.reasons)-2} more)"
-            
-            values = (
-                card_display,
-                f"{rec.confidence:.1%}",
-                f"{rec.synergy_score:.1%}",
-                f"{rec.meta_score:.1%}",
-                f"{rec.deck_fit:.1%}",
-                reasons_text
-            )
-            
-            self.rec_tree.insert('', 'end', values=values, tags=(tag,))
-        
-        # Configure tag colors with minimal contrast for better readability
-        try:
-            import sv_ttk
-            theme = sv_ttk.get_theme()
-            if theme == "dark":
-                # Dark theme - no background, just colored text for distinction
-                self.rec_tree.tag_configure('owned', foreground='#90ee90')
-                self.rec_tree.tag_configure('craftable', foreground='#ffd700')
-            else:
-                # Light theme - very subtle background highlighting
-                self.rec_tree.tag_configure('owned', background='#f9fff9', foreground='#006400')
-                self.rec_tree.tag_configure('craftable', background='#fffef9', foreground='#b8860b')
-        except:
-            # Fallback - no background, just text color
-            self.rec_tree.tag_configure('owned', foreground='#006400')
-            self.rec_tree.tag_configure('craftable', foreground='#b8860b')
-        
-        # Update column headers to show sort indicators
-        self.update_column_headers()
-    
     def update_column_headers(self):
         """Update column headers with sort indicators"""
         headers = {
@@ -974,7 +761,7 @@ class AIRecommendationsTab:
             count_text = f"Total: {filtered_recommendations} of {total_recommendations} recommendations"
         
         # Add land filter info if lands are hidden
-        if hasattr(self, 'show_lands_var') and not self.show_lands_var.get():
+        if not self.show_lands_var.get():
             land_count = sum(1 for r in self.current_smart_recommendations if "Land" in r.card_type)
             count_text += f" (hiding {land_count} lands)"
         
@@ -983,7 +770,6 @@ class AIRecommendationsTab:
     
     def toggle_land_visibility(self):
         """Toggle the visibility of land recommendations"""
-        self.show_lands = self.show_lands_var.get()
         self.current_page = 0  # Reset to first page when filter changes
         self.refresh_display()
     
@@ -1086,18 +872,10 @@ class AIRecommendationsTab:
         # Find the recommendation - check both current recommendation lists
         recommendation = None
         
-        # First check enhanced recommendations
+        # Check enhanced recommendations
         if hasattr(self, 'current_smart_recommendations') and self.current_smart_recommendations:
             for rec in self.current_smart_recommendations:
                 if rec.card_name.lower() == clean_name.lower():
-                    recommendation = rec
-                    break
-        
-        # Fallback to basic recommendations
-        if not recommendation and hasattr(self, 'current_recommendations') and self.current_recommendations:
-            for rec in self.current_recommendations:
-                card_name = rec.card.name if hasattr(rec, 'card') and hasattr(rec.card, 'name') else getattr(rec, 'name', '')
-                if card_name.lower() == clean_name.lower():
                     recommendation = rec
                     break
         
