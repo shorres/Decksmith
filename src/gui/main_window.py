@@ -17,35 +17,8 @@ class MainWindow:
     def __init__(self, root):
         self.root = root
         
-        # Apply basic dark theme
-        self._apply_basic_theme()
-        
         self.setup_window()
         self.create_widgets()
-    
-    def _apply_basic_theme(self):
-        """Apply a basic dark theme"""
-        self.root.configure(bg="#2d2d30")
-        
-        # Configure ttk styles for dark theme
-        style = ttk.Style()
-        style.theme_use('clam')
-        
-        # Configure ttk styles
-        style.configure('TNotebook', background='#2d2d30', borderwidth=0)
-        style.configure('TNotebook.Tab', background='#3c3c3c', foreground='white', padding=[8, 4])
-        style.map('TNotebook.Tab', background=[('selected', '#0e639c'), ('active', '#4c4c4c')])
-        
-        style.configure('TFrame', background='#2d2d30')
-        style.configure('TLabel', background='#2d2d30', foreground='white')
-        style.configure('TButton', background='#3c3c3c', foreground='white')
-        style.map('TButton', background=[('active', '#4c4c4c')])
-        
-        style.configure('TEntry', fieldbackground='#1e1e1e', foreground='white', borderwidth=1)
-        style.configure('TCombobox', fieldbackground='#1e1e1e', foreground='white')
-        style.configure('TTreeview', background='#1e1e1e', foreground='white', fieldbackground='#1e1e1e')
-        style.configure('TTreeview.Heading', background='#3c3c3c', foreground='white')
-        style.map('TTreeview', background=[('selected', '#0e639c')])
     
     
     def setup_window(self):
