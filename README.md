@@ -6,6 +6,7 @@ A comprehensive tool for managing your Magic: The Gathering Arena collection and
 
 - **Collection Management**: Track your card collection with quantities and rarities
 - **Deck Builder**: Create and manage multiple decks
+- **Smart Autocomplete**: Intelligent card suggestions while building decks from your collection
 - **Import/Export**: Import and export decks and collections via CSV
 - **Clipboard Support**: Import/export decks and cards directly from system clipboard
 - **Advanced Sorting**: Sort cards by color, creature type, mana cost, and more
@@ -43,6 +44,15 @@ The tool automatically manages Arena playset limits:
 - When importing decks, cards are automatically added to your collection
 - Duplicate imports across decks won't exceed the 4-card limit
 - Import status shows how many cards were added, updated, or skipped due to limits
+
+## 🎯 **Smart Autocomplete**
+
+Enhanced deck building with intelligent card suggestions:
+- **Collection-based suggestions**: Only shows cards you actually own
+- **Quantity display**: See how many copies you have available (e.g., "Lightning Bolt (4 available)")
+- **Real-time filtering**: Type to filter suggestions as you build
+- **Keyboard navigation**: Use arrow keys and Enter to select suggestions
+- **Smart extraction**: Automatically handles card names with quantity info
 
 ## Installation
 

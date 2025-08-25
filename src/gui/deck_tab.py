@@ -13,6 +13,7 @@ from models.card import Card
 from models.deck import Deck, DeckCard
 from utils.csv_handler import CSVHandler
 from utils.clipboard_handler import ClipboardHandler
+from gui.autocomplete_entry import AutocompleteEntry
 
 class DeckTab:
     """Deck management interface"""
@@ -25,6 +26,7 @@ class DeckTab:
         self.current_deck_index = 0
         self.ai_add_card_callback = None  # Callback for AI recommendations
         self.clipboard_handler = ClipboardHandler()  # Clipboard functionality
+        self.autocomplete_entries = []  # Store autocomplete entry references
         
         self.create_widgets()
         self.load_decks()
@@ -129,9 +131,16 @@ class DeckTab:
         
         ttk.Label(add_frame, text="Add Card:").pack(side=tk.LEFT)
         
-        card_var = tk.StringVar()
-        card_entry = ttk.Entry(add_frame, textvariable=card_var)
+        # Create autocomplete entry for card names
+        card_entry = AutocompleteEntry(
+            add_frame, 
+            width=30,
+            get_suggestions_func=self.get_collection_card_names
+        )
         card_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Store reference for later updates
+        self.autocomplete_entries.append(card_entry)
         
         qty_var = tk.IntVar(value=1)
         ttk.Label(add_frame, text="Qty:").pack(side=tk.LEFT, padx=(10,0))
@@ -139,11 +148,11 @@ class DeckTab:
         qty_spin.pack(side=tk.LEFT, padx=5)
         
         add_btn = ttk.Button(add_frame, text="Add", 
-                           command=lambda: self.add_card_to_deck(card_var.get(), qty_var.get(), list_type == "sideboard"))
+                           command=lambda: self.add_card_to_deck(card_entry.get(), qty_var.get(), list_type == "sideboard"))
         add_btn.pack(side=tk.LEFT, padx=5)
         
         # Bind Enter key to add card
-        card_entry.bind('<Return>', lambda e: add_btn.invoke())
+        card_entry.bind_return(lambda: add_btn.invoke())
         
         # Card list
         list_frame = ttk.Frame(parent)
@@ -273,13 +282,27 @@ class DeckTab:
         if not self.current_deck or not card_name.strip():
             return
         
-        # Create basic card (in real app, would lookup from database)
-        card = Card(name=card_name.strip())
+        # Extract just the card name (remove quantity info if present)
+        clean_card_name = self.extract_card_name(card_name.strip())
+        
+        # Check if card exists in collection for better card data
+        card = None
+        if self.collection and clean_card_name in self.collection.cards:
+            # Use card from collection (has better data)
+            collection_card = self.collection.cards[clean_card_name]
+            card = collection_card.card
+        else:
+            # Create basic card (for cards not in collection)
+            card = Card(name=clean_card_name)
+        
         self.current_deck.add_card(card, quantity, sideboard)
         
         self.refresh_deck_contents()
         self.update_statistics()
         self.save_decks()
+        
+        # Update autocomplete suggestions in case collection changed
+        self.refresh_autocomplete_suggestions()
     
     def add_card_from_ai(self, card: Card, quantity: int = 1, sideboard: bool = False):
         """Add card to current deck from AI recommendations"""
@@ -291,6 +314,34 @@ class DeckTab:
         self.update_statistics()
         self.save_decks()
         return True
+    
+    def get_collection_card_names(self) -> List[str]:
+        """Get list of card names from collection for autocomplete"""
+        if not self.collection or not self.collection.cards:
+            return []
+        
+        card_names = []
+        for card_name, collection_card in self.collection.cards.items():
+            # Only suggest cards that have quantity > 0
+            if collection_card.quantity > 0 or collection_card.quantity_foil > 0:
+                # Add quantity info to help user know how many they have
+                total_qty = collection_card.quantity + collection_card.quantity_foil
+                display_name = f"{card_name} ({total_qty} available)"
+                card_names.append(display_name)
+        
+        return sorted(card_names)
+    
+    def extract_card_name(self, display_name: str) -> str:
+        """Extract just the card name from display name with quantity"""
+        # Remove the quantity part: "Lightning Bolt (4 available)" -> "Lightning Bolt"
+        if " (" in display_name and display_name.endswith(" available)"):
+            return display_name.split(" (")[0]
+        return display_name
+    
+    def refresh_autocomplete_suggestions(self):
+        """Refresh autocomplete suggestions for all card entry widgets"""
+        for entry in self.autocomplete_entries:
+            entry.update_suggestions()
     
     def add_deck_cards_to_collection(self, deck: Deck, update_collection_display=True) -> Dict[str, int]:
         """Add deck cards to collection with playset limits (max 4 per card)"""
@@ -351,7 +402,7 @@ class DeckTab:
                 except:
                     pass
             
-            # Update collection display if requested and we have access to collection tab
+                    # Update collection display if requested and we have access to collection tab
             if update_collection_display:
                 # Find the collection tab through the main window
                 try:
@@ -360,6 +411,8 @@ class DeckTab:
                         main_window.collection_tab.apply_filters()
                         main_window.collection_tab.refresh_display()
                         main_window.collection_tab.save_collection()
+                        # Refresh our autocomplete suggestions since collection changed
+                        self.refresh_autocomplete_suggestions()
                 except:
                     pass
         
