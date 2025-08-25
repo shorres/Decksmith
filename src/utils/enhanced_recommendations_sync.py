@@ -86,7 +86,7 @@ class EnhancedRecommendationEngine:
             }
         }
     
-    def _load_synergy_keywords(self) -> Dict[str, List[str]]:
+    def _load_synergy_keywords(self) -> Dict[str, Dict[str, List[str]]]:
         """Load keyword synergy patterns"""
         return {
             "tribal_synergies": {
