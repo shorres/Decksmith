@@ -44,7 +44,7 @@ class ScryfallAPI:
             'User-Agent': 'MTG Arena Deck Manager/1.0'
         })
         self.last_request_time = 0
-        self.min_request_interval = 0.1  # 100ms between requests as per Scryfall guidelines
+        self.min_request_interval = 0.05  # Reduced from 0.1 to 0.05 (50ms between requests)
     
     def _rate_limit(self):
         """Ensure we don't exceed rate limits"""
@@ -60,7 +60,7 @@ class ScryfallAPI:
         
         try:
             url = f"{self.BASE_URL}{endpoint}"
-            response = self.session.get(url, params=params, timeout=10)
+            response = self.session.get(url, params=params, timeout=5)  # Reduced from 10 to 5 seconds
             
             if response.status_code == 200:
                 return response.json()

@@ -17,6 +17,15 @@ from gui.main_window import MainWindow
 def main():
     """Main application entry point"""
     root = tk.Tk()
+    
+    # Apply theme once at startup for better performance
+    try:
+        import sv_ttk
+        sv_ttk.set_theme("dark")
+        print("✓ Applied Sun Valley dark theme")
+    except Exception as e:
+        print(f"Failed to apply theme: {e}")
+    
     app = MainWindow(root)
     root.mainloop()
 

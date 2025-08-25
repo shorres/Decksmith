@@ -18,8 +18,8 @@ class MainWindow:
     def __init__(self, root):
         self.root = root
         
-        # Initialize Sun Valley theme first
-        self.theme_manager = initialize_theme(root)
+        # Theme is already applied in main.py, no need to reapply
+        self.theme_manager = None
         
         self.setup_window()
         self.create_widgets()
@@ -70,7 +70,7 @@ class MainWindow:
         selection = event.widget.select()
         tab_text = event.widget.tab(selection, "text")
         
-        # Update AI tab when it's selected
+        # Update AI tab when it's selected (no theme refresh needed)
         if tab_text == "AI Recommendations":
             self.ai_tab.on_tab_focus()
     
@@ -120,12 +120,17 @@ class MainWindow:
     def toggle_theme(self):
         """Toggle between light and dark themes"""
         try:
-            new_theme = self.theme_manager.toggle_theme()
+            import sv_ttk
+            
+            # Simple theme toggle without complex manager
+            current_theme = getattr(self, '_current_theme', 'dark')
+            new_theme = 'light' if current_theme == 'dark' else 'dark'
+            
+            sv_ttk.set_theme(new_theme)
+            self._current_theme = new_theme
+            
             theme_name = "Dark" if new_theme == "dark" else "Light"
             self.update_status(f"Switched to {theme_name} theme")
-            
-            # Apply theme to all existing widgets
-            self._refresh_theme_on_tabs()
             
         except Exception as e:
             messagebox.showerror("Theme Error", f"Failed to change theme: {str(e)}")
@@ -133,14 +138,8 @@ class MainWindow:
     
     def _refresh_theme_on_tabs(self):
         """Refresh theme application on all tabs"""
-        try:
-            # The sv_ttk theme is applied globally, no need for individual refresh
-            pass
-            if hasattr(self.ai_tab, 'refresh_theme'):
-                self.ai_tab.refresh_theme()
-                
-        except Exception as e:
-            print(f"Error refreshing themes on tabs: {e}")
+        # sv_ttk applies globally, no per-tab refresh needed
+        pass
     
     def import_collection(self):
         """Import collection from CSV"""

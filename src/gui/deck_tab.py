@@ -101,7 +101,6 @@ class DeckTab:
         buttons_frame.pack(fill=tk.X, padx=5, pady=5)
         
         ttk.Button(buttons_frame, text="Import CSV", command=self.import_deck_csv).pack(fill=tk.X, pady=1)
-        ttk.Button(buttons_frame, text="Import Arena", command=self.import_deck_arena).pack(fill=tk.X, pady=1)
         ttk.Button(buttons_frame, text="Import Clipboard", command=self.import_deck_clipboard).pack(fill=tk.X, pady=1)
         ttk.Button(buttons_frame, text="Export CSV", command=self.export_deck_csv).pack(fill=tk.X, pady=1)
         ttk.Button(buttons_frame, text="Export Arena", command=self.export_deck_arena).pack(fill=tk.X, pady=1)

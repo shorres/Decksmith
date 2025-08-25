@@ -70,9 +70,8 @@ class EnhancedImportProgressDialog:
         
         # Apply theme
         try:
-            theme_manager = get_theme_manager()
-            if theme_manager:
-                theme_manager.apply_theme_to_widget(self.dialog)
+            import sv_ttk
+            # Theme is already applied globally, no need for widget-specific application
         except:
             pass
         
@@ -142,50 +141,56 @@ class EnhancedImportProgressDialog:
         self.dialog.protocol("WM_DELETE_WINDOW", self.cancel_import)
     
     def update_progress(self, current: int, total: int, status: str = ""):
-        """Update progress bar and status"""
-        if self.cancelled:
+        """Update progress bar and status with improved responsiveness"""
+        if self.cancelled or not self.dialog:
             return
             
         try:
-            if total > 0:
+            if total > 0 and self.progress_var:
                 percentage = (current / total) * 100
                 self.progress_var.set(percentage)
-                self.progress_text_var.set(f"{percentage:.0f}%")
+                if self.progress_text_var:
+                    self.progress_text_var.set(f"{current}/{total} ({percentage:.0f}%)")
             
-            if status:
+            if status and self.status_var:
                 self.status_var.set(status)
-                
+            
+            # Force immediate GUI update for better responsiveness
             self.dialog.update_idletasks()
+            self.dialog.update()  # Force a full update
         except tk.TclError:
             pass
     
     def update_card_display(self, card_name: str, scryfall_card=None):
         """Update the card display with current card info"""
-        if self.cancelled:
+        if self.cancelled or not self.dialog:
             return
             
         try:
             self.current_card_name = card_name
-            self.card_name_var.set(card_name)
+            if self.card_name_var:
+                self.card_name_var.set(card_name)
             
             if scryfall_card:
                 details = f"Type: {getattr(scryfall_card, 'type_line', 'Unknown')}\n"
                 details += f"Cost: {getattr(scryfall_card, 'mana_cost', 'N/A')}\n"
                 details += f"Set: {getattr(scryfall_card, 'set_code', 'N/A').upper()}"
-                self.card_details_var.set(details)
+                if self.card_details_var:
+                    self.card_details_var.set(details)
                 
                 # Load card image if available
                 if PIL_AVAILABLE and hasattr(scryfall_card, 'image_uris'):
                     self._load_card_image(scryfall_card)
             else:
-                self.card_details_var.set("Loading card data...")
+                if self.card_details_var:
+                    self.card_details_var.set("Loading card data...")
                 
         except tk.TclError:
             pass
     
     def _load_card_image(self, scryfall_card):
         """Load and display card image"""
-        if not PIL_AVAILABLE or not hasattr(self, 'card_image_label'):
+        if not PIL_AVAILABLE or not self.card_image_label:
             return
             
         try:
@@ -198,14 +203,18 @@ class EnhancedImportProgressDialog:
                 return
                 
             # Check cache
-            if image_url in self.image_cache:
+            if image_url in self.image_cache and self.card_image_label:
                 self.card_image_label.configure(image=self.image_cache[image_url], text="")
                 return
             
             # Download in thread
             def download_image():
                 try:
-                    response = requests.get(image_url, timeout=5)
+                    import requests
+                    from io import BytesIO
+                    from PIL import Image, ImageTk
+                    
+                    response = requests.get(image_url, timeout=3)  # Reduced from 5 to 3 seconds
                     if response.status_code == 200:
                         image_data = BytesIO(response.content)
                         pil_image = Image.open(image_data)
@@ -214,7 +223,7 @@ class EnhancedImportProgressDialog:
                         
                         # Cache and display
                         self.image_cache[image_url] = tk_image
-                        if not self.cancelled and hasattr(self, 'card_image_label'):
+                        if not self.cancelled and self.card_image_label:
                             self.parent.after(0, lambda: self._set_image(tk_image))
                 except:
                     pass  # Fail silently for images
@@ -228,7 +237,7 @@ class EnhancedImportProgressDialog:
     def _set_image(self, tk_image):
         """Set image in main thread"""
         try:
-            if hasattr(self, 'card_image_label') and not self.cancelled:
+            if self.card_image_label and not self.cancelled:
                 self.current_image = tk_image
                 self.card_image_label.configure(image=tk_image, text="")
         except tk.TclError:
@@ -246,14 +255,16 @@ class EnhancedImportProgressDialog:
     def minimize_dialog(self):
         """Minimize the dialog"""
         try:
-            self.dialog.iconify()
+            if self.dialog:
+                self.dialog.iconify()
         except tk.TclError:
             pass
     
     def close_dialog(self):
         """Close the dialog"""
         try:
-            self.dialog.destroy()
+            if self.dialog:
+                self.dialog.destroy()
         except tk.TclError:
             pass
 
@@ -334,7 +345,8 @@ class EnhancedCSVImporter:
         if total_cards == 0:
             raise Exception("No cards found in CSV file")
         
-        self.progress_dialog.update_progress(0, total_cards, "Starting CSV import...")
+        if self.progress_dialog:
+            self.progress_dialog.update_progress(0, total_cards, "Starting CSV import...")
         
         # Import cards
         current_card = 0
@@ -342,7 +354,7 @@ class EnhancedCSVImporter:
             reader = csv.DictReader(csvfile)
             
             for row in reader:
-                if self.progress_dialog.is_cancelled():
+                if self.progress_dialog and self.progress_dialog.is_cancelled():
                     return None
                 
                 card_name = row.get('name', '').strip()
@@ -351,13 +363,14 @@ class EnhancedCSVImporter:
                 
                 current_card += 1
                 
-                # Update progress
-                self.progress_dialog.update_progress(
-                    current_card, total_cards,
-                    f"Processing: {card_name}"
-                )
+                # Update progress with better responsiveness
+                if self.progress_dialog:
+                    self.progress_dialog.update_progress(
+                        current_card, total_cards,
+                        f"Processing: {card_name}"
+                    )
                 
-                # Get enhanced card data
+                # Get enhanced card data (with shorter timeout for speed)
                 scryfall_card = None
                 try:
                     scryfall_card = scryfall_api.get_card_fuzzy(card_name)
@@ -365,7 +378,8 @@ class EnhancedCSVImporter:
                     print(f"Failed to get Scryfall data for {card_name}: {e}")
                 
                 # Update display
-                self.progress_dialog.update_card_display(card_name, scryfall_card)
+                if self.progress_dialog:
+                    self.progress_dialog.update_card_display(card_name, scryfall_card)
                 
                 # Create card object
                 if scryfall_card:
@@ -386,12 +400,13 @@ class EnhancedCSVImporter:
                 
                 deck.cards.append(DeckCard(card, quantity, sideboard))
                 
-                time.sleep(0.1)  # Brief pause for visual effect
+                # Process next card immediately (removed artificial delay)
         
         deck.created_date = datetime.now().isoformat()
         
-        self.progress_dialog.update_progress(total_cards, total_cards, "✅ Import complete!")
-        time.sleep(1)
+        if self.progress_dialog:
+            self.progress_dialog.update_progress(total_cards, total_cards, "✅ Import complete!")
+        time.sleep(0.5)  # Reduced from 1 to 0.5 seconds for faster completion
         
         return deck
     
@@ -420,7 +435,8 @@ class EnhancedCSVImporter:
         if total_cards == 0:
             raise Exception("No valid cards found in Arena file")
         
-        self.progress_dialog.update_progress(0, total_cards, "Starting Arena import...")
+        if self.progress_dialog:
+            self.progress_dialog.update_progress(0, total_cards, "Starting Arena import...")
         
         # Import cards
         current_card = 0
@@ -428,7 +444,7 @@ class EnhancedCSVImporter:
         
         with open(filepath, 'r', encoding='utf-8') as f:
             for line in f:
-                if self.progress_dialog.is_cancelled():
+                if self.progress_dialog and self.progress_dialog.is_cancelled():
                     return None
                 
                 line = line.strip()
@@ -454,10 +470,11 @@ class EnhancedCSVImporter:
                     current_card += 1
                     
                     # Update progress
-                    self.progress_dialog.update_progress(
-                        current_card, total_cards,
-                        f"Processing: {card_name}"
-                    )
+                    if self.progress_dialog:
+                        self.progress_dialog.update_progress(
+                            current_card, total_cards,
+                            f"Processing: {card_name}"
+                        )
                     
                     # Get enhanced card data
                     scryfall_card = None
@@ -467,7 +484,8 @@ class EnhancedCSVImporter:
                         print(f"Failed to get Scryfall data for {card_name}: {e}")
                     
                     # Update display
-                    self.progress_dialog.update_card_display(card_name, scryfall_card)
+                    if self.progress_dialog:
+                        self.progress_dialog.update_card_display(card_name, scryfall_card)
                     
                     # Create card object
                     if scryfall_card:
@@ -477,11 +495,12 @@ class EnhancedCSVImporter:
                     
                     deck.cards.append(DeckCard(card, quantity, is_sideboard))
                     
-                    time.sleep(0.1)  # Brief pause for visual effect
+                    # Process next card immediately (removed artificial delay)
         
         deck.created_date = datetime.now().isoformat()
         
-        self.progress_dialog.update_progress(total_cards, total_cards, "✅ Import complete!")
-        time.sleep(1)
+        if self.progress_dialog:
+            self.progress_dialog.update_progress(total_cards, total_cards, "✅ Import complete!")
+        time.sleep(0.5)  # Reduced completion delay for faster performance
         
         return deck

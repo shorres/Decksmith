@@ -270,8 +270,8 @@ class CardDetailsModal:
                     self.parent.after(0, self.set_image_error)
                     return
                 
-                # Download image
-                response = requests.get(image_url, timeout=10)
+                # Download image with faster timeout
+                response = requests.get(image_url, timeout=5)  # Reduced from 10 to 5 seconds
                 if response.status_code == 200:
                     image_data = BytesIO(response.content)
                     pil_image = Image.open(image_data)
