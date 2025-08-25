@@ -75,6 +75,25 @@ class ScryfallAPI:
             print(f"Request error: {e}")
             return None
     
+    def _make_request_url(self, url: str) -> Optional[Dict]:
+        """Make a request to a specific URL (for pagination)"""
+        self._rate_limit()
+        
+        try:
+            response = self.session.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 404:
+                return None
+            else:
+                print(f"Scryfall API error: {response.status_code}")
+                return None
+                
+        except requests.RequestException as e:
+            print(f"Request error: {e}")
+            return None
+    
     def autocomplete_card_names(self, query: str) -> List[str]:
         """Get card name suggestions for autocomplete"""
         if len(query) < 2:
@@ -88,34 +107,57 @@ class ScryfallAPI:
             return data['data'][:15]  # Limit to 15 suggestions
         return []
     
-    def search_cards(self, query: str, limit: int = 100) -> List[ScryfallCard]:
-        """Search for cards using Scryfall query syntax"""
+    def search_cards(self, query: str, limit: int = 100, max_pages: int = 3) -> List[ScryfallCard]:
+        """Search for cards using Scryfall query syntax with pagination support"""
         if len(query.strip()) < 1:
             return []
         
         endpoint = "/cards/search"
         params = {
-            "q": query,  # Use query directly instead of name:query
+            "q": query,
             "order": "cmc",
             "dir": "asc",
             "unique": "cards"
         }
         
-        data = self._make_request(endpoint, params)
-        if not data or 'data' not in data:
-            return []
-        
         cards = []
-        # Scryfall returns pages of results, process the full first page (up to 175 cards)
-        for card_data in data['data'][:min(limit, 175)]:  # Respect both our limit and Scryfall's page size
-            try:
-                card = self._parse_card_data(card_data)
-                if card:
-                    cards.append(card)
-            except Exception as e:
-                print(f"Error parsing card data: {e}")
-                continue
+        pages_fetched = 0
+        next_page_url = None
         
+        while pages_fetched < max_pages and len(cards) < limit:
+            # Make request to either the initial endpoint or next page
+            if next_page_url:
+                data = self._make_request_url(next_page_url)
+            else:
+                data = self._make_request(endpoint, params)
+            
+            if not data or 'data' not in data:
+                break
+            
+            # Process cards from this page
+            for card_data in data['data']:
+                if len(cards) >= limit:
+                    break
+                    
+                try:
+                    card = self._parse_card_data(card_data)
+                    if card:
+                        cards.append(card)
+                except Exception as e:
+                    print(f"Error parsing card data: {e}")
+                    continue
+            
+            pages_fetched += 1
+            
+            # Check if there are more pages
+            if data.get('has_more', False) and len(cards) < limit:
+                next_page_url = data.get('next_page')
+                if not next_page_url:
+                    break
+            else:
+                break
+        
+        print(f"Fetched {len(cards)} cards from {pages_fetched} page(s) for query: {query[:50]}...")
         return cards
     
     def get_card_by_name(self, name: str) -> Optional[ScryfallCard]:

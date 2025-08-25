@@ -113,10 +113,15 @@ class EnhancedRecommendationEngine:
             }
         }
     
-    def generate_recommendations(self, deck: Deck, collection=None, count: int = 15, format_name: str = "standard") -> List[SmartRecommendation]:
+    def generate_recommendations(self, deck: Deck, collection=None, count: int = 15, format_name: str = "standard", randomize: bool = True) -> List[SmartRecommendation]:
         """Generate intelligent recommendations using Scryfall data (synchronous)"""
         if not deck or not deck.get_mainboard_cards():
             return []
+        
+        # Add randomization for varied results
+        if randomize:
+            import time
+            random.seed(int(time.time() * 1000) % 1000000)  # Use current time for seed variation
         
         # Analyze current deck
         deck_analysis = self._analyze_deck_advanced(deck)
@@ -124,27 +129,31 @@ class EnhancedRecommendationEngine:
         recommendations = []
         current_cards = set(card.card.name.lower() for card in deck.get_mainboard_cards())
         
+        # Increase limits significantly to support larger result sets
+        # Scale limits based on the requested count
+        base_multiplier = max(1, count // 50)  # Scale up for larger requests
+        
         # 1. Get format staples using Scryfall
         staple_recs = self._get_format_staples_scryfall(
-            format_name, deck_analysis["colors"], current_cards, limit=15  # Increased from 8
+            format_name, deck_analysis["colors"], current_cards, limit=50 * base_multiplier
         )
         recommendations.extend(staple_recs)
         
         # 2. Get archetype-specific cards
         archetype_recs = self._get_archetype_recommendations_scryfall(
-            deck_analysis["archetype"], deck_analysis["colors"], current_cards, format_name, limit=12  # Increased from 6
+            deck_analysis["archetype"], deck_analysis["colors"], current_cards, format_name, limit=40 * base_multiplier
         )
         recommendations.extend(archetype_recs)
         
         # 3. Get synergy-based recommendations
         synergy_recs = self._get_synergy_recommendations_scryfall(
-            deck, deck_analysis, current_cards, limit=12  # Increased from 6
+            deck, deck_analysis, current_cards, limit=40 * base_multiplier
         )
         recommendations.extend(synergy_recs)
         
         # 4. Fill mana curve gaps
         curve_recs = self._get_curve_recommendations_scryfall(
-            deck_analysis["curve"], deck_analysis["colors"], current_cards, format_name, limit=10  # Increased from 5
+            deck_analysis["curve"], deck_analysis["colors"], current_cards, format_name, limit=30 * base_multiplier
         )
         recommendations.extend(curve_recs)
         
@@ -269,21 +278,24 @@ class EnhancedRecommendationEngine:
             query += " -t:basic cmc<=4 (r:u OR r:r)"  # Removed mythic restriction and lowered CMC
             
             print(f"Format staples query: {query}")  # Debug print
-            cards_data = self.scryfall.search_cards(query, limit=150)  # Increased for more variety
+            cards_data = self.scryfall.search_cards(query, limit=300, max_pages=2)  # Much more aggressive - up to 2 pages
             
             if not cards_data:
                 # Fallback to even simpler query for more variety
                 fallback_query = f"legal:{format_name.lower()} -t:basic cmc<=5"  # More inclusive CMC
                 print(f"Fallback query: {fallback_query}")
-                cards_data = self.scryfall.search_cards(fallback_query, limit=150)  # More results
+                cards_data = self.scryfall.search_cards(fallback_query, limit=300, max_pages=2)  # More results
             
             print(f"Found {len(cards_data) if cards_data else 0} format staples")  # Debug print
             
             if not cards_data:
                 return recommendations
             
-            # Process results
-            for card in cards_data[:limit * 3]:  # Get more to account for filtering (increased from limit * 2)
+            # Shuffle results for variety in lazy loading
+            random.shuffle(cards_data)
+            
+            # Process results with increased limit
+            for card in cards_data[:limit * 5]:  # Much more generous limit (increased from limit * 3)
                 card_name = card.name
                 
                 if card_name.lower() in current_cards:
@@ -367,13 +379,16 @@ class EnhancedRecommendationEngine:
             query += " -t:basic"
             
             print(f"Archetype query: {query}")  # Debug
-            cards_data = self.scryfall.search_cards(query, limit=80)  # Request more results for archetype cards
+            cards_data = self.scryfall.search_cards(query, limit=200, max_pages=2)  # Use pagination for more results
             
             if not cards_data:
                 return recommendations
             
-            # Process and score results
-            for card in cards_data[:limit * 3]:  # Get more to account for filtering (increased from limit * 2)
+            # Shuffle results for variety in lazy loading
+            random.shuffle(cards_data)
+            
+            # Process and score results with increased limit
+            for card in cards_data[:limit * 5]:  # Much more generous limit
                 card_name = card.name
                 
                 if card_name.lower() in current_cards:
@@ -442,13 +457,13 @@ class EnhancedRecommendationEngine:
             query = f"legal:standard c:{primary_color.lower()} -t:basic cmc<=3"
             
             print(f"Synergy query: {query}")  # Debug
-            cards_data = self.scryfall.search_cards(query, limit=80)  # Request more results for synergy cards
+            cards_data = self.scryfall.search_cards(query, limit=200, max_pages=2)  # Use pagination for more synergy results
             
             if not cards_data:
                 return recommendations
             
-            # Process results
-            for card in cards_data[:limit * 3]:  # Get more to account for filtering (increased from limit)
+            # Process results with increased limit
+            for card in cards_data[:limit * 5]:  # Much more generous limit for synergy cards
                 card_name = card.name
                 
                 if card_name.lower() in current_cards:
@@ -526,13 +541,13 @@ class EnhancedRecommendationEngine:
                 
                 query += " -t:basic (r:c OR r:u OR r:r)"  # Exclude mythics for curve fillers
                 
-                cards_data = self.scryfall.search_cards(query, limit=60)  # Request more results for curve fillers
+                cards_data = self.scryfall.search_cards(query, limit=150, max_pages=2)  # Use pagination for curve fillers
                 
                 if not cards_data:
                     continue
                 
-                # Process results
-                for card in cards_data[:limit * 2]:  # Get more to account for filtering
+                # Process results with increased limit
+                for card in cards_data[:limit * 4]:  # More generous limit for curve fillers
                     card_name = card.name
                     
                     if card_name.lower() in current_cards:
@@ -793,7 +808,7 @@ class EnhancedRecommendationEngine:
         
         return False, 0
 
-def get_smart_recommendations(deck: Deck, collection=None, count: int = 15, format_name: str = "standard") -> List[SmartRecommendation]:
+def get_smart_recommendations(deck: Deck, collection=None, count: int = 15, format_name: str = "standard", randomize: bool = True) -> List[SmartRecommendation]:
     """Main function to get smart recommendations using Scryfall data"""
     engine = EnhancedRecommendationEngine()
-    return engine.generate_recommendations(deck, collection, count, format_name)
+    return engine.generate_recommendations(deck, collection, count, format_name, randomize)

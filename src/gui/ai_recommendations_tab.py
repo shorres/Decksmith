@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import List, Dict, Optional
 import threading
+import re
 
 from utils.ai_recommendations import CardRecommendationEngine
 from utils.enhanced_recommendations_sync import get_smart_recommendations
@@ -23,8 +24,12 @@ class AIRecommendationsTab:
         self.current_smart_recommendations = []
         self.sort_column = 'confidence'  # Default sort by confidence
         self.sort_reverse = True  # Highest confidence first
-        self.current_page = 0  # Current page for pagination
-        self.items_per_page = 50  # Items per page
+        
+        # Lazy loading state
+        self.total_available_recommendations = 0
+        self.is_loading_more = False
+        self.has_more_recommendations = True
+        self.batch_size = 50  # Fetch recommendations in batches of 50
         
         self.create_widgets()
     
@@ -250,37 +255,18 @@ class AIRecommendationsTab:
         self.rec_tree.bind("<Double-Button-1>", self.view_card_details)
         self.rec_tree.bind("<Button-1>", self.on_column_click)
         
+        # Bind scroll events for lazy loading
+        self.rec_tree.bind('<MouseWheel>', self.on_mousewheel)
+        self.rec_tree.bind('<Button-4>', self.on_mousewheel)  # Linux scroll up
+        self.rec_tree.bind('<Button-5>', self.on_mousewheel)  # Linux scroll down
+        
         # Recommendation controls - moved below the table for better visibility
         rec_controls = ttk.Frame(parent)  # Changed from rec_frame to parent
         rec_controls.pack(fill=tk.X, padx=5, pady=5)
 
-        # Show count controls
-        ttk.Label(rec_controls, text="Show:").pack(side=tk.LEFT)
-        self.rec_count_var = tk.IntVar(value=50)
-        rec_count_spin = ttk.Spinbox(rec_controls, from_=5, to=99, width=5, textvariable=self.rec_count_var,
-                                    command=self.refresh_display)
-        rec_count_spin.pack(side=tk.LEFT, padx=5)
-        
-        # Also bind variable changes to refresh
-        self.rec_count_var.trace('w', lambda *args: self.refresh_display())
-        ttk.Label(rec_controls, text="per page").pack(side=tk.LEFT)
-        
-        # Pagination controls
-        page_frame = ttk.Frame(rec_controls)
-        page_frame.pack(side=tk.LEFT, padx=(20, 0))
-        
-        self.prev_page_btn = ttk.Button(page_frame, text="◀ Prev", command=self.prev_page, width=8)
-        self.prev_page_btn.pack(side=tk.LEFT, padx=2)
-        
-        self.page_label = ttk.Label(page_frame, text="Page 1 of 1")
-        self.page_label.pack(side=tk.LEFT, padx=10)
-        
-        self.next_page_btn = ttk.Button(page_frame, text="Next ▶", command=self.next_page, width=8)
-        self.next_page_btn.pack(side=tk.LEFT, padx=2)
-        
         # Filter controls
         filter_frame = ttk.Frame(rec_controls)
-        filter_frame.pack(side=tk.LEFT, padx=(20, 0))
+        filter_frame.pack(side=tk.LEFT, padx=5)
         
         # Land visibility toggle
         self.show_lands_var = tk.BooleanVar(value=True)
@@ -303,6 +289,12 @@ class AIRecommendationsTab:
         self.total_count_label = ttk.Label(rec_controls, text="Total: 0 recommendations", 
                                          font=('TkDefaultFont', 9, 'bold'), foreground='darkblue')
         self.total_count_label.pack(side=tk.RIGHT, padx=5)
+        
+        # Load More button (for manual loading)
+        self.load_more_button = ttk.Button(rec_controls, text="Load More", 
+                                         command=self.load_more_batch, 
+                                         state='disabled')
+        self.load_more_button.pack(side=tk.RIGHT, padx=5)
         
         # Update confidence label
         def update_confidence_label(*args):
@@ -344,89 +336,49 @@ class AIRecommendationsTab:
                 else:
                     self.sort_column = new_sort_column
                     self.sort_reverse = True if new_sort_column != 'name' else False
-                    self.current_page = 0  # Reset to first page when sorting changes
                 
                 self.refresh_display()
     
+    def on_mousewheel(self, event):
+        """Handle mouse wheel scrolling to trigger lazy loading"""
+        # Check if we're near the bottom and should load more
+        self.parent.after_idle(self.check_scroll_position)
+    
+    def check_scroll_position(self, event=None):
+        """Check if we're near the bottom of the tree and should load more recommendations"""
+        if not self.has_more_recommendations or self.is_loading_more:
+            return
+            
+        try:
+            # Get the scrollbar associated with the treeview
+            scrollbar = None
+            for child in self.rec_tree.master.winfo_children():
+                if isinstance(child, ttk.Scrollbar):
+                    scrollbar = child
+                    break
+            
+            if scrollbar:
+                # Get the position of the scrollbar (0.0 to 1.0)
+                scroll_position = scrollbar.get()
+                if len(scroll_position) >= 2:
+                    scroll_top, scroll_bottom = scroll_position[0], scroll_position[1]
+                    
+                    # If we're near the bottom (85% scrolled), load more
+                    if scroll_bottom > 0.85:
+                        print("Near bottom of list, loading more recommendations...")
+                        self.load_more_batch()
+        except Exception as e:
+            print(f"Error checking scroll position: {e}")
+    
+    def on_tree_select(self, event=None):
+        """Handle tree selection changes and check for scroll position"""
+        self.check_scroll_position()
+    
     def refresh_display(self):
         """Refresh the recommendations display with current sort and filter settings"""
-        try:
-            # Validate rec_count_var before proceeding
-            count_value = self.rec_count_var.get()
-            if count_value <= 0:
-                return  # Don't refresh with invalid values
-        except (tk.TclError, ValueError):
-            return  # Don't refresh if value is invalid
-        
-        # Reset to first page when show count changes if we would exceed available pages
-        if self.current_smart_recommendations:
-            min_confidence = self.min_confidence_var.get()
-            filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
-            
-            # Apply land filter if needed
-            if not self.show_lands_var.get():
-                filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
-            
-            try:
-                items_per_page = self.rec_count_var.get()
-                if items_per_page <= 0:
-                    items_per_page = 50
-            except (tk.TclError, ValueError):
-                items_per_page = 50
-            total_pages = max(1, (len(filtered_recs) + items_per_page - 1) // items_per_page)
-            if self.current_page >= total_pages:
-                self.current_page = 0
-            
+        # Simply refresh the enhanced recommendations display
         if self.current_smart_recommendations:
             self.display_enhanced_recommendations()
-    
-    def prev_page(self):
-        """Navigate to previous page"""
-        if self.current_page > 0:
-            self.current_page -= 1
-            self.refresh_display()
-    
-    def next_page(self):
-        """Navigate to next page"""
-        if self.current_smart_recommendations:
-            try:
-                items_per_page = self.rec_count_var.get()
-                if items_per_page <= 0:
-                    items_per_page = 50
-            except (tk.TclError, ValueError):
-                items_per_page = 50
-            
-            # Calculate total filtered results (considering both confidence and land filters)
-            min_confidence = self.min_confidence_var.get()
-            filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
-            
-            # Apply land filter if needed
-            if not self.show_lands_var.get():
-                filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
-            
-            total_pages = (len(filtered_recs) + items_per_page - 1) // items_per_page
-            
-            if self.current_page < total_pages - 1:
-                self.current_page += 1
-                self.refresh_display()
-    
-    def update_pagination_info(self, total_filtered_results):
-        """Update pagination display information"""
-        try:
-            items_per_page = self.rec_count_var.get()
-            if items_per_page <= 0:
-                items_per_page = 50
-        except (tk.TclError, ValueError):
-            items_per_page = 50
-        
-        total_pages = max(1, (total_filtered_results + items_per_page - 1) // items_per_page)
-        current_page_display = self.current_page + 1
-        
-        self.page_label.config(text=f"Page {current_page_display} of {total_pages}")
-        
-        # Enable/disable navigation buttons
-        self.prev_page_btn.config(state="normal" if self.current_page > 0 else "disabled")
-        self.next_page_btn.config(state="normal" if self.current_page < total_pages - 1 else "disabled")
     
     def show_rec_context_menu(self, event):
         """Show context menu for recommendations"""
@@ -545,7 +497,7 @@ class AIRecommendationsTab:
         thread.start()
     
     def get_recommendations(self):
-        """Get AI card recommendations using the enhanced Scryfall-powered system"""
+        """Get AI card recommendations using lazy loading for better performance"""
         current_deck = self.get_current_deck()
         if not current_deck:
             messagebox.showwarning("Warning", "No deck selected")
@@ -554,28 +506,55 @@ class AIRecommendationsTab:
         # Update header to show current deck
         self.update_deck_header()
         
-        self.loading_var.set("Getting enhanced AI recommendations...")
-        self.analysis_status_label.config(text="🤖 Generating Scryfall-powered recommendations...", foreground='blue')
+        # Reset lazy loading state
+        self.current_smart_recommendations = []
+        self.total_available_recommendations = 0
+        self.has_more_recommendations = True
+        self.is_loading_more = False
+        
+        # Clear display
+        for item in self.rec_tree.get_children():
+            self.rec_tree.delete(item)
+        
+
+        self.analysis_status_label.config(text="🤖 Generating Scryfall-powered recommendations...", foreground='light grey')
         self.frame.update()
         
         def get_recs():
             try:
                 collection = self.get_collection()
                 format_name = self.format_var.get()
-                count = self.rec_count_var.get()
                 
-                # Use the enhanced recommendation engine with Scryfall data
-                # Request a large pool of recommendations for better variety
+                # Load initial batch of recommendations
                 enhanced_recommendations = get_smart_recommendations(
-                    current_deck, collection, 200, format_name  # Always request 200 for large pool
+                    current_deck, collection, self.batch_size, format_name
                 )
+                
+                print(f"Initial batch loaded: {len(enhanced_recommendations)} recommendations")
                 
                 def update_recs():
                     self.current_smart_recommendations = enhanced_recommendations
-                    self.current_page = 0  # Reset to first page with new recommendations
+                    self.total_available_recommendations = len(enhanced_recommendations)
+                    
+                    # Check if we likely have more recommendations available
+                    if len(enhanced_recommendations) >= self.batch_size * 0.9:
+                        self.has_more_recommendations = True
+                    else:
+                        self.has_more_recommendations = False
+                    
                     self.display_enhanced_recommendations()
                     self.loading_var.set("")
-                    self.analysis_status_label.config(text="✅ Enhanced recommendations ready", foreground='green')
+                    
+                    status_msg = f"✅ {len(enhanced_recommendations)} recommendations loaded"
+                    if self.has_more_recommendations:
+                        status_msg += " (scroll down for more)"
+                    self.analysis_status_label.config(text=status_msg, foreground='dark slate gray')
+                    
+                    # Update Load More button state
+                    if self.has_more_recommendations:
+                        self.load_more_button.config(state='normal')
+                    else:
+                        self.load_more_button.config(state='disabled')
                 
                 self.frame.after(0, update_recs)
                 
@@ -591,14 +570,103 @@ class AIRecommendationsTab:
         thread.daemon = True
         thread.start()
     
+    def load_more_batch(self):
+        """Load the next batch of recommendations"""
+        if self.is_loading_more or not self.has_more_recommendations:
+            return
+            
+        current_deck = self.get_current_deck()
+        if not current_deck:
+            return
+            
+        def get_more_recs():
+            try:
+                self.is_loading_more = True
+                self.loading_var.set("Loading more recommendations...")
+                
+                # Update Load More button to show loading
+                self.load_more_button.config(text="Loading...", state='disabled')
+                
+                collection = self.get_collection()
+                format_name = self.format_var.get()
+                
+                # Get next batch by requesting more recommendations
+                # Since get_smart_recommendations uses randomization, we'll get different results
+                current_count = len(self.current_smart_recommendations)
+                total_desired = current_count + self.batch_size
+                
+                all_recommendations = get_smart_recommendations(
+                    current_deck, collection, total_desired, format_name
+                )
+                
+                # Extract only the new recommendations (beyond what we already have)
+                additional_recommendations = all_recommendations[current_count:]
+                
+                print(f"Additional batch: {len(additional_recommendations)} new recommendations")
+                
+                # Filter out duplicates
+                existing_names = {rec.card_name for rec in self.current_smart_recommendations}
+                new_recommendations = [rec for rec in additional_recommendations 
+                                     if rec.card_name not in existing_names]
+                
+                print(f"After deduplication: {len(new_recommendations)} unique new recommendations")
+                
+                def update_display():
+                    if new_recommendations:
+                        self.current_smart_recommendations.extend(new_recommendations)
+                        self.total_available_recommendations = len(self.current_smart_recommendations)
+                        
+                        # Check if we should continue loading more
+                        if len(new_recommendations) < self.batch_size * 0.5:
+                            self.has_more_recommendations = False
+                        
+                        self.display_enhanced_recommendations()
+                        
+                        status_msg = f"✅ {len(self.current_smart_recommendations)} recommendations loaded"
+                        if self.has_more_recommendations:
+                            status_msg += " (scroll for more)"
+                        self.analysis_status_label.config(text=status_msg, foreground='green')
+                        
+                        # Update Load More button state
+                        self.load_more_button.config(
+                            text="Load More", 
+                            state='normal' if self.has_more_recommendations else 'disabled'
+                        )
+                    else:
+                        self.has_more_recommendations = False
+                        self.analysis_status_label.config(
+                            text=f"✅ {len(self.current_smart_recommendations)} recommendations (all loaded)", 
+                            foreground='green'
+                        )
+                        
+                        # Disable Load More button
+                        self.load_more_button.config(text="Load More", state='disabled')
+                    
+                    self.loading_var.set("")
+                    self.is_loading_more = False
+                    
+                    # Reset Load More button
+                    self.load_more_button.config(text="Load More")
+                
+                self.frame.after(0, update_display)
+                
+            except Exception as e:
+                print(f"Error loading more recommendations: {str(e)}")
+                self.frame.after(0, lambda: self.loading_var.set(""))
+                self.frame.after(0, lambda: self.load_more_button.config(text="Load More", state='normal'))
+                self.is_loading_more = False
+        
+        thread = threading.Thread(target=get_more_recs)
+        thread.daemon = True
+        thread.start()
+    
     def display_enhanced_recommendations(self):
-        """Display the enhanced AI recommendations with Scryfall data"""
+        """Display the enhanced AI recommendations with Scryfall data using lazy loading"""
         # Clear existing items
         for item in self.rec_tree.get_children():
             self.rec_tree.delete(item)
         
         if not self.current_smart_recommendations:
-            self.update_pagination_info(0)
             self.update_total_count(0, 0)
             return
         
@@ -612,9 +680,9 @@ class AIRecommendationsTab:
             filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
         
         # Update total count display
-        total_before_filters = len(self.current_smart_recommendations)
-        total_after_filters = len(filtered_recs)
-        self.update_total_count(total_before_filters, total_after_filters)
+        total_loaded = len(self.current_smart_recommendations)
+        total_displayed = len(filtered_recs)
+        self.update_total_count(total_loaded, total_displayed)
         
         # Sort recommendations
         sort_key_map = {
@@ -629,37 +697,21 @@ class AIRecommendationsTab:
         if self.sort_column in sort_key_map:
             filtered_recs.sort(key=sort_key_map[self.sort_column], reverse=self.sort_reverse)
         
-        # Pagination logic
-        try:
-            items_per_page = self.rec_count_var.get()
-            if items_per_page <= 0:
-                items_per_page = 15  # Default fallback
-        except (tk.TclError, ValueError):
-            items_per_page = 15  # Default fallback
+        # Update status info for lazy loading
+        if self.has_more_recommendations:
+            info_text = f"Showing {len(filtered_recs)} results (more available - scroll down to load)"
+        else:
+            info_text = f"Showing {len(filtered_recs)} results (all loaded)"
         
-        # Calculate pagination
-        total_results = len(filtered_recs)
-        total_pages = max(1, (total_results + items_per_page - 1) // items_per_page)
-        
-        # Ensure current page is valid
-        if self.current_page >= total_pages:
-            self.current_page = max(0, total_pages - 1)
-        
-        # Get items for current page
-        start_idx = self.current_page * items_per_page
-        end_idx = min(start_idx + items_per_page, total_results)
-        page_recs = filtered_recs[start_idx:end_idx]
-        
-        # Update pagination info
-        self.update_pagination_info(total_results)
-        
-        # Display enhanced recommendations with rich Scryfall data
-        for rec in page_recs:
+        # Display all filtered recommendations (no pagination with lazy loading)
+        for rec in filtered_recs:
             # Determine ownership status and display
             if rec.cost_consideration == "owned":
-                card_display = f"✅ {rec.card_name} (Owned)"
-                tag = 'owned'
+                # Owned cards: clean display without craft icons
+                card_display = rec.card_name
+                ownership_tag = 'owned'
             else:
+                # Craftable cards: show craft icons
                 craft_icons = {
                     "common_craft": "🔨", 
                     "uncommon_craft": "🔧", 
@@ -668,7 +720,18 @@ class AIRecommendationsTab:
                 }
                 craft_icon = craft_icons.get(rec.cost_consideration, "🔨")
                 card_display = f"{craft_icon} {rec.card_name}"
-                tag = 'craftable'
+                ownership_tag = 'craftable'
+            
+            # Add confidence-based coloring
+            if rec.confidence >= 0.8:
+                confidence_tag = 'high_confidence'
+            elif rec.confidence >= 0.6:
+                confidence_tag = 'medium_confidence'
+            else:
+                confidence_tag = 'low_confidence'
+            
+            # Combine tags for ownership and confidence
+            tags = (ownership_tag, confidence_tag)
             
             # Add legality info if available
             if rec.legality:
@@ -710,24 +773,36 @@ class AIRecommendationsTab:
                 reasons_text
             )
             
-            self.rec_tree.insert('', 'end', values=values, tags=(tag,))
+            self.rec_tree.insert('', 'end', values=values, tags=tags)
         
         # Configure tag colors with minimal contrast for better readability
         try:
             import sv_ttk
             theme = sv_ttk.get_theme()
             if theme == "dark":
-                # Dark theme - barely visible highlighting, good contrast text
-                self.rec_tree.tag_configure('owned', foreground='#90ee90')
+                # Dark theme - subtle highlighting for craftable cards only
                 self.rec_tree.tag_configure('craftable', foreground='#ffd700')
+                
+                # Configure confidence level row colors for dark theme
+                self.rec_tree.tag_configure('high_confidence', background='#1a331a')  # Very dark green
+                self.rec_tree.tag_configure('medium_confidence', background='#332e1a')  # Very dark yellow
+                self.rec_tree.tag_configure('low_confidence', background='#331a1a')  # Very dark red
             else:
-                # Light theme - barely visible highlighting
-                self.rec_tree.tag_configure('owned', background='#f9fff9', foreground='#006400')
-                self.rec_tree.tag_configure('craftable', background='#fffef9', foreground='#b8860b')
+                # Light theme - subtle highlighting for craftable cards only
+                self.rec_tree.tag_configure('craftable', foreground='#b8860b')
+                
+                # Configure confidence level row colors for light theme
+                self.rec_tree.tag_configure('high_confidence', background='#e8f5e8')
+                self.rec_tree.tag_configure('medium_confidence', background='#fff2cc')
+                self.rec_tree.tag_configure('low_confidence', background='#ffeaa7')
         except:
-            # Fallback - no background, just text color
-            self.rec_tree.tag_configure('owned', foreground='#006400')
+            # Fallback - minimal styling
             self.rec_tree.tag_configure('craftable', foreground='#b8860b')
+            
+            # Fallback confidence colors - light theme
+            self.rec_tree.tag_configure('high_confidence', background='#e8f5e8')
+            self.rec_tree.tag_configure('medium_confidence', background='#fff2cc')
+            self.rec_tree.tag_configure('low_confidence', background='#ffeaa7')
     
     def update_column_headers(self):
         """Update column headers with sort indicators"""
@@ -749,8 +824,7 @@ class AIRecommendationsTab:
             self.rec_tree.heading(col, text=text)
     
     def filter_recommendations(self, *args):
-        """Filter recommendations by minimum confidence"""
-        self.current_page = 0  # Reset to first page when filtering
+        """Filter recommendations by minimum confidence and land visibility"""
         self.refresh_display()
         
     def update_total_count(self, total_recommendations, filtered_recommendations):
@@ -770,7 +844,6 @@ class AIRecommendationsTab:
     
     def toggle_land_visibility(self):
         """Toggle the visibility of land recommendations"""
-        self.current_page = 0  # Reset to first page when filter changes
         self.refresh_display()
     
     def refresh_all(self):
