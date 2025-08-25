@@ -977,79 +977,214 @@ class AIRecommendationsTab:
             messagebox.showinfo("Info", f"Would add {quantity}x {card_name} to {location}")
     
     def view_card_details(self, event=None):
-        """View detailed information about selected card"""
+        """View detailed information about selected card using enhanced modal"""
         recommendation, card_name = self._get_selected_recommendation()
         if not recommendation or not card_name:
             messagebox.showwarning("Warning", "No recommendation selected")
             return
+
+        # Create enhanced card details dialog
+        details_dialog = tk.Toplevel(self.frame)
+        details_dialog.title(f"Card Details - {card_name}")
+        details_dialog.geometry("700x600")
+        details_dialog.resizable(True, True)
+        details_dialog.transient(self.frame.winfo_toplevel())
+        details_dialog.grab_set()
         
-        details = ""  # Initialize details variable
+        # Center the dialog
+        details_dialog.update_idletasks()
+        x = (details_dialog.winfo_screenwidth() // 2) - (350)
+        y = (details_dialog.winfo_screenheight() // 2) - (300)
+        details_dialog.geometry(f"700x600+{x}+{y}")
         
-        # Build card details based on recommendation type
+        # Apply theme
+        try:
+            import sv_ttk
+            theme = sv_ttk.get_theme()
+        except:
+            theme = "dark"
+        
+        # Main container with padding
+        main_frame = ttk.Frame(details_dialog)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Title
+        title_frame = ttk.Frame(main_frame)
+        title_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        ttk.Label(title_frame, text=f"CARD DETAILS", 
+                 font=('TkDefaultFont', 14, 'bold')).pack()
+        ttk.Label(title_frame, text=card_name, 
+                 font=('TkDefaultFont', 12)).pack()
+        
+        # Create notebook for organized sections
+        notebook = ttk.Notebook(main_frame)
+        notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+        
+        # Card Info Tab
+        info_frame = ttk.Frame(notebook)
+        notebook.add(info_frame, text="Card Information")
+        
+        info_text = tk.Text(info_frame, wrap=tk.WORD, height=20)
+        info_scrollbar = ttk.Scrollbar(info_frame, orient=tk.VERTICAL, command=info_text.yview)
+        info_text.configure(yscrollcommand=info_scrollbar.set)
+        
+        info_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        info_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # AI Analysis Tab
+        ai_frame = ttk.Frame(notebook)
+        notebook.add(ai_frame, text="AI Recommendation Analysis")
+        
+        ai_text = tk.Text(ai_frame, wrap=tk.WORD, height=20)
+        ai_scrollbar = ttk.Scrollbar(ai_frame, orient=tk.VERTICAL, command=ai_text.yview)
+        ai_text.configure(yscrollcommand=ai_scrollbar.set)
+        
+        ai_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        ai_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Populate card information
+        self._populate_card_info(info_text, recommendation)
+        
+        # Populate AI analysis
+        self._populate_ai_analysis(ai_text, recommendation)
+        
+        # Make text areas read-only
+        info_text.configure(state=tk.DISABLED)
+        ai_text.configure(state=tk.DISABLED)
+        
+        # Close button
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X)
+        
+        ttk.Button(button_frame, text="View on Scryfall", 
+                  command=lambda: self._open_scryfall_url(card_name)).pack(side=tk.LEFT)
+        ttk.Button(button_frame, text="Close", 
+                  command=details_dialog.destroy).pack(side=tk.RIGHT)
+    
+    def _populate_card_info(self, text_widget, recommendation):
+        """Populate the card information tab"""
+        details = ""
+        
         if hasattr(recommendation, 'card_name'):
             # Enhanced recommendation with Scryfall data
-            details = f"🎴 CARD DETAILS: {recommendation.card_name}\n"
-            details += "=" * 23 + "\n\n"
-            details += f"💰 Mana Cost: {getattr(recommendation, 'mana_cost', 'Unknown')}\n"
-            details += f"🎭 Type: {getattr(recommendation, 'card_type', 'Unknown')}\n"
-            details += f"💎 Rarity: {getattr(recommendation, 'rarity', 'Unknown').title()}\n"
+            details += f"BASIC INFORMATION\n"
+            details += "=" * 40 + "\n\n"
+            
+            mana_cost = getattr(recommendation, 'mana_cost', 'Unknown')
+            details += f"Mana Cost: {mana_cost}\n"
+            
+            card_type = getattr(recommendation, 'card_type', 'Unknown')
+            details += f"Type Line: {card_type}\n"
+            
+            rarity = getattr(recommendation, 'rarity', 'Unknown')
+            details += f"Rarity: {rarity.title()}\n"
+            
+            cmc = getattr(recommendation, 'cmc', 0)
+            details += f"Converted Mana Cost: {int(cmc)}\n"
             
             if hasattr(recommendation, 'power_toughness') and recommendation.power_toughness:
-                details += f"⚔️ Power/Toughness: {recommendation.power_toughness}\n"
+                details += f"Power/Toughness: {recommendation.power_toughness}\n"
             
-            if hasattr(recommendation, 'oracle_text') and recommendation.oracle_text:
-                details += f"\n📜 Oracle Text:\n{recommendation.oracle_text}\n"
+            details += "\n"
             
+            # Oracle text
+            oracle_text = getattr(recommendation, 'oracle_text', '')
+            if oracle_text:
+                details += f"ORACLE TEXT\n"
+                details += "=" * 40 + "\n\n"
+                details += f"{oracle_text}\n\n"
+            
+            # Keywords
             if hasattr(recommendation, 'keywords') and recommendation.keywords:
-                details += f"\n🏷️ Keywords: {', '.join(recommendation.keywords)}\n"
+                details += f"KEYWORDS\n"
+                details += "=" * 40 + "\n\n"
+                details += f"{', '.join(recommendation.keywords)}\n\n"
             
+            # Format legality
             if hasattr(recommendation, 'legality') and recommendation.legality:
-                details += f"\n⚖️ Format Legality:\n"
+                details += f"FORMAT LEGALITY\n"
+                details += "=" * 40 + "\n\n"
                 for format_name, status in recommendation.legality.items():
-                    if status == "legal":
-                        details += f"  ✅ {format_name.title()}: Legal\n"
-                    elif status == "not_legal":
-                        details += f"  ❌ {format_name.title()}: Not Legal\n"
-                    elif status == "restricted":
-                        details += f"  ⚠️ {format_name.title()}: Restricted\n"
-            
-            # AI Analysis for enhanced recommendations
-            details += f"\n🤖 AI RECOMMENDATION ANALYSIS:\n"
-            details += f"🎯 Confidence: {recommendation.confidence:.1%}\n"
-            details += f"🔗 Synergy Score: {recommendation.synergy_score:.1%}\n"
-            details += f"📈 Meta Score: {recommendation.meta_score:.1%}\n"
-            details += f"🎲 Deck Fit: {recommendation.deck_fit:.1%}\n"
-            details += f"💡 Cost Consideration: {recommendation.cost_consideration.replace('_', ' ').title()}\n"
-            
+                    status_icon = {"legal": "[LEGAL]", "not_legal": "[BANNED]", "restricted": "[RESTRICTED]"}.get(status, f"[{status.upper()}]")
+                    details += f"{format_name.title()}: {status_icon}\n"
+                details += "\n"
+        
         elif hasattr(recommendation, 'card'):
             # Basic recommendation with card object
             card = recommendation.card
-            details = f"🎴 CARD DETAILS: {card.name}\n"
-            details += "=" * 23 + "\n\n"
-            details += f"💰 Mana Cost: {card.mana_cost}\n"
-            details += f"🔢 CMC: {card.converted_mana_cost}\n"
-            details += f"🎭 Type: {card.card_type}\n"
-            details += f"💎 Rarity: {card.rarity}\n"
-            details += f"🎨 Colors: {', '.join(card.colors) if card.colors else 'Colorless'}\n"
+            details += f"BASIC INFORMATION\n"
+            details += "=" * 40 + "\n\n"
+            details += f"Mana Cost: {card.mana_cost}\n"
+            details += f"Converted Mana Cost: {card.converted_mana_cost}\n"
+            details += f"Type Line: {card.card_type}\n"
+            details += f"Rarity: {card.rarity}\n"
+            details += f"Colors: {', '.join(card.colors) if card.colors else 'Colorless'}\n"
             
             if card.power is not None and card.toughness is not None:
-                details += f"⚔️ Power/Toughness: {card.power}/{card.toughness}\n"
+                details += f"Power/Toughness: {card.power}/{card.toughness}\n"
             
-            details += f"\n📜 Oracle Text:\n{card.text}\n"
-            
-            # AI Analysis for basic recommendations
-            details += f"\n🤖 AI RECOMMENDATION ANALYSIS:\n"
-            details += f"🎯 Confidence: {getattr(recommendation, 'confidence', 0):.1%}\n"
-            details += f"🔗 Synergy Score: {getattr(recommendation, 'synergy_score', 0):.1%}\n"
-            details += f"📊 Popularity: {getattr(recommendation, 'popularity_score', 0):.1%}\n"
-            details += f"🎲 Archetype Fit: {getattr(recommendation, 'archetype_fit', 0):.1%}\n"
-        else:
-            # Fallback for unknown recommendation format
-            details = f"🎴 CARD DETAILS: {card_name}\n"
-            details += "=" * 23 + "\n\n"
-            details += "⚠️ Limited information available for this recommendation.\n"
+            details += f"\nORACLE TEXT\n"
+            details += "=" * 40 + "\n\n"
+            details += f"{card.text}\n\n"
         
-        messagebox.showinfo(f"Card Details", details)
+        else:
+            details = f"LIMITED INFORMATION AVAILABLE\n"
+            details += "=" * 40 + "\n\n"
+            details += "Unable to retrieve detailed card information.\n"
+        
+        text_widget.insert(1.0, details)
+    
+    def _populate_ai_analysis(self, text_widget, recommendation):
+        """Populate the AI analysis tab"""
+        analysis = ""
+        
+        if hasattr(recommendation, 'confidence'):
+            analysis += f"RECOMMENDATION METRICS\n"
+            analysis += "=" * 40 + "\n\n"
+            
+            confidence = recommendation.confidence
+            analysis += f"Confidence Score: {confidence:.1%}\n"
+            analysis += f"  {'[EXCELLENT]' if confidence >= 0.8 else '[GOOD]' if confidence >= 0.6 else '[FAIR]'}\n\n"
+            
+            synergy = getattr(recommendation, 'synergy_score', 0)
+            analysis += f"Synergy Score: {synergy:.1%}\n"
+            analysis += f"  {'[HIGH SYNERGY]' if synergy >= 0.7 else '[MODERATE]' if synergy >= 0.5 else '[LOW SYNERGY]'}\n\n"
+            
+            deck_fit = getattr(recommendation, 'deck_fit', 0)
+            analysis += f"Archetype Fit: {deck_fit:.1%}\n"
+            analysis += f"  {'[PERFECT FIT]' if deck_fit >= 0.8 else '[GOOD FIT]' if deck_fit >= 0.6 else '[EXPERIMENTAL]'}\n\n"
+            
+            meta_score = getattr(recommendation, 'meta_score', 0)
+            analysis += f"Meta Score: {meta_score:.1%}\n"
+            analysis += f"  {'[META STAPLE]' if meta_score >= 0.7 else '[VIABLE]' if meta_score >= 0.4 else '[NICHE]'}\n\n"
+            
+            cost_consideration = getattr(recommendation, 'cost_consideration', 'unknown')
+            analysis += f"Acquisition: {cost_consideration.replace('_', ' ').title()}\n\n"
+            
+            # Reasons
+            if hasattr(recommendation, 'reasons') and recommendation.reasons:
+                analysis += f"RECOMMENDATION REASONS\n"
+                analysis += "=" * 40 + "\n\n"
+                for i, reason in enumerate(recommendation.reasons, 1):
+                    analysis += f"{i}. {reason}\n"
+                analysis += "\n"
+        
+        else:
+            analysis = f"NO AI ANALYSIS AVAILABLE\n"
+            analysis += "=" * 40 + "\n\n"
+            analysis += "This recommendation doesn't include AI analysis data.\n"
+        
+        text_widget.insert(1.0, analysis)
+    
+    def _open_scryfall_url(self, card_name):
+        """Open card page on Scryfall"""
+        import webbrowser
+        import urllib.parse
+        
+        encoded_name = urllib.parse.quote(card_name)
+        url = f"https://scryfall.com/search?q=%21%22{encoded_name}%22"
+        webbrowser.open(url)
     
     def explain_recommendation(self):
         """Explain why a card is recommended"""

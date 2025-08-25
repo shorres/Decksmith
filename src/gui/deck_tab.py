@@ -189,6 +189,9 @@ class DeckTab:
         
         # Context menu
         context_menu = tk.Menu(parent, tearoff=0)
+        context_menu.add_command(label="View Card Details", 
+                               command=lambda: self.view_card_details(tree))
+        context_menu.add_separator()
         context_menu.add_command(label="Edit Quantity", 
                                command=lambda: self.edit_card_quantity(tree, list_type == "sideboard"))
         context_menu.add_command(label="Remove Card", 
@@ -827,3 +830,179 @@ class DeckTab:
                     json.dump(deck.to_dict(), f, indent=2)
             except Exception as e:
                 print(f"Failed to save deck {deck.name}: {e}")
+    
+    def view_card_details(self, tree):
+        """View detailed card information using the existing card details modal"""
+        selection = tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "No card selected")
+            return
+            
+        if not self.current_deck:
+            messagebox.showwarning("Warning", "No deck selected")
+            return
+            
+        item = selection[0]
+        card_name = tree.item(item)['values'][1]  # Card name is in the second column (first is quantity)
+        
+        if not card_name:
+            messagebox.showwarning("Warning", "Unable to determine card name")
+            return
+        
+        # Find the actual card object from the current deck
+        card_obj = None
+        
+        # Look in mainboard first
+        if tree == self.mainboard_tree:
+            for deck_card in self.current_deck.get_mainboard_cards():
+                if deck_card.card.name == card_name:
+                    card_obj = deck_card.card
+                    break
+        # Then look in sideboard
+        elif tree == self.sideboard_tree:
+            for deck_card in self.current_deck.get_sideboard_cards():
+                if deck_card.card.name == card_name:
+                    card_obj = deck_card.card
+                    break
+        
+        if not card_obj:
+            # Fallback: search both mainboard and sideboard
+            for deck_card in self.current_deck.get_mainboard_cards() + self.current_deck.get_sideboard_cards():
+                if deck_card.card.name == card_name:
+                    card_obj = deck_card.card
+                    break
+        
+        if card_obj:
+            # Use the existing CardDetailsModal from card_details_modal.py
+            try:
+                from .card_details_modal import CardDetailsModal
+                modal = CardDetailsModal(self.parent, card_obj)
+            except ImportError:
+                # Fallback to a simpler modal if the main one isn't available
+                self._show_simple_card_details(card_name)
+        else:
+            # If we can't find the card object, use the simple modal with just the name
+            self._show_simple_card_details(card_name)
+    
+    def _show_simple_card_details(self, card_name):
+        """Show simple card details as a fallback"""
+        # Create simple details dialog
+        details_dialog = tk.Toplevel(self.parent)
+        details_dialog.title(f"Card Details - {card_name}")
+        details_dialog.geometry("600x400")
+        details_dialog.resizable(True, True)
+        details_dialog.transient(self.parent)
+        details_dialog.grab_set()
+        
+        # Center the dialog
+        details_dialog.update_idletasks()
+        x = (details_dialog.winfo_screenwidth() // 2) - (300)
+        y = (details_dialog.winfo_screenheight() // 2) - (200)
+        details_dialog.geometry(f"600x400+{x}+{y}")
+        
+        # Main frame
+        main_frame = ttk.Frame(details_dialog)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ttk.Label(main_frame, text=f"Card Details: {card_name}", 
+                              font=('TkDefaultFont', 14, 'bold'))
+        title_label.pack(pady=(0, 15))
+        
+        # Info text area
+        text_frame = ttk.Frame(main_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+        
+        text_widget = tk.Text(text_frame, wrap=tk.WORD, height=15)
+        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
+        text_widget.configure(yscrollcommand=scrollbar.set)
+        
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Load card information from Scryfall
+        self._load_card_info_async(text_widget, card_name)
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X)
+        
+        ttk.Button(button_frame, text="View on Scryfall", 
+                  command=lambda: self._open_scryfall_url(card_name)).pack(side=tk.LEFT)
+        ttk.Button(button_frame, text="Close", 
+                  command=details_dialog.destroy).pack(side=tk.RIGHT)
+    
+    def _load_card_info_async(self, text_widget, card_name):
+        """Load card information asynchronously"""
+        def load_info():
+            try:
+                from ..utils.scryfall_api import ScryfallAPI
+                api = ScryfallAPI()
+                card_data = api.get_card_by_name(card_name)
+                
+                if card_data:
+                    details = self._format_card_details(card_data)
+                else:
+                    details = f"Card information not found for: {card_name}"
+                    
+                # Update UI in main thread
+                text_widget.after(0, lambda: self._update_text_widget(text_widget, details))
+                
+            except Exception as e:
+                error_msg = f"Error loading card information: {str(e)}"
+                text_widget.after(0, lambda: self._update_text_widget(text_widget, error_msg))
+        
+        # Start loading in background
+        import threading
+        threading.Thread(target=load_info, daemon=True).start()
+        
+        # Show loading message
+        text_widget.insert(1.0, f"Loading information for {card_name}...")
+        text_widget.configure(state=tk.DISABLED)
+    
+    def _update_text_widget(self, text_widget, content):
+        """Update text widget content"""
+        text_widget.configure(state=tk.NORMAL)
+        text_widget.delete(1.0, tk.END)
+        text_widget.insert(1.0, content)
+        text_widget.configure(state=tk.DISABLED)
+    
+    def _format_card_details(self, card_data):
+        """Format card data for display"""
+        details = f"CARD INFORMATION\n"
+        details += "=" * 40 + "\n\n"
+        
+        details += f"Name: {card_data.get('name', 'Unknown')}\n"
+        details += f"Mana Cost: {card_data.get('mana_cost', 'Unknown')}\n"
+        details += f"Type Line: {card_data.get('type_line', 'Unknown')}\n"
+        details += f"Rarity: {card_data.get('rarity', 'Unknown').title()}\n"
+        
+        if 'power' in card_data and 'toughness' in card_data:
+            details += f"Power/Toughness: {card_data['power']}/{card_data['toughness']}\n"
+        
+        details += f"\nORACLE TEXT\n"
+        details += "=" * 40 + "\n\n"
+        details += f"{card_data.get('oracle_text', 'No oracle text available')}\n\n"
+        
+        # Format legality if available
+        if 'legalities' in card_data:
+            details += f"FORMAT LEGALITY\n"
+            details += "=" * 40 + "\n\n"
+            for format_name, status in card_data['legalities'].items():
+                if status == "legal":
+                    details += f"{format_name.title()}: [LEGAL]\n"
+                elif status == "not_legal":
+                    details += f"{format_name.title()}: [BANNED]\n"
+                elif status == "restricted":
+                    details += f"{format_name.title()}: [RESTRICTED]\n"
+        
+        return details
+    
+    def _open_scryfall_url(self, card_name):
+        """Open card page on Scryfall"""
+        import webbrowser
+        import urllib.parse
+        
+        encoded_name = urllib.parse.quote(card_name)
+        url = f"https://scryfall.com/search?q=%21%22{encoded_name}%22"
+        webbrowser.open(url)

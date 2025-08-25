@@ -132,7 +132,7 @@ class CollectionTab:
         remove_selected_btn.pack(side=tk.RIGHT, padx=(0, 2))
         
         # Remove filtered button (trash with funnel icon)
-        remove_filtered_btn = ttk.Button(trash_frame, text="🗑️🔽", width=4, 
+        remove_filtered_btn = ttk.Button(trash_frame, text="🗑️🔽", width=5, 
                                        command=self.remove_filtered_cards)
         remove_filtered_btn.pack(side=tk.RIGHT, padx=(0, 2))
         
