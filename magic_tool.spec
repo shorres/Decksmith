@@ -6,129 +6,87 @@ This provides fine-grained control over the packaging process
 # -*- mode: python ; coding: utf-8 -*-
 
 import os
-import sys
-from pathlib import Path
 
-# Get the application root directory
-app_root = Path(__file__).parent
+# Get the current directory - spec files need to use SPECPATH
+current_dir = os.path.dirname(SPECPATH)
 
-block_cipher = None
+# Use absolute path as fallback
+if not os.path.exists(os.path.join(current_dir, 'main.py')):
+    # Use the directory containing the spec file directly
+    current_dir = r'D:\Repos\Magic Tool'
 
-# Define all the data files and directories to include
-datas = [
-    # Include the entire src directory
-    (str(app_root / 'src'), 'src'),
-    # Include data directory (for collections, decks, cache)
-    (str(app_root / 'data'), 'data'),
-    # Include any README or documentation
-    (str(app_root / 'README.md'), '.'),
-    # Include requirements for reference
-    (str(app_root / 'requirements.txt'), '.'),
-]
-
-# Define hidden imports (modules that PyInstaller might miss)
-hidden_imports = [
+# Define standard library imports only
+hiddenimports = [
     'tkinter',
     'tkinter.ttk',
-    'tkinter.messagebox',
-    'tkinter.simpledialog',
     'tkinter.filedialog',
+    'tkinter.messagebox',
     'PIL',
     'PIL.Image',
     'PIL.ImageTk',
     'requests',
     'json',
-    'threading',
-    'webbrowser',
-    'urllib.parse',
-    'dataclasses',
-    'typing',
-    'collections',
-    'pathlib',
+    'csv',
     'datetime',
-    'time',
-    'os',
-    'sys',
-    # Application-specific modules
-    'src.models.card',
-    'src.models.collection',
-    'src.models.deck',
-    'src.gui.main_window',
-    'src.gui.collection_tab',
-    'src.gui.deck_tab',
-    'src.gui.ai_recommendations_tab',
-    'src.gui.card_details_modal',
-    'src.gui.sun_valley_theme',
-    'src.utils.scryfall_api',
-    'src.utils.persistent_cache',
-    'src.utils.enhanced_recommendations_sync',
-    'src.utils.clipboard_handler',
-    'src.utils.csv_handler',
+    'threading',
+    'pyperclip',  # For clipboard handling
 ]
 
-# Analysis phase - what files to include and analyze
+# Data files to include
+datas = []
+
+# Include data directory if it exists
+data_dir = os.path.join(current_dir, 'data')
+if os.path.exists(data_dir):
+    datas.append((data_dir, 'data'))
+
+# Include the entire src directory as data
+src_dir = os.path.join(current_dir, 'src')
+if os.path.exists(src_dir):
+    datas.append((src_dir, 'src'))
+
 a = Analysis(
-    ['main.py'],  # Entry point script
-    pathex=[str(app_root)],  # Paths to search for modules
-    binaries=[],  # Additional binary files (none needed for this app)
-    datas=datas,  # Data files to include
-    hiddenimports=hidden_imports,  # Hidden imports to include
-    hookspath=[],  # Custom hooks directory
-    hooksconfig={},  # Hooks configuration
-    runtime_hooks=[],  # Runtime hooks
-    excludes=[  # Modules to exclude to reduce size
-        'matplotlib',
-        'numpy',
-        'pandas',
-        'scipy',
-        'pytest',
-        'setuptools',
-        'wheel',
-    ],
+    ['main.py'],
+    pathex=[current_dir],
+    binaries=[],
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=['matplotlib', 'numpy', 'pandas', 'scipy', 'pytest'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=block_cipher,
+    cipher=None,
     noarchive=False,
 )
 
-# PYZ phase - create the Python zip archive
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
-# EXE phase - create the executable
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
-    name='Magic Tool',  # Executable name
-    debug=False,  # Set to True for debugging
+    exclude_binaries=True,
+    name='Magic Tool',
+    debug=False,
     bootloader_ignore_signals=False,
-    strip=False,  # Set to True to reduce size (may break some functionality)
-    upx=False,  # UPX compression (can cause issues with some antivirus)
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=False,  # False for GUI app, True for console output
+    strip=False,
+    upx=False,
+    console=True,  # Enable console for debugging
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # Windows-specific options
-    version=None,  # Version information file (optional)
-    icon=None,  # Application icon (none available)
 )
 
-# Optional: Create a COLLECT for directory distribution instead of single file
-# Uncomment the following lines if you want a directory distribution:
-
-# coll = COLLECT(
-#     exe,
-#     a.binaries,
-#     a.zipfiles,
-#     a.datas,
-#     strip=False,
-#     upx=False,
-#     upx_exclude=[],
-#     name='Magic Tool'
-# )
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name='Magic Tool',
+)
