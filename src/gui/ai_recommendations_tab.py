@@ -26,6 +26,8 @@ class AIRecommendationsTab:
         self.smart_engine = IntelligentRecommendationEngine()
         self.current_recommendations = []
         self.current_smart_recommendations = []
+        self.sort_column = 'synergy'  # Default sort by synergy
+        self.sort_reverse = True  # Highest synergy first
         
         self.create_widgets()
     
@@ -249,6 +251,7 @@ class AIRecommendationsTab:
         self.create_rec_context_menu()
         self.rec_tree.bind("<Button-3>", self.show_rec_context_menu)
         self.rec_tree.bind("<Double-Button-1>", self.view_card_details)
+        self.rec_tree.bind("<Button-1>", self.on_column_click)
         
         # Recommendation controls - moved below the table for better visibility
         rec_controls = ttk.Frame(parent)  # Changed from rec_frame to parent
@@ -256,8 +259,12 @@ class AIRecommendationsTab:
         
         ttk.Label(rec_controls, text="Show:").pack(side=tk.LEFT)
         self.rec_count_var = tk.IntVar(value=50)
-        rec_count_spin = ttk.Spinbox(rec_controls, from_=5, to=50, width=5, textvariable=self.rec_count_var)
+        rec_count_spin = ttk.Spinbox(rec_controls, from_=5, to=50, width=5, textvariable=self.rec_count_var,
+                                    command=self.refresh_display)
         rec_count_spin.pack(side=tk.LEFT, padx=5)
+        
+        # Also bind variable changes to refresh
+        self.rec_count_var.trace('w', lambda *args: self.refresh_display())
         ttk.Label(rec_controls, text="recommendations").pack(side=tk.LEFT)
         
         # Filter controls
@@ -286,6 +293,47 @@ class AIRecommendationsTab:
         self.rec_context_menu.add_command(label="❓ Why This Card?", command=self.explain_recommendation)
         self.rec_context_menu.add_separator()
         self.rec_context_menu.add_command(label="🎯 Similar Cards", command=self.find_similar_cards)
+    
+    def on_column_click(self, event):
+        """Handle column header clicks for sorting"""
+        region = self.rec_tree.identify_region(event.x, event.y)
+        if region == "heading":
+            column = self.rec_tree.identify("column", event.x, event.y)
+            column_names = {
+                '#1': 'name',
+                '#2': 'confidence', 
+                '#3': 'synergy',
+                '#4': 'meta',
+                '#5': 'fit',
+                '#6': 'reasons'
+            }
+            
+            if column in column_names:
+                new_sort_column = column_names[column]
+                
+                # Toggle sort direction if same column, otherwise default to descending for scores
+                if new_sort_column == self.sort_column:
+                    self.sort_reverse = not self.sort_reverse
+                else:
+                    self.sort_column = new_sort_column
+                    self.sort_reverse = True if new_sort_column != 'name' else False
+                
+                self.refresh_display()
+    
+    def refresh_display(self):
+        """Refresh the recommendations display with current sort and filter settings"""
+        try:
+            # Validate rec_count_var before proceeding
+            count_value = self.rec_count_var.get()
+            if count_value <= 0:
+                return  # Don't refresh with invalid values
+        except (tk.TclError, ValueError):
+            return  # Don't refresh if value is invalid
+            
+        if self.current_smart_recommendations:
+            self.display_enhanced_recommendations()
+        elif self.current_recommendations:
+            self.display_recommendations()
     
     def show_rec_context_menu(self, event):
         """Show context menu for recommendations"""
@@ -458,6 +506,28 @@ class AIRecommendationsTab:
         min_confidence = self.min_confidence_var.get()
         filtered_recs = [r for r in self.current_recommendations if r.confidence >= min_confidence]
         
+        # Sort recommendations
+        sort_key_map = {
+            'name': lambda r: (r.card.name if hasattr(r, 'card') and hasattr(r.card, 'name') else getattr(r, 'name', 'Unknown')).lower(),
+            'confidence': lambda r: getattr(r, 'confidence', 0),
+            'synergy': lambda r: getattr(r, 'synergy_score', 0),
+            'meta': lambda r: getattr(r, 'popularity_score', 0),
+            'fit': lambda r: getattr(r, 'archetype_fit', 0),
+            'reasons': lambda r: len(getattr(r, 'reasons', []))
+        }
+        
+        if self.sort_column in sort_key_map:
+            filtered_recs.sort(key=sort_key_map[self.sort_column], reverse=self.sort_reverse)
+        
+        # Limit by show count with validation
+        try:
+            show_count = self.rec_count_var.get()
+            if show_count <= 0:
+                show_count = 50  # Default fallback
+        except (tk.TclError, ValueError):
+            show_count = 50  # Default fallback
+        limited_recs = filtered_recs[:show_count]
+        
         # Get collection to check ownership
         collection = self.get_collection()
         
@@ -481,7 +551,7 @@ class AIRecommendationsTab:
         owned_recs = []
         craftable_recs = []
         
-        for rec in filtered_recs:
+        for rec in limited_recs:
             # Get card name from recommendation
             card_name = rec.card.name if hasattr(rec, 'card') and hasattr(rec.card, 'name') else getattr(rec, 'name', 'Unknown')
             is_owned, quantity = check_card_ownership(card_name)
@@ -527,9 +597,25 @@ class AIRecommendationsTab:
             
             self.rec_tree.insert('', 'end', values=values, tags=('craftable',))
         
-        # Configure tag colors
-        self.rec_tree.tag_configure('owned', background='lightgreen')
-        self.rec_tree.tag_configure('craftable', background='lightyellow')
+        # Configure tag colors with minimal contrast for better readability
+        try:
+            import sv_ttk
+            theme = sv_ttk.get_theme()
+            if theme == "dark":
+                # Dark theme - no background, just colored text for distinction
+                self.rec_tree.tag_configure('owned', foreground='#90ee90')
+                self.rec_tree.tag_configure('craftable', foreground='#ffd700')
+            else:
+                # Light theme - very subtle background highlighting
+                self.rec_tree.tag_configure('owned', background='#f9fff9', foreground='#006400')
+                self.rec_tree.tag_configure('craftable', background='#fffef9', foreground='#b8860b')
+        except:
+            # Fallback - no background, just text color
+            self.rec_tree.tag_configure('owned', foreground='#006400')
+            self.rec_tree.tag_configure('craftable', foreground='#b8860b')
+        
+        # Update column headers to show sort indicators
+        self.update_column_headers()
     
     def display_enhanced_recommendations(self):
         """Display the enhanced AI recommendations with Scryfall data"""
@@ -544,8 +630,30 @@ class AIRecommendationsTab:
         min_confidence = self.min_confidence_var.get()
         filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
         
+        # Sort recommendations
+        sort_key_map = {
+            'name': lambda r: r.card_name.lower(),
+            'confidence': lambda r: r.confidence,
+            'synergy': lambda r: r.synergy_score,
+            'meta': lambda r: r.meta_score,
+            'fit': lambda r: r.deck_fit,
+            'reasons': lambda r: len(r.reasons)
+        }
+        
+        if self.sort_column in sort_key_map:
+            filtered_recs.sort(key=sort_key_map[self.sort_column], reverse=self.sort_reverse)
+        
+        # Limit by show count with validation
+        try:
+            show_count = self.rec_count_var.get()
+            if show_count <= 0:
+                show_count = 50  # Default fallback
+        except (tk.TclError, ValueError):
+            show_count = 50  # Default fallback
+        limited_recs = filtered_recs[:show_count]
+        
         # Display enhanced recommendations with rich Scryfall data
-        for rec in filtered_recs:
+        for rec in limited_recs:
             # Determine ownership status and display
             if rec.cost_consideration == "owned":
                 card_display = f"✅ {rec.card_name} (Owned)"
@@ -600,9 +708,22 @@ class AIRecommendationsTab:
             
             self.rec_tree.insert('', 'end', values=values, tags=(tag,))
         
-        # Configure tag colors
-        self.rec_tree.tag_configure('owned', background='lightgreen')
-        self.rec_tree.tag_configure('craftable', background='lightyellow')
+        # Configure tag colors with minimal contrast for better readability
+        try:
+            import sv_ttk
+            theme = sv_ttk.get_theme()
+            if theme == "dark":
+                # Dark theme - barely visible highlighting, good contrast text
+                self.rec_tree.tag_configure('owned', foreground='#90ee90')
+                self.rec_tree.tag_configure('craftable', foreground='#ffd700')
+            else:
+                # Light theme - barely visible highlighting
+                self.rec_tree.tag_configure('owned', background='#f9fff9', foreground='#006400')
+                self.rec_tree.tag_configure('craftable', background='#fffef9', foreground='#b8860b')
+        except:
+            # Fallback - no background, just text color
+            self.rec_tree.tag_configure('owned', foreground='#006400')
+            self.rec_tree.tag_configure('craftable', foreground='#b8860b')
     
     def display_smart_recommendations(self):
         """Display the smart AI recommendations"""
@@ -640,17 +761,48 @@ class AIRecommendationsTab:
             
             self.rec_tree.insert('', 'end', values=values, tags=(tag,))
         
-        # Configure tag colors
-        self.rec_tree.tag_configure('owned', background='lightgreen')
-        self.rec_tree.tag_configure('craftable', background='lightyellow')
+        # Configure tag colors with minimal contrast for better readability
+        try:
+            import sv_ttk
+            theme = sv_ttk.get_theme()
+            if theme == "dark":
+                # Dark theme - no background, just colored text for distinction
+                self.rec_tree.tag_configure('owned', foreground='#90ee90')
+                self.rec_tree.tag_configure('craftable', foreground='#ffd700')
+            else:
+                # Light theme - very subtle background highlighting
+                self.rec_tree.tag_configure('owned', background='#f9fff9', foreground='#006400')
+                self.rec_tree.tag_configure('craftable', background='#fffef9', foreground='#b8860b')
+        except:
+            # Fallback - no background, just text color
+            self.rec_tree.tag_configure('owned', foreground='#006400')
+            self.rec_tree.tag_configure('craftable', foreground='#b8860b')
+        
+        # Update column headers to show sort indicators
+        self.update_column_headers()
+    
+    def update_column_headers(self):
+        """Update column headers with sort indicators"""
+        headers = {
+            'card': ('Card', 'name'),
+            'confidence': ('Confidence', 'confidence'), 
+            'synergy': ('Synergy', 'synergy'),
+            'meta': ('Meta', 'meta'),
+            'fit': ('Deck Fit', 'fit'),
+            'reasons': ('Reasons', 'reasons')
+        }
+        
+        for col, (base_text, col_key) in headers.items():
+            if col_key == self.sort_column:
+                arrow = " ↓" if self.sort_reverse else " ↑"
+                text = f"{base_text}{arrow}"
+            else:
+                text = base_text
+            self.rec_tree.heading(col, text=text)
     
     def filter_recommendations(self, *args):
         """Filter recommendations by minimum confidence"""
-        # Use enhanced display if we have enhanced recommendations
-        if hasattr(self, 'current_smart_recommendations') and self.current_smart_recommendations:
-            self.display_enhanced_recommendations()
-        else:
-            self.display_recommendations()
+        self.refresh_display()
     
     def refresh_all(self):
         """Refresh all analyses and recommendations"""
