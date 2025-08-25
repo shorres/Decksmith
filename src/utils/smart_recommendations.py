@@ -25,6 +25,11 @@ class SmartRecommendation:
     meta_score: float
     deck_fit: float
     cost_consideration: str  # "owned", "common_craft", "rare_craft", "mythic_craft"
+    cmc: float = 0.0  # Converted mana cost from Scryfall
+    legality: Optional[Dict[str, str]] = None  # Format legality information
+    oracle_text: str = ""  # Card oracle text
+    power_toughness: Optional[str] = None  # Power/Toughness for creatures
+    keywords: Optional[List[str]] = None  # Extracted keywords
 
 class IntelligentRecommendationEngine:
     """AI-powered recommendation engine that analyzes deck patterns"""

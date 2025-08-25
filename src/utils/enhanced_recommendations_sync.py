@@ -31,6 +31,7 @@ class SmartRecommendation:
     deck_fit: float
     cost_consideration: str  # owned, common_craft, uncommon_craft, rare_craft, mythic_craft
     reasons: List[str]
+    cmc: float = 0.0  # Converted mana cost from Scryfall
     legality: Optional[Dict] = None  # Format legality from Scryfall
     oracle_text: Optional[str] = None  # Card text
     power_toughness: Optional[str] = None  # For creatures
@@ -318,6 +319,7 @@ class EnhancedRecommendationEngine:
                     deck_fit=0.7,
                     cost_consideration="unknown",
                     reasons=reasons,
+                    cmc=card.cmc,  # Add CMC field
                     legality=card.legalities,
                     oracle_text=card.oracle_text,
                     power_toughness=self._get_power_toughness_from_card(card),
@@ -404,6 +406,7 @@ class EnhancedRecommendationEngine:
                     deck_fit=0.9,
                     cost_consideration="unknown",
                     reasons=reasons,
+                    cmc=card.cmc,  # Add CMC field
                     legality=card.legalities,
                     oracle_text=card.oracle_text,
                     power_toughness=self._get_power_toughness_from_card(card),
@@ -473,6 +476,7 @@ class EnhancedRecommendationEngine:
                     deck_fit=0.8,
                     cost_consideration="unknown",
                     reasons=reasons,
+                    cmc=card.cmc,  # Add CMC field
                     legality=card.legalities,
                     oracle_text=card.oracle_text,
                     power_toughness=self._get_power_toughness_from_card(card),
@@ -555,6 +559,7 @@ class EnhancedRecommendationEngine:
                         deck_fit=0.8,
                         cost_consideration="unknown",
                         reasons=reasons,
+                        cmc=card.cmc,  # Add CMC field
                         legality=card.legalities,
                         oracle_text=card.oracle_text,
                         power_toughness=self._get_power_toughness_from_card(card),

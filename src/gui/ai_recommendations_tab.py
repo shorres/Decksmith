@@ -223,21 +223,21 @@ class AIRecommendationsTab:
         rec_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Recommendation list
-        columns = ('Card', 'Confidence', 'Synergy', 'Popularity', 'Archetype Fit', 'Reasons')
+        columns = ('Card', 'Confidence', 'Synergy', 'CMC', 'Archetype Fit', 'Reasons')
         self.rec_tree = ttk.Treeview(rec_frame, columns=columns, show='headings', height=12)
         
         # Configure columns
         self.rec_tree.heading('Card', text='Card Name')
         self.rec_tree.heading('Confidence', text='Confidence')
         self.rec_tree.heading('Synergy', text='Synergy')
-        self.rec_tree.heading('Popularity', text='Meta Usage')
+        self.rec_tree.heading('CMC', text='CMC')
         self.rec_tree.heading('Archetype Fit', text='Arch Fit')
         self.rec_tree.heading('Reasons', text='Reasons/Notes')
         
         self.rec_tree.column('Card', width=150)
         self.rec_tree.column('Confidence', width=80)
         self.rec_tree.column('Synergy', width=70)
-        self.rec_tree.column('Popularity', width=80)
+        self.rec_tree.column('CMC', width=50)
         self.rec_tree.column('Archetype Fit', width=80)
         self.rec_tree.column('Reasons', width=300)
         
@@ -319,7 +319,7 @@ class AIRecommendationsTab:
                 '#1': 'name',
                 '#2': 'confidence', 
                 '#3': 'synergy',
-                '#4': 'meta',
+                '#4': 'cmc',
                 '#5': 'fit',
                 '#6': 'reasons'
             }
@@ -710,7 +710,7 @@ class AIRecommendationsTab:
             'name': lambda r: r.card_name.lower(),
             'confidence': lambda r: r.confidence,
             'synergy': lambda r: r.synergy_score,
-            'meta': lambda r: r.meta_score,
+            'cmc': lambda r: getattr(r, 'cmc', 0),  # Use CMC from Scryfall data
             'fit': lambda r: r.deck_fit,
             'reasons': lambda r: len(r.reasons)
         }
@@ -791,7 +791,7 @@ class AIRecommendationsTab:
                 card_display,
                 f"{rec.confidence:.1%}",
                 f"{rec.synergy_score:.1%}",
-                f"{rec.meta_score:.1%}",
+                str(int(getattr(rec, 'cmc', 0))),  # Show CMC as integer
                 f"{rec.deck_fit:.1%}",
                 reasons_text
             )
@@ -877,7 +877,7 @@ class AIRecommendationsTab:
             'card': ('Card', 'name'),
             'confidence': ('Confidence', 'confidence'), 
             'synergy': ('Synergy', 'synergy'),
-            'meta': ('Meta', 'meta'),
+            'cmc': ('CMC', 'cmc'),
             'fit': ('Deck Fit', 'fit'),
             'reasons': ('Reasons', 'reasons')
         }
