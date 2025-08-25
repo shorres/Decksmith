@@ -251,7 +251,7 @@ class AIRecommendationsTab:
         rec_controls.pack(fill=tk.X, padx=5, pady=5)
         
         ttk.Label(rec_controls, text="Show:").pack(side=tk.LEFT)
-        self.rec_count_var = tk.IntVar(value=10)
+        self.rec_count_var = tk.IntVar(value=50)
         rec_count_spin = ttk.Spinbox(rec_controls, from_=5, to=50, width=5, textvariable=self.rec_count_var)
         rec_count_spin.pack(side=tk.LEFT, padx=5)
         ttk.Label(rec_controls, text="recommendations").pack(side=tk.LEFT)

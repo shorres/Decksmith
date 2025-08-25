@@ -592,7 +592,7 @@ class DeckTab:
             self.refresh_deck_contents()
     
     def import_deck_csv(self):
-        """Import deck from CSV file"""
+        """Import deck from CSV file with enhanced progress dialog"""
         filename = filedialog.askopenfilename(
             title="Import Deck (CSV)",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
@@ -600,31 +600,38 @@ class DeckTab:
         
         if filename:
             try:
-                csv_handler = CSVHandler()
-                deck = csv_handler.import_deck_from_csv(filename)
-                self.decks.append(deck)
-                self.refresh_deck_list()
-                self.deck_listbox.selection_set(len(self.decks) - 1)
-                self.on_deck_select()
-                self.save_decks()
+                # Import with enhanced progress dialog
+                from .enhanced_import_dialog import EnhancedCSVImporter
+                importer = EnhancedCSVImporter(self.parent)
+                deck = importer.import_deck_with_progress(filename, "csv")
                 
-                # Add deck cards to collection with playset limits
-                if self.collection:
-                    result = self.add_deck_cards_to_collection(deck)
-                    collection_msg = f"\n\nCollection updated:\n"
-                    collection_msg += f"• {result['cards_added']} new cards added\n"
-                    collection_msg += f"• {result['cards_updated']} existing cards updated\n"
-                    if result['cards_skipped'] > 0:
-                        collection_msg += f"• {result['cards_skipped']} cards skipped (already at 4-card limit)"
+                if deck:  # Check if import wasn't cancelled
+                    self.decks.append(deck)
+                    self.refresh_deck_list()
+                    self.deck_listbox.selection_set(len(self.decks) - 1)
+                    self.on_deck_select()
+                    self.save_decks()
                     
-                    messagebox.showinfo("Success", f"Deck imported successfully!{collection_msg}")
+                    # Add deck cards to collection with playset limits
+                    if self.collection:
+                        result = self.add_deck_cards_to_collection(deck)
+                        collection_msg = f"\n\nCollection updated:\n"
+                        collection_msg += f"• {result['cards_added']} new cards added\n"
+                        collection_msg += f"• {result['cards_updated']} existing cards updated\n"
+                        if result['cards_skipped'] > 0:
+                            collection_msg += f"• {result['cards_skipped']} cards skipped (already at 4-card limit)"
+                        
+                        messagebox.showinfo("Success", f"Deck imported successfully!{collection_msg}")
+                    else:
+                        messagebox.showinfo("Success", "Deck imported successfully!")
                 else:
-                    messagebox.showinfo("Success", "Deck imported successfully!")
+                    # Import was cancelled
+                    messagebox.showinfo("Cancelled", "Deck import was cancelled.")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to import deck: {str(e)}")
-    
+
     def import_deck_arena(self):
-        """Import deck from Arena format file"""
+        """Import deck from Arena format file with enhanced progress dialog"""
         filename = filedialog.askopenfilename(
             title="Import Deck (Arena Format)",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
@@ -632,26 +639,33 @@ class DeckTab:
         
         if filename:
             try:
-                csv_handler = CSVHandler()
-                deck = csv_handler.import_deck_from_arena_format(filename)
-                self.decks.append(deck)
-                self.refresh_deck_list()
-                self.deck_listbox.selection_set(len(self.decks) - 1)
-                self.on_deck_select()
-                self.save_decks()
+                # Import with enhanced progress dialog
+                from .enhanced_import_dialog import EnhancedCSVImporter
+                importer = EnhancedCSVImporter(self.parent)
+                deck = importer.import_deck_with_progress(filename, "arena")
                 
-                # Add deck cards to collection with playset limits
-                if self.collection:
-                    result = self.add_deck_cards_to_collection(deck)
-                    collection_msg = f"\n\nCollection updated:\n"
-                    collection_msg += f"• {result['cards_added']} new cards added\n"
-                    collection_msg += f"• {result['cards_updated']} existing cards updated\n"
-                    if result['cards_skipped'] > 0:
-                        collection_msg += f"• {result['cards_skipped']} cards skipped (already at 4-card limit)"
+                if deck:  # Check if import wasn't cancelled
+                    self.decks.append(deck)
+                    self.refresh_deck_list()
+                    self.deck_listbox.selection_set(len(self.decks) - 1)
+                    self.on_deck_select()
+                    self.save_decks()
                     
-                    messagebox.showinfo("Success", f"Deck imported successfully!{collection_msg}")
+                    # Add deck cards to collection with playset limits
+                    if self.collection:
+                        result = self.add_deck_cards_to_collection(deck)
+                        collection_msg = f"\n\nCollection updated:\n"
+                        collection_msg += f"• {result['cards_added']} new cards added\n"
+                        collection_msg += f"• {result['cards_updated']} existing cards updated\n"
+                        if result['cards_skipped'] > 0:
+                            collection_msg += f"• {result['cards_skipped']} cards skipped (already at 4-card limit)"
+                        
+                        messagebox.showinfo("Success", f"Deck imported successfully!{collection_msg}")
+                    else:
+                        messagebox.showinfo("Success", "Deck imported successfully!")
                 else:
-                    messagebox.showinfo("Success", "Deck imported successfully!")
+                    # Import was cancelled
+                    messagebox.showinfo("Cancelled", "Deck import was cancelled.")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to import deck: {str(e)}")
     

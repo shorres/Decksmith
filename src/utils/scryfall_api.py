@@ -87,7 +87,7 @@ class ScryfallAPI:
             return data['data'][:15]  # Limit to 15 suggestions
         return []
     
-    def search_cards(self, query: str, limit: int = 20) -> List[ScryfallCard]:
+    def search_cards(self, query: str, limit: int = 100) -> List[ScryfallCard]:
         """Search for cards using Scryfall query syntax"""
         if len(query.strip()) < 1:
             return []
