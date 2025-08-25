@@ -249,12 +249,12 @@ class CollectionTab:
         """Update collection statistics display"""
         stats = self.collection.get_completion_stats()
         
-        stats_text = f"Total Cards: {stats['total_cards']}\\n"
-        stats_text += f"Unique Cards: {stats['unique_cards']}\\n\\n"
-        stats_text += f"Commons: {stats['commons']}\\n"
-        stats_text += f"Uncommons: {stats['uncommons']}\\n"
-        stats_text += f"Rares: {stats['rares']}\\n"
-        stats_text += f"Mythics: {stats['mythics']}\\n\\n"
+        stats_text = f"Total Cards: {stats['total_cards']}\n"
+        stats_text += f"Unique Cards: {stats['unique_cards']}\n\n"
+        stats_text += f"Commons: {stats['commons']}\n"
+        stats_text += f"Uncommons: {stats['uncommons']}\n"
+        stats_text += f"Rares: {stats['rares']}\n"
+        stats_text += f"Mythics: {stats['mythics']}\n\n"
         
         # Add color distribution
         color_dist = {}
@@ -263,9 +263,9 @@ class CollectionTab:
                 color_dist[color] = color_dist.get(color, 0) + collection_card.quantity
         
         if color_dist:
-            stats_text += "Color Distribution:\\n"
+            stats_text += "Color Distribution:\n"
             for color, count in sorted(color_dist.items()):
-                stats_text += f"  {color}: {count}\\n"
+                stats_text += f"  {color}: {count}\n"
         
         self.stats_text.delete(1.0, tk.END)
         self.stats_text.insert(1.0, stats_text)
@@ -414,16 +414,16 @@ class CollectionTab:
         
         if card_name in self.collection.cards:
             card = self.collection.cards[card_name].card
-            details = f"Name: {card.name}\\n"
-            details += f"Mana Cost: {card.mana_cost}\\n"
-            details += f"CMC: {card.converted_mana_cost}\\n"
-            details += f"Type: {card.card_type}\\n"
-            details += f"Rarity: {card.rarity}\\n"
-            details += f"Colors: {', '.join(card.colors)}\\n"
+            details = f"Name: {card.name}\n"
+            details += f"Mana Cost: {card.mana_cost}\n"
+            details += f"CMC: {card.converted_mana_cost}\n"
+            details += f"Type: {card.card_type}\n"
+            details += f"Rarity: {card.rarity}\n"
+            details += f"Colors: {', '.join(card.colors)}\n"
             if card.power is not None and card.toughness is not None:
-                details += f"P/T: {card.power}/{card.toughness}\\n"
+                details += f"P/T: {card.power}/{card.toughness}\n"
             if card.text:
-                details += f"\\nText: {card.text}"
+                details += f"\nText: {card.text}"
             
             messagebox.showinfo(f"Card Details - {card_name}", details)
     

@@ -134,15 +134,8 @@ class MainWindow:
     def _refresh_theme_on_tabs(self):
         """Refresh theme application on all tabs"""
         try:
-            # Refresh collection tab theme
-            if hasattr(self.collection_tab, 'refresh_theme'):
-                self.collection_tab.refresh_theme()
-            
-            # Refresh deck tab theme
-            if hasattr(self.deck_tab, 'refresh_theme'):
-                self.deck_tab.refresh_theme()
-            
-            # Refresh AI tab theme
+            # The sv_ttk theme is applied globally, no need for individual refresh
+            pass
             if hasattr(self.ai_tab, 'refresh_theme'):
                 self.ai_tab.refresh_theme()
                 
@@ -188,18 +181,18 @@ class MainWindow:
         """Show AI features help dialog"""
         messagebox.showinfo(
             "AI Features Help",
-            "AI-Powered Card Recommendations\\n\\n"
-            "The AI system analyzes your deck and provides intelligent card suggestions based on:\\n\\n"
-            "🎯 Synergy Analysis: Cards that work well with your current deck\\n"
-            "📊 Meta Popularity: Cards that are successful in the current format\\n"
-            "🏗️ Archetype Fitting: Cards that match your deck's strategy\\n"
-            "📈 Mana Curve Optimization: Cards that improve your deck's balance\\n\\n"
-            "Features:\\n"
-            "• Deck archetype identification\\n"
-            "• Personalized card recommendations\\n"
-            "• Deck improvement suggestions\\n"
-            "• Similar deck analysis\\n"
-            "• Confidence scoring for all suggestions\\n\\n"
+            "AI-Powered Card Recommendations\n\n"
+            "The AI system analyzes your deck and provides intelligent card suggestions based on:\n\n"
+            "🎯 Synergy Analysis: Cards that work well with your current deck\n"
+            "📊 Meta Popularity: Cards that are successful in the current format\n"
+            "🏗️ Archetype Fitting: Cards that match your deck's strategy\n"
+            "📈 Mana Curve Optimization: Cards that improve your deck's balance\n\n"
+            "Features:\n"
+            "• Deck archetype identification\n"
+            "• Personalized card recommendations\n"
+            "• Deck improvement suggestions\n"
+            "• Similar deck analysis\n"
+            "• Confidence scoring for all suggestions\n\n"
             "Click 'Analyze Current Deck' to get started!"
         )
     
@@ -207,17 +200,17 @@ class MainWindow:
         """Show about dialog"""
         messagebox.showinfo(
             "About",
-            "Magic: The Gathering Arena Deck Manager\\n\\n"
-            "A comprehensive tool for managing your MTG Arena collection and decks.\\n\\n"
-            "Features:\\n"
-            "• Collection management with filtering and statistics\\n"
-            "• Advanced deck building tools\\n"
-            "• CSV import/export capabilities\\n"
-            "• Arena format support\\n"
-            "• AI-powered card recommendations\\n"
-            "• Deck archetype analysis\\n"
-            "• Meta-based suggestions\\n"
-            "• Synergy detection\\n\\n"
+            "Magic: The Gathering Arena Deck Manager\n\n"
+            "A comprehensive tool for managing your MTG Arena collection and decks.\n\n"
+            "Features:\n"
+            "• Collection management with filtering and statistics\n"
+            "• Advanced deck building tools\n"
+            "• CSV import/export capabilities\n"
+            "• Arena format support\n"
+            "• AI-powered card recommendations\n"
+            "• Deck archetype analysis\n"
+            "• Meta-based suggestions\n"
+            "• Synergy detection\n\n"
             "Built with Python and powered by AI for the best deck building experience!"
         )
     

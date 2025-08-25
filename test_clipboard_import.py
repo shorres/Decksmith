@@ -100,13 +100,13 @@ def test_clipboard_import():
                 
                 # Show deck summary
                 summary_text.delete(1.0, tk.END)
-                summary_text.insert(1.0, f"Deck Name: {deck.name}\\n")
-                summary_text.insert(tk.END, f"Total Cards: {deck.get_total_cards()}\\n")
-                summary_text.insert(tk.END, f"Created: {deck.created_date}\\n\\n")
-                summary_text.insert(tk.END, "Cards:\\n")
+                summary_text.insert(1.0, f"Deck Name: {deck.name}\n")
+                summary_text.insert(tk.END, f"Total Cards: {deck.get_total_cards()}\n")
+                summary_text.insert(tk.END, f"Created: {deck.created_date}\n\n")
+                summary_text.insert(tk.END, "Cards:\n")
                 for deck_card in deck.cards:
                     sb_text = " (SB)" if deck_card.sideboard else ""
-                    summary_text.insert(tk.END, f"• {deck_card.quantity}x {deck_card.card.name}{sb_text}\\n")
+                    summary_text.insert(tk.END, f"• {deck_card.quantity}x {deck_card.card.name}{sb_text}\n")
             else:
                 status_var.set("❌ Import cancelled or failed")
         except Exception as e:
@@ -134,10 +134,10 @@ def test_clipboard_import():
     
     # Initial instructions
     summary_text.insert(1.0, 
-        "Instructions:\\n"
-        "1. Click one of the sample buttons to load test data to clipboard\\n"
-        "2. Click 'Test Enhanced Clipboard Import' to see the progress dialog\\n"
-        "3. Watch the progress bar and card images during import\\n\\n"
+        "Instructions:\n"
+        "1. Click one of the sample buttons to load test data to clipboard\n"
+        "2. Click 'Test Enhanced Clipboard Import' to see the progress dialog\n"
+        "3. Watch the progress bar and card images during import\n\n"
         "The import will show each card with enhanced Scryfall data and artwork!"
     )
     
