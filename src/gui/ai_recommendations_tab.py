@@ -10,6 +10,8 @@ import threading
 from models.deck import Deck
 from models.collection import Collection
 from utils.ai_recommendations import CardRecommendationEngine, CardRecommendation
+from utils.moxfield_service import MoxfieldService, CollectionChecker
+from utils.smart_recommendations import IntelligentRecommendationEngine, SmartRecommendation
 
 class AIRecommendationsTab:
     """AI-powered card recommendations interface"""
@@ -20,7 +22,11 @@ class AIRecommendationsTab:
         self.get_collection = get_collection_func
         self.add_card_callback = add_card_callback
         self.recommendation_engine = CardRecommendationEngine()
+        self.smart_engine = IntelligentRecommendationEngine()
+        self.moxfield_service = MoxfieldService()
         self.current_recommendations = []
+        self.current_smart_recommendations = []
+        self.current_moxfield_suggestions = []
         
         self.create_widgets()
     
@@ -185,12 +191,24 @@ class AIRecommendationsTab:
         self.similar_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         similar_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
         
+        # Moxfield upgrades tab
+        moxfield_frame = ttk.Frame(analysis_notebook)
+        analysis_notebook.add(moxfield_frame, text="Moxfield Upgrades")
+        
+        self.moxfield_text = tk.Text(moxfield_frame, height=6, wrap=tk.WORD)
+        moxfield_scroll = ttk.Scrollbar(moxfield_frame, orient=tk.VERTICAL, command=self.moxfield_text.yview)
+        self.moxfield_text.configure(yscrollcommand=moxfield_scroll.set)
+        
+        self.moxfield_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        moxfield_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
+        
         # Control buttons
         control_frame = ttk.Frame(parent)
         control_frame.pack(fill=tk.X, padx=5, pady=5)
         
         ttk.Button(control_frame, text="Analyze Current Deck", command=self.analyze_deck).pack(side=tk.LEFT, padx=5)
         ttk.Button(control_frame, text="Get Recommendations", command=self.get_recommendations).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Moxfield Analysis", command=self.get_moxfield_analysis).pack(side=tk.LEFT, padx=5)
         ttk.Button(control_frame, text="Refresh", command=self.refresh_all).pack(side=tk.LEFT, padx=5)
         
         # Format selection
@@ -216,11 +234,11 @@ class AIRecommendationsTab:
         
         # Configure columns
         self.rec_tree.heading('Card', text='Card Name')
-        self.rec_tree.heading('Confidence', text='Confidence')
-        self.rec_tree.heading('Synergy', text='Synergy')
-        self.rec_tree.heading('Popularity', text='Popularity')
-        self.rec_tree.heading('Archetype Fit', text='Archetype')
-        self.rec_tree.heading('Reasons', text='Reasons')
+        self.rec_tree.heading('Confidence', text='Source')
+        self.rec_tree.heading('Synergy', text='Popularity')
+        self.rec_tree.heading('Popularity', text='Usage')
+        self.rec_tree.heading('Archetype Fit', text='Rarity/Type')
+        self.rec_tree.heading('Reasons', text='Reasons/Notes')
         
         self.rec_tree.column('Card', width=150)
         self.rec_tree.column('Confidence', width=80)
@@ -394,7 +412,7 @@ class AIRecommendationsTab:
         thread.start()
     
     def get_recommendations(self):
-        """Get AI card recommendations"""
+        """Get AI card recommendations using the smart engine"""
         current_deck = self.get_current_deck()
         if not current_deck:
             messagebox.showwarning("Warning", "No deck selected")
@@ -403,8 +421,8 @@ class AIRecommendationsTab:
         # Update header to show current deck
         self.update_deck_header()
         
-        self.loading_var.set("Getting recommendations...")
-        self.analysis_status_label.config(text="🤖 Generating AI recommendations...", foreground='blue')
+        self.loading_var.set("Getting AI recommendations...")
+        self.analysis_status_label.config(text="🤖 Generating intelligent recommendations...", foreground='blue')
         self.frame.update()
         
         def get_recs():
@@ -413,27 +431,136 @@ class AIRecommendationsTab:
                 format_name = self.format_var.get()
                 count = self.rec_count_var.get()
                 
-                recommendations = self.recommendation_engine.recommend_cards(
+                # Use the new smart recommendation engine
+                smart_recommendations = self.smart_engine.generate_recommendations(
                     current_deck, collection, count, format_name
                 )
                 
                 def update_recs():
-                    self.current_recommendations = recommendations
-                    self.display_recommendations()
+                    self.current_smart_recommendations = smart_recommendations
+                    self.display_smart_recommendations()
                     self.loading_var.set("")
-                    self.analysis_status_label.config(text="✅ Recommendations ready", foreground='green')
+                    self.analysis_status_label.config(text="✅ Smart recommendations ready", foreground='green')
                 
                 self.frame.after(0, update_recs)
                 
             except Exception as e:
                 def show_error():
-                    messagebox.showerror("Recommendation Error", f"Recommendations failed: {str(e)}")
+                    messagebox.showerror("Recommendation Error", f"Smart recommendations failed: {str(e)}")
                     self.loading_var.set("")
                     self.analysis_status_label.config(text="❌ Recommendations failed", foreground='red')
                 
                 self.frame.after(0, show_error)
         
         thread = threading.Thread(target=get_recs)
+        thread.daemon = True
+        thread.start()
+    
+    def get_moxfield_analysis(self):
+        """Get Moxfield-based analysis and recommendations"""
+        current_deck = self.get_current_deck()
+        if not current_deck:
+            messagebox.showwarning("Warning", "No deck selected")
+            return
+        
+        # Update header to show current deck
+        self.update_deck_header()
+        
+        self.loading_var.set("Analyzing with Moxfield...")
+        self.analysis_status_label.config(text="🔍 Getting Moxfield analysis...", foreground='blue')
+        self.frame.update()
+        
+        def get_moxfield_analysis():
+            try:
+                collection = self.get_collection()
+                
+                # Find similar decks on Moxfield
+                similar_decks = self.moxfield_service.find_similar_decks(current_deck, limit=8)
+                
+                # Get upgrade suggestions based on similar decks
+                upgrade_suggestions = CollectionChecker.get_upgrade_suggestions(
+                    current_deck, similar_decks, collection
+                )
+                
+                # Build analysis text
+                moxfield_text = f"🌐 MOXFIELD ANALYSIS for '{current_deck.name}'\n"
+                moxfield_text += "=" * 60 + "\n\n"
+                
+                if similar_decks:
+                    moxfield_text += "🔍 SIMILAR DECKS FROM MOXFIELD:\n\n"
+                    for i, deck in enumerate(similar_decks[:5], 1):
+                        similarity_percentage = deck['similarity'] * 100
+                        stars = "⭐" * min(5, max(1, int(similarity_percentage / 20)))
+                        
+                        moxfield_text += f"  {i}. 🎴 {deck['name']}\n"
+                        moxfield_text += f"     👤 by {deck['author']}\n"
+                        moxfield_text += f"     📊 Similarity: {stars} {similarity_percentage:.1f}%\n"
+                        moxfield_text += f"     ❤️  {deck['likes']} likes | 👀 {deck['views']} views\n"
+                        moxfield_text += f"     🔗 {deck['url']}\n"
+                        
+                        if deck.get('common_cards'):
+                            common_sample = ', '.join(deck['common_cards'][:3])
+                            moxfield_text += f"     🤝 Shared cards: {common_sample}"
+                            if len(deck['common_cards']) > 3:
+                                moxfield_text += f" (+{len(deck['common_cards'])-3} more)"
+                            moxfield_text += "\n"
+                        moxfield_text += "\n"
+                else:
+                    moxfield_text += "🔍 No similar decks found on Moxfield.\n"
+                    moxfield_text += "Your deck might be unique or in a less popular format.\n\n"
+                
+                # Upgrade suggestions section
+                if upgrade_suggestions:
+                    moxfield_text += "💡 UPGRADE SUGGESTIONS:\n\n"
+                    
+                    # Separate owned vs craftable
+                    owned_upgrades = [s for s in upgrade_suggestions if s['is_owned']]
+                    craftable_upgrades = [s for s in upgrade_suggestions if not s['is_owned']]
+                    
+                    if owned_upgrades:
+                        moxfield_text += "✅ CARDS YOU ALREADY OWN:\n"
+                        for i, suggestion in enumerate(owned_upgrades[:8], 1):
+                            moxfield_text += f"  {i}. 💎 {suggestion['name']}"
+                            moxfield_text += f" (Own: {suggestion['owned_quantity']})\n"
+                            moxfield_text += f"      📈 Popular in {suggestion['appearances']} similar decks\n"
+                            moxfield_text += f"      💰 {suggestion['mana_cost']} | {suggestion['type_line']}\n\n"
+                    
+                    if craftable_upgrades:
+                        moxfield_text += "⚒️  CARDS TO CRAFT:\n"
+                        for i, suggestion in enumerate(craftable_upgrades[:8], 1):
+                            moxfield_text += f"  {i}. 🔨 {suggestion['name']}\n"
+                            moxfield_text += f"      📈 Popular in {suggestion['appearances']} similar decks\n"
+                            moxfield_text += f"      💰 {suggestion['mana_cost']} | {suggestion['type_line']}\n"
+                            rarity_emoji = {"common": "⚪", "uncommon": "🔵", "rare": "🟡", "mythic": "🔴"}.get(suggestion.get('rarity', 'common'), "⚪")
+                            moxfield_text += f"      {rarity_emoji} {suggestion.get('rarity', 'Common').title()}\n\n"
+                else:
+                    moxfield_text += "💡 No specific upgrade suggestions found.\n"
+                    moxfield_text += "Your deck might already be well-optimized!\n\n"
+                
+                # Store suggestions for use in recommendations panel
+                self.current_moxfield_suggestions = upgrade_suggestions
+                
+                def update_ui():
+                    self.moxfield_text.delete(1.0, tk.END)
+                    self.moxfield_text.insert(1.0, moxfield_text)
+                    
+                    # Also update the recommendations panel with Moxfield suggestions
+                    self.display_moxfield_recommendations()
+                    
+                    self.loading_var.set("")
+                    self.analysis_status_label.config(text="✅ Moxfield analysis complete", foreground='green')
+                
+                self.frame.after(0, update_ui)
+                
+            except Exception as e:
+                def show_error():
+                    messagebox.showerror("Moxfield Error", f"Moxfield analysis failed: {str(e)}")
+                    self.loading_var.set("")
+                    self.analysis_status_label.config(text="❌ Moxfield analysis failed", foreground='red')
+                
+                self.frame.after(0, show_error)
+        
+        thread = threading.Thread(target=get_moxfield_analysis)
         thread.daemon = True
         thread.start()
     
@@ -447,22 +574,137 @@ class AIRecommendationsTab:
         min_confidence = self.min_confidence_var.get()
         filtered_recs = [r for r in self.current_recommendations if r.confidence >= min_confidence]
         
-        # Add recommendations to tree
-        for rec in filtered_recs:
-            reasons_text = "; ".join(rec.reasons[:2])  # Show first 2 reasons
+        # Categorize by ownership
+        collection = self.get_collection()
+        categorized = CollectionChecker.categorize_recommendations(filtered_recs, collection)
+        
+        # Add owned cards first (with green highlighting)
+        for rec in categorized.get('owned', []):
+            reasons_text = "; ".join(rec.get('reasons', ['No reasons available'])[:2])
+            if len(rec.get('reasons', [])) > 2:
+                reasons_text += f" (+{len(rec['reasons'])-2} more)"
+            
+            card_name = rec.get('card', {}).get('name', 'Unknown') if isinstance(rec.get('card'), dict) else getattr(rec.get('card'), 'name', 'Unknown')
+            owned_qty = rec.get('owned_quantity', 0)
+            
+            values = (
+                f"✅ {card_name} (Own: {owned_qty})",
+                f"{rec.get('confidence', 0):.1%}",
+                f"{rec.get('synergy_score', 0):.1%}",
+                f"{rec.get('popularity_score', 0):.1%}",
+                f"{rec.get('archetype_fit', 0):.1%}",
+                reasons_text
+            )
+            
+            item_id = self.rec_tree.insert('', 'end', values=values, tags=('owned',))
+        
+        # Add craftable cards (with different highlighting)
+        for rec in categorized.get('craftable', []):
+            reasons_text = "; ".join(rec.get('reasons', ['No reasons available'])[:2])
+            if len(rec.get('reasons', [])) > 2:
+                reasons_text += f" (+{len(rec['reasons'])-2} more)"
+            
+            card_name = rec.get('card', {}).get('name', 'Unknown') if isinstance(rec.get('card'), dict) else getattr(rec.get('card'), 'name', 'Unknown')
+            
+            values = (
+                f"🔨 {card_name} (Need to craft)",
+                f"{rec.get('confidence', 0):.1%}",
+                f"{rec.get('synergy_score', 0):.1%}",
+                f"{rec.get('popularity_score', 0):.1%}",
+                f"{rec.get('archetype_fit', 0):.1%}",
+                reasons_text
+            )
+            
+            item_id = self.rec_tree.insert('', 'end', values=values, tags=('craftable',))
+        
+        # Configure tag colors
+        self.rec_tree.tag_configure('owned', background='lightgreen')
+        self.rec_tree.tag_configure('craftable', background='lightyellow')
+    
+    def display_smart_recommendations(self):
+        """Display the smart AI recommendations"""
+        # Clear existing items
+        for item in self.rec_tree.get_children():
+            self.rec_tree.delete(item)
+        
+        if not self.current_smart_recommendations:
+            return
+        
+        # Display smart recommendations with ownership info
+        for rec in self.current_smart_recommendations:
+            # Determine ownership status and display
+            if rec.cost_consideration == "owned":
+                card_display = f"✅ {rec.card_name} (Owned)"
+                tag = 'owned'
+            else:
+                craft_icon = {"common_craft": "🔨", "uncommon_craft": "🔧", "rare_craft": "💎", "mythic_craft": "👑"}.get(rec.cost_consideration, "🔨")
+                card_display = f"{craft_icon} {rec.card_name} (Craft: {rec.rarity.title()})"
+                tag = 'craftable'
+            
+            # Format reasons for display
+            reasons_text = "; ".join(rec.reasons[:2])
             if len(rec.reasons) > 2:
                 reasons_text += f" (+{len(rec.reasons)-2} more)"
             
             values = (
-                rec.card.name,
+                card_display,
                 f"{rec.confidence:.1%}",
                 f"{rec.synergy_score:.1%}",
-                f"{rec.popularity_score:.1%}",
-                f"{rec.archetype_fit:.1%}",
+                f"{rec.meta_score:.1%}",
+                f"{rec.deck_fit:.1%}",
                 reasons_text
             )
             
-            self.rec_tree.insert('', 'end', values=values)
+            self.rec_tree.insert('', 'end', values=values, tags=(tag,))
+        
+        # Configure tag colors
+        self.rec_tree.tag_configure('owned', background='lightgreen')
+        self.rec_tree.tag_configure('craftable', background='lightyellow')
+    
+    def display_moxfield_recommendations(self):
+        """Display Moxfield upgrade suggestions in the recommendations panel"""
+        if not self.current_moxfield_suggestions:
+            return
+        
+        # Clear existing items
+        for item in self.rec_tree.get_children():
+            self.rec_tree.delete(item)
+        
+        # Display Moxfield suggestions
+        owned_suggestions = [s for s in self.current_moxfield_suggestions if s['is_owned']]
+        craftable_suggestions = [s for s in self.current_moxfield_suggestions if not s['is_owned']]
+        
+        # Add owned cards first
+        for suggestion in owned_suggestions:
+            values = (
+                f"✅ {suggestion['name']} (Own: {suggestion['owned_quantity']})",
+                "Moxfield",  # Confidence column
+                f"{suggestion['appearances']} decks",  # Synergy column (repurposed)
+                f"Avg: {suggestion['avg_copies']:.1f}",  # Popularity column
+                suggestion.get('rarity', 'Common').title(),  # Archetype column (repurposed)
+                suggestion.get('upgrade_reason', 'Popular upgrade')
+            )
+            
+            self.rec_tree.insert('', 'end', values=values, tags=('owned',))
+        
+        # Add craftable cards
+        for suggestion in craftable_suggestions:
+            rarity_emoji = {"common": "⚪", "uncommon": "🔵", "rare": "🟡", "mythic": "🔴"}.get(suggestion.get('rarity', 'common'), "⚪")
+            
+            values = (
+                f"🔨 {suggestion['name']} (Craft needed)",
+                "Moxfield",  # Confidence column
+                f"{suggestion['appearances']} decks",  # Synergy column (repurposed)
+                f"Avg: {suggestion['avg_copies']:.1f}",  # Popularity column
+                f"{rarity_emoji} {suggestion.get('rarity', 'Common').title()}",  # Archetype column
+                suggestion.get('upgrade_reason', 'Popular upgrade')
+            )
+            
+            self.rec_tree.insert('', 'end', values=values, tags=('craftable',))
+        
+        # Configure tag colors
+        self.rec_tree.tag_configure('owned', background='lightgreen')
+        self.rec_tree.tag_configure('craftable', background='lightyellow')
     
     def filter_recommendations(self, *args):
         """Filter recommendations by minimum confidence"""
@@ -473,6 +715,7 @@ class AIRecommendationsTab:
         self.update_deck_header()  # Update deck info first
         self.analyze_deck()
         self.get_recommendations()
+        # Note: Moxfield analysis is separate due to API rate limits
     
     def add_to_mainboard(self):
         """Add selected recommendation to mainboard"""
