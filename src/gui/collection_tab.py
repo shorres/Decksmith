@@ -256,7 +256,8 @@ class CollectionTab:
         
         if filename:
             try:
-                self.collection = CSVHandler.import_collection_from_csv(filename)
+                csv_handler = CSVHandler()
+                self.collection = csv_handler.import_collection_from_csv(filename)
                 self.apply_filters()
                 self.refresh_display()
                 messagebox.showinfo("Success", "Collection imported successfully!")

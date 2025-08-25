@@ -600,7 +600,8 @@ class DeckTab:
         
         if filename:
             try:
-                deck = CSVHandler.import_deck_from_csv(filename)
+                csv_handler = CSVHandler()
+                deck = csv_handler.import_deck_from_csv(filename)
                 self.decks.append(deck)
                 self.refresh_deck_list()
                 self.deck_listbox.selection_set(len(self.decks) - 1)
@@ -631,7 +632,8 @@ class DeckTab:
         
         if filename:
             try:
-                deck = CSVHandler.import_deck_from_arena_format(filename)
+                csv_handler = CSVHandler()
+                deck = csv_handler.import_deck_from_arena_format(filename)
                 self.decks.append(deck)
                 self.refresh_deck_list()
                 self.deck_listbox.selection_set(len(self.decks) - 1)

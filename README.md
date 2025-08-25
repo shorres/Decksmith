@@ -1,11 +1,12 @@
 # Magic: The Gathering Arena Deck Manager
 
-A comprehensive tool for managing your Magic: The Gathering Arena collection and decks.
+A comprehensive tool for managing your Magic: The Gathering Arena collection and decks with advanced Scryfall integration.
 
 ## Features
 
 - **Collection Management**: Track your card collection with quantities and rarities
 - **Scryfall Integration**: Real-time card search and auto-fill from the complete MTG database
+- **🆕 Auto-Enrichment**: Import lists are automatically enriched with complete card data from Scryfall
 - **Deck Builder**: Create and manage multiple decks
 - **Smart Autocomplete**: Intelligent card suggestions while building decks from your collection
 - **Import/Export**: Import and export decks and collections via CSV
@@ -14,9 +15,54 @@ A comprehensive tool for managing your Magic: The Gathering Arena collection and
 - **Deck Analysis**: View deck statistics and mana curves
 - **AI Recommendations**: Get intelligent card suggestions based on synergy and popularity
 
+## 🚀 **NEW: Scryfall Auto-Enrichment**
+
+When importing card lists, the tool now automatically fetches complete card information from Scryfall:
+
+### ✨ What Gets Auto-Enriched:
+- **Mana Cost**: Exact mana symbols and costs
+- **Card Type**: Complete type line (e.g., "Legendary Creature — Human Wizard")
+- **Creature Types**: Automatically extracted from type lines
+- **Rarity**: Common, Uncommon, Rare, Mythic, etc.
+- **Colors**: Color identity for deck building
+- **Power/Toughness**: For creatures
+- **Oracle Text**: Complete rules text
+- **Set Information**: Set codes and collector numbers
+- **Much More**: All official card data
+
+### 📥 Import Sources That Get Auto-Enriched:
+- **CSV Collections**: `name,quantity,quantity_foil` → Complete card data
+- **Arena Deck Files**: Simple name lists → Full card information
+- **Clipboard Imports**: Any format → Enriched with Scryfall data
+- **Manual Imports**: Just provide card names → Get everything else automatically
+
+### 🎯 Benefits:
+- **⏱️ No Manual Data Entry**: Just provide card names, get everything else
+- **📊 Accurate Statistics**: Proper mana curves, color distribution, etc.  
+- **🔍 Better Search/Filter**: Complete data enables advanced filtering
+- **🎨 Rich Display**: See mana costs, types, rarities immediately
+- **🔄 Always Current**: Data comes fresh from Scryfall's database
+
+### 🖥️ How It Works:
+Simply import your card lists as before - the tool handles the rest:
+```
+# Your simple CSV:
+name,quantity
+Lightning Bolt,4
+Counterspell,3
+
+# Becomes enriched with:
+✓ Mana Cost: {R} and {U}{U}
+✓ Type: Instant
+✓ Rarity: Uncommon  
+✓ Colors: R and U
+✓ Set Information: Latest printing data
+✓ Oracle Text: Complete rules text
+```
+
 ## Clipboard Functionality
 
-The tool now supports importing and exporting decks directly from your system clipboard:
+The tool supports importing and exporting decks directly from your system clipboard with **automatic Scryfall enrichment**:
 
 ### Supported Formats:
 - **Arena Format**: `4 Lightning Bolt (M21) 159`
@@ -26,7 +72,8 @@ The tool now supports importing and exporting decks directly from your system cl
 1. Copy a deck list from any source (Arena export, website, etc.)
 2. Click "Import Clipboard" in the Decks tab
 3. The tool will automatically detect the format and import your deck
-4. **NEW**: Cards are automatically added to your collection (max 4 per card)
+4. **🆕 Auto-Enrichment**: All cards are automatically enriched with complete Scryfall data
+5. **NEW**: Cards are automatically added to your collection (max 4 per card)
 
 ### Export to Clipboard:
 1. Select a deck in the Decks tab
@@ -36,6 +83,7 @@ The tool now supports importing and exporting decks directly from your system cl
 
 ### Collection Import:
 - Use "Import Clipboard" in the Collection tab to add cards from clipboard to your collection
+- **🆕 Auto-Enrichment**: Cards imported this way get full Scryfall data automatically
 - Perfect for importing from Arena collection exports or card lists from websites
 
 ## 🃏 **Arena Playset Management**

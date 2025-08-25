@@ -8,11 +8,67 @@ import pyperclip
 from typing import List, Dict, Tuple, Optional
 from models.card import Card
 from models.deck import Deck, DeckCard
+from utils.scryfall_api import ScryfallAPI
 
 class ClipboardHandler:
     """Handles importing decks and cards from clipboard"""
     
     def __init__(self):
+        """Initialize clipboard handler with Scryfall API"""
+        self.scryfall_api = ScryfallAPI()
+        self._card_cache = {}  # Cache cards to avoid duplicate API calls
+    
+    def _create_enriched_card(self, name: str) -> Card:
+        """
+        Create a Card object enriched with Scryfall data when possible
+        Uses caching to avoid duplicate API calls for the same card
+        
+        Args:
+            name: Card name
+            
+        Returns:
+            Card object with enriched data from Scryfall or basic data
+        """
+        # Check cache first
+        if name in self._card_cache:
+            return self._card_cache[name]
+        
+        # Try to get card data from Scryfall
+        scryfall_card = self.scryfall_api.get_card_fuzzy(name)
+        
+        if scryfall_card:
+            print(f"✓ Enriched '{name}' with Scryfall data")
+            card = Card(
+                name=scryfall_card.name,
+                mana_cost=scryfall_card.mana_cost,
+                converted_mana_cost=int(scryfall_card.cmc),
+                card_type=scryfall_card.type_line,
+                creature_type=self._extract_creature_types(scryfall_card.type_line),
+                rarity=scryfall_card.rarity,
+                colors=scryfall_card.colors,
+                power=int(scryfall_card.power) if scryfall_card.power and scryfall_card.power.isdigit() else None,
+                toughness=int(scryfall_card.toughness) if scryfall_card.toughness and scryfall_card.toughness.isdigit() else None,
+                text=scryfall_card.oracle_text,
+                set_code=scryfall_card.set_code,
+                collector_number=scryfall_card.collector_number
+            )
+        else:
+            print(f"⚠ Could not find '{name}' in Scryfall, using basic data")
+            # Fall back to creating card with minimal info
+            card = Card(name=name)
+        
+        # Cache the result
+        self._card_cache[name] = card
+        return card
+    
+    def _extract_creature_types(self, type_line: str) -> str:
+        """Extract creature types from type line"""
+        if '—' in type_line:
+            # Split on em dash and take the part after it
+            parts = type_line.split('—', 1)
+            if len(parts) > 1:
+                return parts[1].strip()
+        return ''
         """Initialize clipboard handler"""
         # Regular expressions for parsing different formats
         self.arena_deck_pattern = re.compile(r'^(\d+)\s+(.+?)(?:\s+\(([A-Z]{3})\)\s+(\d+))?$', re.MULTILINE)
@@ -63,7 +119,7 @@ class ClipboardHandler:
             return "unknown"
     
     def parse_arena_format(self, content: str) -> Tuple[List[DeckCard], List[DeckCard]]:
-        """Parse Arena format deck list"""
+        """Parse Arena format deck list with Scryfall auto-enrichment"""
         mainboard = []
         sideboard = []
         current_section = "mainboard"
@@ -94,14 +150,13 @@ class ClipboardHandler:
                 set_code = match.group(3)
                 collector_number = match.group(4)
                 
-                card = Card(
-                    name=name,
-                    mana_cost="",  # Will be filled in later if needed
-                    card_type="Unknown",
-                    text="",
-                    set_code=set_code,
-                    collector_number=collector_number
-                )
+                # Create enriched card with Scryfall data
+                card = self._create_enriched_card(name)
+                # Preserve set/collector info from Arena format
+                if hasattr(card, 'set_code') and not card.set_code:
+                    card.set_code = set_code
+                if hasattr(card, 'collector_number') and not card.collector_number:
+                    card.collector_number = collector_number
                 
                 deck_card = DeckCard(card=card, quantity=quantity)
                 
@@ -113,7 +168,7 @@ class ClipboardHandler:
         return mainboard, sideboard
     
     def parse_simple_format(self, content: str) -> Tuple[List[DeckCard], List[DeckCard]]:
-        """Parse simple format deck list (quantity + name)"""
+        """Parse simple format deck list (quantity + name) with Scryfall auto-enrichment"""
         mainboard = []
         sideboard = []
         current_section = "mainboard"
@@ -149,12 +204,8 @@ class ClipboardHandler:
                 if not name:
                     continue
                 
-                card = Card(
-                    name=name,
-                    mana_cost="",  # Will be filled in later if needed
-                    card_type="Unknown",
-                    text=""
-                )
+                # Create enriched card with Scryfall data
+                card = self._create_enriched_card(name)
                 
                 deck_card = DeckCard(card=card, quantity=quantity)
                 
