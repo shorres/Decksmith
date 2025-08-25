@@ -10,12 +10,16 @@ import os
 from .collection_tab import CollectionTab
 from .deck_tab import DeckTab
 from .ai_recommendations_tab import AIRecommendationsTab
+from .sun_valley_theme import initialize_theme, get_theme_manager
 
 class MainWindow:
     """Main application window"""
     
     def __init__(self, root):
         self.root = root
+        
+        # Initialize Sun Valley theme first
+        self.theme_manager = initialize_theme(root)
         
         self.setup_window()
         self.create_widgets()
@@ -99,6 +103,8 @@ class MainWindow:
         # View menu (simplified)
         view_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="View", menu=view_menu)
+        view_menu.add_command(label="Toggle Theme (Light/Dark)", command=self.toggle_theme)
+        view_menu.add_separator()
         view_menu.add_command(label="Refresh", command=self.refresh_view)
         
         # Help menu
@@ -110,6 +116,38 @@ class MainWindow:
     def refresh_view(self):
         """Refresh the current view"""
         self.update_status("View refreshed")
+    
+    def toggle_theme(self):
+        """Toggle between light and dark themes"""
+        try:
+            new_theme = self.theme_manager.toggle_theme()
+            theme_name = "Dark" if new_theme == "dark" else "Light"
+            self.update_status(f"Switched to {theme_name} theme")
+            
+            # Apply theme to all existing widgets
+            self._refresh_theme_on_tabs()
+            
+        except Exception as e:
+            messagebox.showerror("Theme Error", f"Failed to change theme: {str(e)}")
+            self.update_status("Theme change failed")
+    
+    def _refresh_theme_on_tabs(self):
+        """Refresh theme application on all tabs"""
+        try:
+            # Refresh collection tab theme
+            if hasattr(self.collection_tab, 'refresh_theme'):
+                self.collection_tab.refresh_theme()
+            
+            # Refresh deck tab theme
+            if hasattr(self.deck_tab, 'refresh_theme'):
+                self.deck_tab.refresh_theme()
+            
+            # Refresh AI tab theme
+            if hasattr(self.ai_tab, 'refresh_theme'):
+                self.ai_tab.refresh_theme()
+                
+        except Exception as e:
+            print(f"Error refreshing themes on tabs: {e}")
     
     def import_collection(self):
         """Import collection from CSV"""

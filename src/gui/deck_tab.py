@@ -710,26 +710,34 @@ class DeckTab:
                 messagebox.showerror("Error", f"Failed to export deck: {str(e)}")
     
     def import_deck_clipboard(self):
-        """Import deck from clipboard"""
+        """Import deck from clipboard with enhanced progress dialog"""
         try:
-            deck = self.clipboard_handler.import_deck_from_clipboard()
-            if deck:
-                # Check clipboard format
-                content = self.clipboard_handler.get_clipboard_content()
-                format_type = self.clipboard_handler.detect_format(content)
-                format_desc = self.clipboard_handler.get_format_description(format_type)
+            # Get clipboard content to check what's available
+            content = self.clipboard_handler.get_clipboard_content()
+            if not content:
+                messagebox.showwarning("Warning", "Clipboard is empty")
+                return
                 
-                # Ask user to confirm import
-                result = messagebox.askyesno(
-                    "Import Deck from Clipboard", 
-                    f"Found deck with {deck.get_total_cards()} total cards.\n"
-                    f"Format detected: {format_desc}\n\n"
-                    f"Import this deck?\n\n"
-                    f"Note: Cards will also be added to your collection\n"
-                    f"(max 4 copies per card as per Arena playset rules)"
-                )
+            # Detect format for user confirmation
+            format_type = self.clipboard_handler.detect_format(content)
+            format_desc = self.clipboard_handler.get_format_description(format_type)
+            
+            # Ask user to confirm import
+            result = messagebox.askyesno(
+                "Import Deck from Clipboard", 
+                f"Format detected: {format_desc}\n\n"
+                f"Import this deck with enhanced visual feedback?\n\n"
+                f"Note: Cards will also be added to your collection\n"
+                f"(max 4 copies per card as per Arena playset rules)"
+            )
+            
+            if result:
+                # Import with enhanced progress dialog
+                from .clipboard_import_dialog import import_clipboard_with_enhanced_dialog
                 
-                if result:
+                deck = import_clipboard_with_enhanced_dialog(self.parent, content)
+                
+                if deck:
                     self.decks.append(deck)
                     self.refresh_deck_list()
                     self.deck_listbox.selection_clear(0, tk.END)
@@ -749,12 +757,7 @@ class DeckTab:
                         messagebox.showinfo("Success", f"Imported deck '{deck.name}' from clipboard!{collection_msg}")
                     else:
                         messagebox.showinfo("Success", f"Imported deck '{deck.name}' from clipboard!")
-            else:
-                content = self.clipboard_handler.get_clipboard_content()
-                if not content:
-                    messagebox.showwarning("Warning", "Clipboard is empty")
-                else:
-                    messagebox.showerror("Error", "Could not parse clipboard content as a deck list")
+                # If deck is None, it was cancelled or failed - error already shown
         except Exception as e:
             messagebox.showerror("Error", f"Failed to import from clipboard: {str(e)}")
     
