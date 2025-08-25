@@ -26,8 +26,10 @@ class AIRecommendationsTab:
         self.smart_engine = IntelligentRecommendationEngine()
         self.current_recommendations = []
         self.current_smart_recommendations = []
-        self.sort_column = 'synergy'  # Default sort by synergy
-        self.sort_reverse = True  # Highest synergy first
+        self.sort_column = 'confidence'  # Default sort by confidence
+        self.sort_reverse = True  # Highest confidence first
+        self.current_page = 0  # Current page for pagination
+        self.items_per_page = 50  # Items per page
         
         self.create_widgets()
     
@@ -256,16 +258,30 @@ class AIRecommendationsTab:
         # Recommendation controls - moved below the table for better visibility
         rec_controls = ttk.Frame(parent)  # Changed from rec_frame to parent
         rec_controls.pack(fill=tk.X, padx=5, pady=5)
-        
+
+        # Show count controls
         ttk.Label(rec_controls, text="Show:").pack(side=tk.LEFT)
         self.rec_count_var = tk.IntVar(value=50)
-        rec_count_spin = ttk.Spinbox(rec_controls, from_=5, to=50, width=5, textvariable=self.rec_count_var,
+        rec_count_spin = ttk.Spinbox(rec_controls, from_=5, to=99, width=5, textvariable=self.rec_count_var,
                                     command=self.refresh_display)
         rec_count_spin.pack(side=tk.LEFT, padx=5)
         
         # Also bind variable changes to refresh
         self.rec_count_var.trace('w', lambda *args: self.refresh_display())
-        ttk.Label(rec_controls, text="recommendations").pack(side=tk.LEFT)
+        ttk.Label(rec_controls, text="per page").pack(side=tk.LEFT)
+        
+        # Pagination controls
+        page_frame = ttk.Frame(rec_controls)
+        page_frame.pack(side=tk.LEFT, padx=(20, 0))
+        
+        self.prev_page_btn = ttk.Button(page_frame, text="◀ Prev", command=self.prev_page, width=8)
+        self.prev_page_btn.pack(side=tk.LEFT, padx=2)
+        
+        self.page_label = ttk.Label(page_frame, text="Page 1 of 1")
+        self.page_label.pack(side=tk.LEFT, padx=10)
+        
+        self.next_page_btn = ttk.Button(page_frame, text="Next ▶", command=self.next_page, width=8)
+        self.next_page_btn.pack(side=tk.LEFT, padx=2)
         
         # Filter controls
         ttk.Label(rec_controls, text="Min Confidence:").pack(side=tk.LEFT, padx=(20, 5))
@@ -317,6 +333,7 @@ class AIRecommendationsTab:
                 else:
                     self.sort_column = new_sort_column
                     self.sort_reverse = True if new_sort_column != 'name' else False
+                    self.current_page = 0  # Reset to first page when sorting changes
                 
                 self.refresh_display()
     
@@ -329,11 +346,66 @@ class AIRecommendationsTab:
                 return  # Don't refresh with invalid values
         except (tk.TclError, ValueError):
             return  # Don't refresh if value is invalid
+        
+        # Reset to first page when show count changes if we would exceed available pages
+        if self.current_smart_recommendations:
+            min_confidence = self.min_confidence_var.get()
+            filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
+            try:
+                items_per_page = self.rec_count_var.get()
+                if items_per_page <= 0:
+                    items_per_page = 50
+            except (tk.TclError, ValueError):
+                items_per_page = 50
+            total_pages = max(1, (len(filtered_recs) + items_per_page - 1) // items_per_page)
+            if self.current_page >= total_pages:
+                self.current_page = 0
             
         if self.current_smart_recommendations:
             self.display_enhanced_recommendations()
-        elif self.current_recommendations:
-            self.display_recommendations()
+    
+    def prev_page(self):
+        """Navigate to previous page"""
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.refresh_display()
+    
+    def next_page(self):
+        """Navigate to next page"""
+        if self.current_smart_recommendations:
+            try:
+                items_per_page = self.rec_count_var.get()
+                if items_per_page <= 0:
+                    items_per_page = 50
+            except (tk.TclError, ValueError):
+                items_per_page = 50
+            
+            # Calculate total filtered results
+            min_confidence = self.min_confidence_var.get()
+            filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
+            total_pages = (len(filtered_recs) + items_per_page - 1) // items_per_page
+            
+            if self.current_page < total_pages - 1:
+                self.current_page += 1
+                self.refresh_display()
+    
+    def update_pagination_info(self, total_filtered_results):
+        """Update pagination display information"""
+        try:
+            items_per_page = self.rec_count_var.get()
+            if items_per_page <= 0:
+                items_per_page = 50
+        except (tk.TclError, ValueError):
+            items_per_page = 50
+        
+        total_pages = max(1, (total_filtered_results + items_per_page - 1) // items_per_page)
+        current_page_display = self.current_page + 1
+        
+        self.page_label.config(text=f"Page {current_page_display} of {total_pages}")
+        
+        # Enable/disable navigation buttons
+        self.prev_page_btn.config(state="normal" if self.current_page > 0 else "disabled")
+        self.next_page_btn.config(state="normal" if self.current_page < total_pages - 1 else "disabled")
     
     def show_rec_context_menu(self, event):
         """Show context menu for recommendations"""
@@ -478,6 +550,7 @@ class AIRecommendationsTab:
                 
                 def update_recs():
                     self.current_smart_recommendations = enhanced_recommendations
+                    self.current_page = 0  # Reset to first page with new recommendations
                     self.display_enhanced_recommendations()
                     self.loading_var.set("")
                     self.analysis_status_label.config(text="✅ Enhanced recommendations ready", foreground='green')
@@ -624,6 +697,7 @@ class AIRecommendationsTab:
             self.rec_tree.delete(item)
         
         if not self.current_smart_recommendations:
+            self.update_pagination_info(0)
             return
         
         # Filter by minimum confidence
@@ -643,17 +717,32 @@ class AIRecommendationsTab:
         if self.sort_column in sort_key_map:
             filtered_recs.sort(key=sort_key_map[self.sort_column], reverse=self.sort_reverse)
         
-        # Limit by show count with validation
+        # Pagination logic
         try:
-            show_count = self.rec_count_var.get()
-            if show_count <= 0:
-                show_count = 50  # Default fallback
+            items_per_page = self.rec_count_var.get()
+            if items_per_page <= 0:
+                items_per_page = 50  # Default fallback
         except (tk.TclError, ValueError):
-            show_count = 50  # Default fallback
-        limited_recs = filtered_recs[:show_count]
+            items_per_page = 50  # Default fallback
+        
+        # Calculate pagination
+        total_results = len(filtered_recs)
+        total_pages = max(1, (total_results + items_per_page - 1) // items_per_page)
+        
+        # Ensure current page is valid
+        if self.current_page >= total_pages:
+            self.current_page = max(0, total_pages - 1)
+        
+        # Get items for current page
+        start_idx = self.current_page * items_per_page
+        end_idx = min(start_idx + items_per_page, total_results)
+        page_recs = filtered_recs[start_idx:end_idx]
+        
+        # Update pagination info
+        self.update_pagination_info(total_results)
         
         # Display enhanced recommendations with rich Scryfall data
-        for rec in limited_recs:
+        for rec in page_recs:
             # Determine ownership status and display
             if rec.cost_consideration == "owned":
                 card_display = f"✅ {rec.card_name} (Owned)"
@@ -802,6 +891,7 @@ class AIRecommendationsTab:
     
     def filter_recommendations(self, *args):
         """Filter recommendations by minimum confidence"""
+        self.current_page = 0  # Reset to first page when filtering
         self.refresh_display()
     
     def refresh_all(self):
