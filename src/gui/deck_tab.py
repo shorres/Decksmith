@@ -13,6 +13,7 @@ from models.card import Card
 from models.deck import Deck, DeckCard
 from utils.csv_handler import CSVHandler
 from utils.clipboard_handler import ClipboardHandler
+from utils.performance_optimizer import get_performance_optimizer, LazyTreeView
 from gui.autocomplete_entry import AutocompleteEntry
 
 class DeckTab:
@@ -31,6 +32,19 @@ class DeckTab:
         self.create_widgets()
         self.load_decks()
         self.refresh_display()
+    
+    def on_tab_focus(self):
+        """Called when the deck tab gets focus - optimized with debouncing"""
+        optimizer = get_performance_optimizer()
+        if optimizer.debounce_tab_switch(self._perform_tab_focus, "Deck Tab"):
+            self._perform_tab_focus()
+    
+    def _perform_tab_focus(self):
+        """Internal method to perform the actual tab focus update"""
+        # Only refresh if needed
+        if hasattr(self, '_needs_refresh') and self._needs_refresh:
+            self.refresh_display()
+            self._needs_refresh = False
     
     def create_widgets(self):
         """Create the deck tab widgets"""
@@ -503,41 +517,62 @@ class DeckTab:
         self.update_statistics()
     
     def refresh_deck_contents(self):
-        """Refresh the deck contents display"""
-        # Clear existing items
-        for item in self.mainboard_tree.get_children():
-            self.mainboard_tree.delete(item)
-        for item in self.sideboard_tree.get_children():
-            self.sideboard_tree.delete(item)
-        
+        """Refresh the deck contents display with lazy loading optimization"""
         if not self.current_deck:
+            # Clear trees if no deck
+            for item in self.mainboard_tree.get_children():
+                self.mainboard_tree.delete(item)
+            for item in self.sideboard_tree.get_children():
+                self.sideboard_tree.delete(item)
             return
         
-        # Add mainboard cards
-        mainboard_cards = self.current_deck.get_mainboard_cards()
-        for deck_card in sorted(mainboard_cards, key=lambda x: (x.card.converted_mana_cost, x.card.name)):
-            card = deck_card.card
-            values = (
-                deck_card.quantity,
-                card.name,
-                card.card_type,
-                card.converted_mana_cost,
-                ','.join(card.colors)
-            )
-            self.mainboard_tree.insert('', 'end', values=values)
+        # Use lazy tree views for efficient updates
+        mainboard_lazy = LazyTreeView(self.mainboard_tree)
+        sideboard_lazy = LazyTreeView(self.sideboard_tree)
         
-        # Add sideboard cards
+        # Get current data for comparison
+        mainboard_cards = self.current_deck.get_mainboard_cards()
         sideboard_cards = self.current_deck.get_sideboard_cards()
-        for deck_card in sorted(sideboard_cards, key=lambda x: (x.card.converted_mana_cost, x.card.name)):
-            card = deck_card.card
-            values = (
-                deck_card.quantity,
-                card.name,
-                card.card_type,
-                card.converted_mana_cost,
-                ','.join(card.colors)
-            )
-            self.sideboard_tree.insert('', 'end', values=values)
+        
+        # Create data keys for change detection
+        mainboard_key = tuple((dc.card.name, dc.quantity) for dc in mainboard_cards)
+        sideboard_key = tuple((dc.card.name, dc.quantity) for dc in sideboard_cards)
+        
+        # Only update if data has changed
+        mainboard_changed = mainboard_lazy.update_data(mainboard_key)
+        sideboard_changed = sideboard_lazy.update_data(sideboard_key)
+        
+        # Clear and refresh mainboard if changed
+        if not mainboard_changed:
+            for item in self.mainboard_tree.get_children():
+                self.mainboard_tree.delete(item)
+            
+            for deck_card in sorted(mainboard_cards, key=lambda x: (x.card.converted_mana_cost, x.card.name)):
+                card = deck_card.card
+                values = (
+                    deck_card.quantity,
+                    card.name,
+                    card.card_type,
+                    card.converted_mana_cost,
+                    ','.join(card.colors)
+                )
+                self.mainboard_tree.insert('', 'end', values=values)
+        
+        # Clear and refresh sideboard if changed
+        if not sideboard_changed:
+            for item in self.sideboard_tree.get_children():
+                self.sideboard_tree.delete(item)
+                
+            for deck_card in sorted(sideboard_cards, key=lambda x: (x.card.converted_mana_cost, x.card.name)):
+                card = deck_card.card
+                values = (
+                    deck_card.quantity,
+                    card.name,
+                    card.card_type,
+                    card.converted_mana_cost,
+                    ','.join(card.colors)
+                )
+                self.sideboard_tree.insert('', 'end', values=values)
     
     def update_statistics(self):
         """Update deck statistics display"""

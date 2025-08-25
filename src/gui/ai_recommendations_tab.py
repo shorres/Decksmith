@@ -10,6 +10,7 @@ import re
 
 from utils.ai_recommendations import CardRecommendationEngine
 from utils.enhanced_recommendations_sync import get_smart_recommendations
+from utils.performance_optimizer import get_performance_optimizer, debounce_update, LazyTreeView
 from .sun_valley_theme import get_theme_manager
 
 class AIRecommendationsTab:
@@ -147,7 +148,22 @@ class AIRecommendationsTab:
             self.analysis_status_label.config(text="")
     
     def on_tab_focus(self):
-        """Called when the AI recommendations tab gets focus"""
+        """Called when the AI recommendations tab gets focus - optimized with debouncing"""
+        optimizer = get_performance_optimizer()
+        
+        # Debounce rapid tab switches
+        if optimizer.debounce_tab_switch(self.update_deck_header, "AI Recommendations"):
+            self._delayed_tab_update()
+    
+    def _delayed_tab_update(self):
+        """Delayed tab update to reduce switching lag"""
+        # Only update header if deck actually changed
+        current_deck = self.get_current_deck()
+        if hasattr(self, '_last_deck_id') and current_deck:
+            if self._last_deck_id == id(current_deck):
+                return  # No change, skip update
+        
+        self._last_deck_id = id(current_deck) if current_deck else None
         self.update_deck_header()
     
     def get_frame(self):
@@ -660,9 +676,10 @@ class AIRecommendationsTab:
     
     def display_enhanced_recommendations(self):
         """Display the enhanced AI recommendations with Scryfall data using lazy loading"""
-        # Clear existing items
-        for item in self.rec_tree.get_children():
-            self.rec_tree.delete(item)
+        optimizer = get_performance_optimizer()
+        
+        # Use lazy tree view for efficient updates
+        lazy_tree = LazyTreeView(self.rec_tree)
         
         if not self.current_smart_recommendations:
             self.update_total_count(0, 0)
@@ -676,6 +693,15 @@ class AIRecommendationsTab:
         if not self.show_lands_var.get():
             # Filter out lands (cards with "Land" in their card_type)
             filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
+        
+        # Check if data has changed before updating
+        data_key = (len(filtered_recs), min_confidence, self.show_lands_var.get(), self.sort_column, self.sort_reverse)
+        if lazy_tree.update_data(data_key):
+            return  # No changes needed
+            
+        # Clear existing items only if updating
+        for item in self.rec_tree.get_children():
+            self.rec_tree.delete(item)
         
         # Update total count display
         total_loaded = len(self.current_smart_recommendations)

@@ -66,12 +66,16 @@ class MainWindow:
         self.status_bar.grid(row=1, column=0, sticky="ew", padx=5, pady=2)
     
     def on_tab_changed(self, event):
-        """Handle tab change events"""
+        """Handle tab change events with performance optimization"""
         selection = event.widget.select()
         tab_text = event.widget.tab(selection, "text")
         
-        # Update AI tab when it's selected (no theme refresh needed)
-        if tab_text == "AI Recommendations":
+        # Call appropriate tab focus method for performance optimization
+        if tab_text == "Collection":
+            self.collection_tab.on_tab_focus()
+        elif tab_text == "Decks":
+            self.deck_tab.on_tab_focus()
+        elif tab_text == "AI Recommendations":
             self.ai_tab.on_tab_focus()
     
     def create_menu(self):

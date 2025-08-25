@@ -13,6 +13,7 @@ from models.card import Card
 from models.collection import Collection, CollectionCard
 from utils.csv_handler import CSVHandler
 from utils.clipboard_handler import ClipboardHandler
+from utils.performance_optimizer import get_performance_optimizer, LazyTreeView
 from gui.scryfall_autocomplete import ScryfallAutocompleteEntry
 from gui.card_details_modal import show_card_details_modal
 from utils.scryfall_api import scryfall_api
@@ -29,6 +30,19 @@ class CollectionTab:
         self.create_widgets()
         self.load_collection()
         self.refresh_display()
+    
+    def on_tab_focus(self):
+        """Called when the collection tab gets focus - optimized with debouncing"""
+        optimizer = get_performance_optimizer()
+        if optimizer.debounce_tab_switch(self._perform_tab_focus, "Collection Tab"):
+            self._perform_tab_focus()
+    
+    def _perform_tab_focus(self):
+        """Internal method to perform the actual tab focus update"""
+        # Only refresh if needed
+        if hasattr(self, '_needs_refresh') and self._needs_refresh:
+            self.refresh_display()
+            self._needs_refresh = False
     
     def create_widgets(self):
         """Create the collection tab widgets"""
@@ -132,7 +146,7 @@ class CollectionTab:
         remove_selected_btn.pack(side=tk.RIGHT, padx=(0, 2))
         
         # Remove filtered button (trash with funnel icon)
-        remove_filtered_btn = ttk.Button(trash_frame, text="🗑️🔽", width=5, 
+        remove_filtered_btn = ttk.Button(trash_frame, text="🗑️🔽", width=8, 
                                        command=self.remove_filtered_cards)
         remove_filtered_btn.pack(side=tk.RIGHT, padx=(0, 2))
         
@@ -223,8 +237,18 @@ class CollectionTab:
         self.on_filter_change()
     
     def refresh_display(self):
-        """Refresh the card list display"""
-        # Clear existing items
+        """Refresh the card list display with lazy loading optimization"""
+        # Use lazy tree view for efficient updates
+        lazy_tree = LazyTreeView(self.tree)
+        
+        # Create data key for change detection
+        data_key = tuple((cc.card.name, cc.quantity, cc.quantity_foil) for cc in self.filtered_cards)
+        
+        # Only update if data has changed
+        if lazy_tree.update_data(data_key):
+            return  # No changes needed
+        
+        # Clear existing items only if updating
         for item in self.tree.get_children():
             self.tree.delete(item)
         
