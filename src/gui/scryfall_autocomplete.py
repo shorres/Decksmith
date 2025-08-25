@@ -196,7 +196,7 @@ class ScryfallAutocompleteEntry(ttk.Frame):
     
     def on_focus_out(self, event):
         """Handle focus out - delay hiding to allow listbox clicks"""
-        self.after(200, self.hide_dropdown)
+        self.after(500, self.hide_dropdown)
     
     def on_up_arrow(self, event):
         """Handle up arrow key"""
@@ -258,6 +258,22 @@ class ScryfallAutocompleteEntry(ttk.Frame):
         selection = self.listbox.curselection()
         if selection:
             self.current_selection = selection[0]
+            # Small delay to distinguish between click-to-highlight and click-to-select
+            self.after(100, self._handle_selection)
+    
+    def _handle_selection(self):
+        """Handle delayed selection after click"""
+        if (self.current_selection >= 0 and 
+            self.current_selection < len(self.suggestions) and
+            self.dropdown_frame.winfo_viewable()):
+            
+            selected_suggestion = self.suggestions[self.current_selection]
+            self.set(selected_suggestion)
+            self.hide_dropdown()
+            
+            # Trigger card selection callback
+            if self.on_card_selected:
+                self.on_card_selected(selected_suggestion)
     
     def on_listbox_double_click(self, event):
         """Handle listbox double-click"""

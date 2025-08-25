@@ -59,9 +59,11 @@ Enhanced deck building with intelligent card suggestions:
 
 Powered by Scryfall's comprehensive MTG database:
 - **Real-time search**: Type any card name to get instant suggestions from the entire MTG database
-- **Auto-fill card data**: Select a card and automatically populate all fields (mana cost, type, rarity, etc.)
+- **One-click auto-fill**: Click any suggestion to automatically populate ALL card fields
+- **Auto-fill card data**: Complete card information (mana cost, type, rarity, colors) filled instantly
 - **Fuzzy matching**: Find cards even with partial or slightly incorrect names
 - **Complete database**: Access to every MTG card ever printed
+- **Visual feedback**: Loading indicators and confirmation when data is populated
 - **Rate-limited API calls**: Respectful API usage following Scryfall guidelines
 - **Offline-friendly**: Graceful handling when internet is unavailable
 
@@ -108,6 +110,26 @@ Magic Tool/
 │   └── decks/              # Deck files
 └── requirements.txt        # Python dependencies
 ```
+
+## 💫 **How to Use the Enhanced Features**
+
+### **Adding Cards to Collection:**
+1. **Click "Add Card"** in the Collection tab
+2. **Start typing** any MTG card name (e.g., "Lightning")
+3. **See suggestions** appear from Scryfall's database  
+4. **Click any suggestion** → ALL fields auto-populate instantly! ✨
+5. **Adjust quantity** if needed and add to collection
+
+### **Enhanced Workflow:**
+- **Type "Light"** → See "Lightning Bolt", "Light Up the Stage", etc.
+- **Click "Lightning Bolt"** → Mana cost: {R}, Type: Instant, Colors: Red all filled!
+- **Just click "Add"** → Card added with complete, accurate data
+
+### **Building Decks:**
+- **Use deck builder** with collection-aware autocomplete
+- **Import from clipboard** for instant deck creation
+- **Get AI recommendations** for card synergies
+- **Export to Arena** format for easy import
 
 ## License
 

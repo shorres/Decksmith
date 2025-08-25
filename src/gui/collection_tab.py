@@ -441,14 +441,28 @@ class AddCardDialog:
     
     def on_card_selected(self, card_name: str):
         """Called when a card is selected from autocomplete"""
-        # Auto-fill will be triggered by the auto-fill button or can be called here
-        pass
+        # Auto-fill card data when a card is selected
+        self.auto_fill_card_data()
     
     def auto_fill_card_data(self):
         """Auto-fill card data from Scryfall"""
         card_name = self.card_autocomplete.get().strip()
         if not card_name:
             return
+        
+        # Show that we're loading data
+        original_button_text = "Auto-Fill"  # Default text
+        auto_fill_button = None
+        
+        # Find the auto-fill button to show loading state
+        for widget in self.dialog.winfo_children():
+            if isinstance(widget, ttk.Frame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ttk.Button) and "Auto-Fill" in str(child.cget('text')):
+                        auto_fill_button = child
+                        original_button_text = str(child.cget('text'))
+                        child.configure(text="Loading...", state='disabled')
+                        break
         
         try:
             # Get card data from Scryfall
@@ -463,18 +477,31 @@ class AddCardDialog:
                 if "Creature" in scryfall_card.type_line and "—" in scryfall_card.type_line:
                     creature_type = scryfall_card.type_line.split("—")[1].strip()
                     self.creature_type_var.set(creature_type)
+                else:
+                    self.creature_type_var.set("")  # Clear if not a creature
                 
                 self.rarity_var.set(scryfall_card.rarity)
                 
-                # Set colors
+                # Set colors - clear all first, then set the ones that apply
                 for color_code in self.color_vars:
                     self.color_vars[color_code].set(color_code in scryfall_card.colors)
                 
-                # Set power/toughness if creature (need to add these variables)
-                # Note: These fields need to be added to the dialog
+                # Visual feedback that auto-fill worked
+                if auto_fill_button:
+                    auto_fill_button.configure(text="✓ Auto-Filled", state='normal')
+                    # Reset button text after a delay
+                    self.dialog.after(2000, lambda: auto_fill_button.configure(text=original_button_text) if auto_fill_button.winfo_exists() else None)
+            else:
+                # Card not found
+                if auto_fill_button:
+                    auto_fill_button.configure(text="Card Not Found", state='normal')
+                    self.dialog.after(2000, lambda: auto_fill_button.configure(text=original_button_text) if auto_fill_button.winfo_exists() else None)
                 
         except Exception as e:
             print(f"Error auto-filling card data: {e}")
+            if auto_fill_button:
+                auto_fill_button.configure(text="Error", state='normal')
+                self.dialog.after(2000, lambda: auto_fill_button.configure(text=original_button_text) if auto_fill_button.winfo_exists() else None)
     
     def create_widgets(self):
         """Create dialog widgets"""
