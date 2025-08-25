@@ -214,7 +214,7 @@ class AIRecommendationsTab:
         
         # Loading indicator
         self.loading_var = tk.StringVar(value="")
-        self.loading_label = ttk.Label(control_frame, textvariable=self.loading_var, foreground="blue")
+        self.loading_label = ttk.Label(control_frame, textvariable=self.loading_var, foreground="light goldenrod")
         self.loading_label.pack(side=tk.RIGHT, padx=5)
     
     def create_recommendations_panel(self, parent):
@@ -223,7 +223,7 @@ class AIRecommendationsTab:
         rec_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Recommendation list
-        columns = ('Card', 'Confidence', 'Synergy', 'CMC', 'Archetype Fit', 'Reasons')
+        columns = ('Card', 'Confidence', 'Synergy', 'CMC', 'Reasons')
         self.rec_tree = ttk.Treeview(rec_frame, columns=columns, show='headings', height=12)
         
         # Configure columns
@@ -231,15 +231,13 @@ class AIRecommendationsTab:
         self.rec_tree.heading('Confidence', text='Confidence')
         self.rec_tree.heading('Synergy', text='Synergy')
         self.rec_tree.heading('CMC', text='CMC')
-        self.rec_tree.heading('Archetype Fit', text='Arch Fit')
         self.rec_tree.heading('Reasons', text='Reasons/Notes')
         
         self.rec_tree.column('Card', width=150)
         self.rec_tree.column('Confidence', width=80)
         self.rec_tree.column('Synergy', width=70)
         self.rec_tree.column('CMC', width=50)
-        self.rec_tree.column('Archetype Fit', width=80)
-        self.rec_tree.column('Reasons', width=300)
+        self.rec_tree.column('Reasons', width=400)  # Expanded to take up space from removed Archetype Fit
         
         # Scrollbar
         rec_scrollbar = ttk.Scrollbar(rec_frame, orient=tk.VERTICAL, command=self.rec_tree.yview)
@@ -287,7 +285,7 @@ class AIRecommendationsTab:
         
         # Total recommendations count
         self.total_count_label = ttk.Label(rec_controls, text="Total: 0 recommendations", 
-                                         font=('TkDefaultFont', 9, 'bold'), foreground='darkblue')
+                                         font=('TkDefaultFont', 9, 'bold'), foreground='light grey')
         self.total_count_label.pack(side=tk.RIGHT, padx=5)
         
         # Load More button (for manual loading)
@@ -398,7 +396,7 @@ class AIRecommendationsTab:
         self.update_deck_header()
         
         self.loading_var.set("Analyzing...")
-        self.analysis_status_label.config(text="🔍 Analyzing deck...", foreground='blue')
+        self.analysis_status_label.config(text="🔍 Analyzing deck...", foreground='light goldenrod')
         self.frame.update()
         
         def analyze():
@@ -516,8 +514,8 @@ class AIRecommendationsTab:
         for item in self.rec_tree.get_children():
             self.rec_tree.delete(item)
         
-
-        self.analysis_status_label.config(text="🤖 Generating Scryfall-powered recommendations...", foreground='light grey')
+        self.loading_var.set("Getting enhanced AI recommendations...")
+        self.analysis_status_label.config(text="🤖 Generating Scryfall-powered recommendations...", foreground='light goldenrod')
         self.frame.update()
         
         def get_recs():
@@ -548,7 +546,7 @@ class AIRecommendationsTab:
                     status_msg = f"✅ {len(enhanced_recommendations)} recommendations loaded"
                     if self.has_more_recommendations:
                         status_msg += " (scroll down for more)"
-                    self.analysis_status_label.config(text=status_msg, foreground='dark slate gray')
+                    self.analysis_status_label.config(text=status_msg, foreground='spring green')
                     
                     # Update Load More button state
                     if self.has_more_recommendations:
@@ -625,7 +623,7 @@ class AIRecommendationsTab:
                         status_msg = f"✅ {len(self.current_smart_recommendations)} recommendations loaded"
                         if self.has_more_recommendations:
                             status_msg += " (scroll for more)"
-                        self.analysis_status_label.config(text=status_msg, foreground='green')
+                        self.analysis_status_label.config(text=status_msg, foreground='spring green')
                         
                         # Update Load More button state
                         self.load_more_button.config(
@@ -690,7 +688,6 @@ class AIRecommendationsTab:
             'confidence': lambda r: r.confidence,
             'synergy': lambda r: r.synergy_score,
             'cmc': lambda r: 0 if "Land" in r.card_type else getattr(r, 'cmc', 0),  # Lands sort as CMC 0
-            'fit': lambda r: r.deck_fit,
             'reasons': lambda r: len(r.reasons)
         }
         
@@ -769,7 +766,6 @@ class AIRecommendationsTab:
                 f"{rec.confidence:.1%}",
                 f"{rec.synergy_score:.1%}",
                 cmc_display,  # Show "Land" for lands, CMC as integer for others
-                f"{rec.deck_fit:.1%}",
                 reasons_text
             )
             
@@ -811,7 +807,6 @@ class AIRecommendationsTab:
             'confidence': ('Confidence', 'confidence'), 
             'synergy': ('Synergy', 'synergy'),
             'cmc': ('CMC', 'cmc'),
-            'fit': ('Deck Fit', 'fit'),
             'reasons': ('Reasons', 'reasons')
         }
         
@@ -994,7 +989,7 @@ class AIRecommendationsTab:
         if hasattr(recommendation, 'card_name'):
             # Enhanced recommendation with Scryfall data
             details = f"🎴 CARD DETAILS: {recommendation.card_name}\n"
-            details += "=" * 50 + "\n\n"
+            details += "=" * 23 + "\n\n"
             details += f"💰 Mana Cost: {getattr(recommendation, 'mana_cost', 'Unknown')}\n"
             details += f"🎭 Type: {getattr(recommendation, 'card_type', 'Unknown')}\n"
             details += f"💎 Rarity: {getattr(recommendation, 'rarity', 'Unknown').title()}\n"
@@ -1030,7 +1025,7 @@ class AIRecommendationsTab:
             # Basic recommendation with card object
             card = recommendation.card
             details = f"🎴 CARD DETAILS: {card.name}\n"
-            details += "=" * 50 + "\n\n"
+            details += "=" * 23 + "\n\n"
             details += f"💰 Mana Cost: {card.mana_cost}\n"
             details += f"🔢 CMC: {card.converted_mana_cost}\n"
             details += f"🎭 Type: {card.card_type}\n"
@@ -1051,7 +1046,7 @@ class AIRecommendationsTab:
         else:
             # Fallback for unknown recommendation format
             details = f"🎴 CARD DETAILS: {card_name}\n"
-            details += "=" * 50 + "\n\n"
+            details += "=" * 23 + "\n\n"
             details += "⚠️ Limited information available for this recommendation.\n"
         
         messagebox.showinfo(f"Card Details", details)
@@ -1064,7 +1059,7 @@ class AIRecommendationsTab:
             return
         
         explanation = f"🤔 WHY IS {card_name.upper()} RECOMMENDED?\n"
-        explanation += "=" * 49 + "\n\n"
+        explanation += "=" * 23 + "\n\n"
         
         if hasattr(recommendation, 'reasons') and recommendation.reasons:
             explanation += "💡 RECOMMENDATION REASONS:\n"
