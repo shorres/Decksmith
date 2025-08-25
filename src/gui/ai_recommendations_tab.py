@@ -777,7 +777,7 @@ class AIRecommendationsTab:
             theme = sv_ttk.get_theme()
             if theme == "dark":
                 # Dark theme - subtle highlighting for craftable cards only
-                self.rec_tree.tag_configure('craftable', foreground='#ffd700')
+                self.rec_tree.tag_configure('craftable', foreground="light grey")
                 
                 # Configure confidence level row colors for dark theme
                 self.rec_tree.tag_configure('high_confidence', background='#1a331a')  # Very dark green
