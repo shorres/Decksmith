@@ -21,6 +21,7 @@ hiddenimports = [
     'tkinter.ttk',
     'tkinter.filedialog',
     'tkinter.messagebox',
+    'tkinter.simpledialog',
     'PIL',
     'PIL.Image',
     'PIL.ImageTk',
@@ -30,6 +31,7 @@ hiddenimports = [
     'datetime',
     'threading',
     'pyperclip',  # For clipboard handling
+    'sv_ttk',     # Sun Valley theme
 ]
 
 # Data files to include
@@ -73,7 +75,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,  # Enable console for debugging
+    console=False,  # Disable console for clean GUI launch
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
