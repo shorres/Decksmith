@@ -223,7 +223,7 @@ class AIRecommendationsTab:
         self.rec_tree.heading('Confidence', text='Source')
         self.rec_tree.heading('Synergy', text='Popularity')
         self.rec_tree.heading('Popularity', text='Usage')
-        self.rec_tree.heading('Archetype Fit', text='Rarity/Type')
+        self.rec_tree.heading('Archetype Fit', text='Arch Fit')
         self.rec_tree.heading('Reasons', text='Reasons/Notes')
         
         self.rec_tree.column('Card', width=150)
@@ -246,8 +246,8 @@ class AIRecommendationsTab:
         self.rec_tree.bind("<Button-3>", self.show_rec_context_menu)
         self.rec_tree.bind("<Double-Button-1>", self.view_card_details)
         
-        # Recommendation controls
-        rec_controls = ttk.Frame(rec_frame)
+        # Recommendation controls - moved below the table for better visibility
+        rec_controls = ttk.Frame(parent)  # Changed from rec_frame to parent
         rec_controls.pack(fill=tk.X, padx=5, pady=5)
         
         ttk.Label(rec_controls, text="Show:").pack(side=tk.LEFT)
