@@ -101,7 +101,7 @@ class CollectionTab:
         ttk.Label(filters_frame, text="Rarity:").pack(anchor=tk.W, padx=5, pady=(10,0))
         self.rarity_var = tk.StringVar()
         rarity_combo = ttk.Combobox(filters_frame, textvariable=self.rarity_var)
-        rarity_combo['values'] = ('', 'Common', 'Uncommon', 'Rare', 'Mythic Rare')
+        rarity_combo['values'] = ('', 'Common', 'Uncommon', 'Rare', 'Mythic')
         rarity_combo.pack(fill=tk.X, padx=5, pady=2)
         rarity_combo.bind('<<ComboboxSelected>>', self.on_filter_change)
         
@@ -690,7 +690,7 @@ class AddCardDialog:
         ttk.Label(main_frame, text="Rarity:").grid(row=5, column=0, sticky=tk.W, pady=2)
         self.rarity_var = tk.StringVar(value="Common")
         rarity_combo = ttk.Combobox(main_frame, textvariable=self.rarity_var)
-        rarity_combo['values'] = ('Common', 'Uncommon', 'Rare', 'Mythic Rare')
+        rarity_combo['values'] = ('Common', 'Uncommon', 'Rare', 'Mythic')
         rarity_combo.grid(row=5, column=1, sticky="ew", pady=2)
         
         # Colors
