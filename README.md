@@ -5,6 +5,7 @@ A comprehensive tool for managing your Magic: The Gathering Arena collection and
 ## Features
 
 - **Collection Management**: Track your card collection with quantities and rarities
+- **Scryfall Integration**: Real-time card search and auto-fill from the complete MTG database
 - **Deck Builder**: Create and manage multiple decks
 - **Smart Autocomplete**: Intelligent card suggestions while building decks from your collection
 - **Import/Export**: Import and export decks and collections via CSV
@@ -53,6 +54,16 @@ Enhanced deck building with intelligent card suggestions:
 - **Real-time filtering**: Type to filter suggestions as you build
 - **Keyboard navigation**: Use arrow keys and Enter to select suggestions
 - **Smart extraction**: Automatically handles card names with quantity info
+
+## 🔮 **Scryfall Integration**
+
+Powered by Scryfall's comprehensive MTG database:
+- **Real-time search**: Type any card name to get instant suggestions from the entire MTG database
+- **Auto-fill card data**: Select a card and automatically populate all fields (mana cost, type, rarity, etc.)
+- **Fuzzy matching**: Find cards even with partial or slightly incorrect names
+- **Complete database**: Access to every MTG card ever printed
+- **Rate-limited API calls**: Respectful API usage following Scryfall guidelines
+- **Offline-friendly**: Graceful handling when internet is unavailable
 
 ## Installation
 

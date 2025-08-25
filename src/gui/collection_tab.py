@@ -13,6 +13,8 @@ from models.card import Card
 from models.collection import Collection, CollectionCard
 from utils.csv_handler import CSVHandler
 from utils.clipboard_handler import ClipboardHandler
+from gui.scryfall_autocomplete import ScryfallAutocompleteEntry
+from utils.scryfall_api import scryfall_api
 
 class CollectionTab:
     """Collection management interface"""
@@ -437,15 +439,60 @@ class AddCardDialog:
         self.create_widgets()
         self.dialog.wait_window()
     
+    def on_card_selected(self, card_name: str):
+        """Called when a card is selected from autocomplete"""
+        # Auto-fill will be triggered by the auto-fill button or can be called here
+        pass
+    
+    def auto_fill_card_data(self):
+        """Auto-fill card data from Scryfall"""
+        card_name = self.card_autocomplete.get().strip()
+        if not card_name:
+            return
+        
+        try:
+            # Get card data from Scryfall
+            scryfall_card = scryfall_api.get_card_fuzzy(card_name)
+            if scryfall_card:
+                # Fill in all the fields
+                self.mana_cost_var.set(scryfall_card.mana_cost)
+                self.cmc_var.set(int(scryfall_card.cmc))
+                self.type_var.set(scryfall_card.type_line)
+                
+                # Extract creature type from type line
+                if "Creature" in scryfall_card.type_line and "—" in scryfall_card.type_line:
+                    creature_type = scryfall_card.type_line.split("—")[1].strip()
+                    self.creature_type_var.set(creature_type)
+                
+                self.rarity_var.set(scryfall_card.rarity)
+                
+                # Set colors
+                for color_code in self.color_vars:
+                    self.color_vars[color_code].set(color_code in scryfall_card.colors)
+                
+                # Set power/toughness if creature (need to add these variables)
+                # Note: These fields need to be added to the dialog
+                
+        except Exception as e:
+            print(f"Error auto-filling card data: {e}")
+    
     def create_widgets(self):
         """Create dialog widgets"""
         main_frame = ttk.Frame(self.dialog)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Card name
+        # Card name with Scryfall autocomplete
         ttk.Label(main_frame, text="Card Name:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.name_var = tk.StringVar()
-        ttk.Entry(main_frame, textvariable=self.name_var).grid(row=0, column=1, sticky="ew", pady=2)
+        
+        self.card_autocomplete = ScryfallAutocompleteEntry(
+            main_frame, 
+            width=30,
+            on_card_selected=self.on_card_selected
+        )
+        self.card_autocomplete.grid(row=0, column=1, sticky="ew", pady=2)
+        
+        # Auto-fill button
+        ttk.Button(main_frame, text="Auto-Fill", command=self.auto_fill_card_data).grid(row=0, column=2, padx=5)
         
         # Mana cost
         ttk.Label(main_frame, text="Mana Cost:").grid(row=1, column=0, sticky=tk.W, pady=2)
@@ -507,14 +554,15 @@ class AddCardDialog:
     
     def ok_clicked(self):
         """Handle OK button click"""
-        if not self.name_var.get().strip():
+        card_name = self.card_autocomplete.get().strip()
+        if not card_name:
             messagebox.showerror("Error", "Card name is required")
             return
         
         colors = [color for color, var in self.color_vars.items() if var.get()]
         
         card_data = {
-            'name': self.name_var.get().strip(),
+            'name': card_name,
             'mana_cost': self.mana_cost_var.get(),
             'converted_mana_cost': self.cmc_var.get(),
             'card_type': self.type_var.get(),
