@@ -14,6 +14,7 @@ from models.collection import Collection, CollectionCard
 from utils.csv_handler import CSVHandler
 from utils.clipboard_handler import ClipboardHandler
 from gui.scryfall_autocomplete import ScryfallAutocompleteEntry
+from gui.card_details_modal import show_card_details_modal
 from utils.scryfall_api import scryfall_api
 
 class CollectionTab:
@@ -114,6 +115,27 @@ class CollectionTab:
         list_frame = ttk.LabelFrame(parent, text="Cards")
         list_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
+        # Header frame with trash icons
+        header_frame = ttk.Frame(list_frame)
+        header_frame.pack(fill=tk.X, padx=5, pady=(5, 2))
+        
+        # Title label
+        ttk.Label(header_frame, text="Collection", font=('TkDefaultFont', 10, 'bold')).pack(side=tk.LEFT)
+        
+        # Trash operations on the right
+        trash_frame = ttk.Frame(header_frame)
+        trash_frame.pack(side=tk.RIGHT)
+        
+        # Remove selected button (trash icon)
+        remove_selected_btn = ttk.Button(trash_frame, text="🗑️", width=3, 
+                                       command=self.remove_selected_cards)
+        remove_selected_btn.pack(side=tk.RIGHT, padx=(0, 2))
+        
+        # Remove filtered button (trash with funnel icon)
+        remove_filtered_btn = ttk.Button(trash_frame, text="🗑️🔽", width=4, 
+                                       command=self.remove_filtered_cards)
+        remove_filtered_btn.pack(side=tk.RIGHT, padx=(0, 2))
+        
         # Treeview for card list
         columns = ('Name', 'Type', 'Rarity', 'Colors', 'CMC', 'Quantity', 'Foil')
         self.tree = ttk.Treeview(list_frame, columns=columns, show='headings')
@@ -143,9 +165,10 @@ class CollectionTab:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Context menu
+        # Context menu and event bindings
         self.create_context_menu()
         self.tree.bind("<Button-3>", self.show_context_menu)
+        self.tree.bind("<Double-1>", self.on_card_double_click)
     
     def create_context_menu(self):
         """Create context menu for card list"""
@@ -425,6 +448,103 @@ class CollectionTab:
                 json.dump(self.collection.to_dict(), f, indent=2)
         except Exception as e:
             print(f"Failed to save collection: {e}")
+
+    def on_card_double_click(self, event):
+        """Handle double-click on a card to show details modal"""
+        selection = self.tree.selection()
+        if not selection:
+            return
+        
+        item = selection[0]
+        values = self.tree.item(item)['values']
+        card_name = values[0]
+        
+        if card_name in self.collection.cards:
+            collection_card = self.collection.cards[card_name]
+            card = collection_card.card
+            
+            # Show the card details modal
+            show_card_details_modal(self.parent, card, collection_card)
+    
+    def remove_selected_cards(self):
+        """Remove all currently selected cards from collection"""
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select cards to remove.")
+            return
+        
+        card_names = []
+        for item in selection:
+            card_name = self.tree.item(item)['values'][0]
+            card_names.append(card_name)
+        
+        if len(card_names) == 1:
+            message = f"Remove '{card_names[0]}' from collection?"
+            title = "Confirm Removal"
+        else:
+            message = f"Remove {len(card_names)} selected cards from collection?\n\nCards to remove:\n"
+            message += "\n".join(f"• {name}" for name in card_names[:10])
+            if len(card_names) > 10:
+                message += f"\n... and {len(card_names) - 10} more cards"
+            title = "Confirm Mass Removal"
+        
+        if messagebox.askyesno(title, message):
+            removed_count = 0
+            for card_name in card_names:
+                if card_name in self.collection.cards:
+                    del self.collection.cards[card_name]
+                    removed_count += 1
+            
+            self.apply_filters()
+            self.refresh_display()
+            self.save_collection()
+            
+            messagebox.showinfo("Success", f"Removed {removed_count} cards from collection.")
+    
+    def remove_filtered_cards(self):
+        """Remove all cards currently shown in the filtered view"""
+        if not self.filtered_cards:
+            messagebox.showwarning("No Cards", "No cards to remove in current filter.")
+            return
+        
+        card_count = len(self.filtered_cards)
+        
+        # Show confirmation with details about what will be removed
+        message = f"Remove ALL {card_count} cards currently shown in the filtered view?\n\n"
+        message += "This will permanently remove:\n"
+        
+        # Show first few cards as examples
+        for i, collection_card in enumerate(self.filtered_cards[:5]):
+            message += f"• {collection_card.card.name}\n"
+        
+        if card_count > 5:
+            message += f"... and {card_count - 5} more cards\n"
+        
+        message += f"\n⚠️ This action cannot be undone!"
+        
+        if messagebox.askyesno("Confirm Mass Removal", message):
+            # Additional confirmation for large removals
+            if card_count > 50:
+                confirm_msg = f"Are you absolutely sure you want to remove {card_count} cards?\n\nType 'REMOVE' to confirm:"
+                user_input = simpledialog.askstring("Final Confirmation", confirm_msg)
+                if user_input != "REMOVE":
+                    messagebox.showinfo("Cancelled", "Mass removal cancelled.")
+                    return
+            
+            removed_count = 0
+            cards_to_remove = [cc.card.name for cc in self.filtered_cards]
+            
+            for card_name in cards_to_remove:
+                if card_name in self.collection.cards:
+                    del self.collection.cards[card_name]
+                    removed_count += 1
+            
+            # Clear filters to show full collection
+            self.clear_filters()
+            self.refresh_display()
+            self.save_collection()
+            
+            messagebox.showinfo("Success", f"Removed {removed_count} cards from collection.")
 
 class AddCardDialog:
     """Dialog for adding new cards to collection"""
