@@ -9,9 +9,14 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 import math
 
-from ..models.card import Card
-from ..models.deck import Deck, DeckCard
-from .scryfall_api import ScryfallAPI
+try:
+    from ..models.card import Card
+    from ..models.deck import Deck, DeckCard
+    from .scryfall_api import ScryfallAPI
+except ImportError:
+    from models.card import Card
+    from models.deck import Deck, DeckCard
+    from utils.scryfall_api import ScryfallAPI
 
 @dataclass
 class SmartRecommendation:

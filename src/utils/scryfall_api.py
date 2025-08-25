@@ -7,7 +7,11 @@ import json
 import time
 from typing import List, Dict, Optional
 from dataclasses import dataclass
-from ..models.card import Card
+
+try:
+    from ..models.card import Card
+except ImportError:
+    from models.card import Card
 
 @dataclass
 class ScryfallCard:
