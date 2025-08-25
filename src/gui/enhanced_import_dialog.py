@@ -87,23 +87,6 @@ class EnhancedImportProgressDialog:
                                font=('TkDefaultFont', 14, 'bold'))
         title_label.pack()
         
-        # Progress section
-        progress_frame = ttk.LabelFrame(main_frame, text="Progress", padding=10)
-        progress_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        self.status_var = tk.StringVar(value="Preparing import...")
-        status_label = ttk.Label(progress_frame, textvariable=self.status_var)
-        status_label.pack(pady=(0, 5))
-        
-        self.progress_var = tk.DoubleVar()
-        progress_bar = ttk.Progressbar(progress_frame, variable=self.progress_var,
-                                      maximum=100, mode='determinate')
-        progress_bar.pack(fill=tk.X, pady=(0, 5))
-        
-        self.progress_text_var = tk.StringVar(value="0%")
-        self.progress_text = ttk.Label(progress_frame, textvariable=self.progress_text_var)
-        self.progress_text.pack()
-        
         # Card display section
         card_frame = ttk.LabelFrame(main_frame, text="Current Card", padding=10)
         card_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
@@ -124,6 +107,23 @@ class EnhancedImportProgressDialog:
         card_details_label = ttk.Label(card_frame, textvariable=self.card_details_var,
                                       wraplength=400)
         card_details_label.pack()
+        
+        # Progress section (below card info)
+        progress_frame = ttk.LabelFrame(main_frame, text="Progress", padding=10)
+        progress_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        self.status_var = tk.StringVar(value="Preparing import...")
+        status_label = ttk.Label(progress_frame, textvariable=self.status_var)
+        status_label.pack(pady=(0, 5))
+        
+        self.progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_frame, variable=self.progress_var,
+                                      maximum=100, mode='determinate')
+        progress_bar.pack(fill=tk.X, pady=(0, 5))
+        
+        self.progress_text_var = tk.StringVar(value="0%")
+        self.progress_text = ttk.Label(progress_frame, textvariable=self.progress_text_var)
+        self.progress_text.pack()
         
         # Buttons
         button_frame = ttk.Frame(main_frame)
@@ -367,7 +367,7 @@ class EnhancedCSVImporter:
                 if self.progress_dialog:
                     self.progress_dialog.update_progress(
                         current_card, total_cards,
-                        f"Processing: {card_name}"
+                        f"Importing cards from CSV..."
                     )
                 
                 # Get enhanced card data (with shorter timeout for speed)
@@ -473,7 +473,7 @@ class EnhancedCSVImporter:
                     if self.progress_dialog:
                         self.progress_dialog.update_progress(
                             current_card, total_cards,
-                            f"Processing: {card_name}"
+                            f"Importing cards from Arena deck..."
                         )
                     
                     # Get enhanced card data
