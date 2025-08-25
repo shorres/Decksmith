@@ -54,7 +54,7 @@ def main():
         root = tk.Tk()
         
         # Initialize theme
-        theme_manager = initialize_theme(root)
+        # theme_manager = initialize_theme(root)
         
         # Create main window
         app = MainWindow(root)
