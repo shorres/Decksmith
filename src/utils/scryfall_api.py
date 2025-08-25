@@ -7,7 +7,7 @@ import json
 import time
 from typing import List, Dict, Optional
 from dataclasses import dataclass
-from models.card import Card
+from ..models.card import Card
 
 @dataclass
 class ScryfallCard:
@@ -27,6 +27,7 @@ class ScryfallCard:
     collector_number: str
     image_uri: Optional[str]
     scryfall_id: str
+    legalities: Dict[str, str]  # Format legality information
 
 class ScryfallAPI:
     """Scryfall API client for card data and autocomplete"""
@@ -83,13 +84,13 @@ class ScryfallAPI:
         return []
     
     def search_cards(self, query: str, limit: int = 20) -> List[ScryfallCard]:
-        """Search for cards by name"""
-        if len(query) < 2:
+        """Search for cards using Scryfall query syntax"""
+        if len(query.strip()) < 1:
             return []
         
         endpoint = "/cards/search"
         params = {
-            "q": f"name:{query}",
+            "q": query,  # Use query directly instead of name:query
             "order": "name",
             "dir": "asc",
             "unique": "cards"
@@ -174,7 +175,8 @@ class ScryfallAPI:
                 set_name=data.get('set_name', ''),
                 collector_number=data.get('collector_number', ''),
                 image_uri=image_uri,
-                scryfall_id=data.get('id', '')
+                scryfall_id=data.get('id', ''),
+                legalities=data.get('legalities', {})
             )
         except Exception as e:
             print(f"Error parsing Scryfall card data: {e}")

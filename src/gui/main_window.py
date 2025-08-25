@@ -10,12 +10,19 @@ import os
 from gui.collection_tab import CollectionTab
 from gui.deck_tab import DeckTab
 from gui.ai_recommendations_tab import AIRecommendationsTab
+from gui.theme_manager import ThemeManager
+from gui.settings_dialog import SettingsDialog
 
 class MainWindow:
     """Main application window"""
     
     def __init__(self, root):
         self.root = root
+        
+        # Initialize theme manager first
+        self.theme_manager = ThemeManager(root)
+        self.settings_dialog = None
+        
         self.setup_window()
         self.create_widgets()
     
@@ -94,11 +101,39 @@ class MainWindow:
         deck_menu.add_command(label="Export to CSV", command=self.export_deck_csv)
         deck_menu.add_command(label="Export to Arena", command=self.export_deck_arena)
         
+        # View menu with themes
+        view_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="View", menu=view_menu)
+        
+        # Theme submenu
+        theme_menu = tk.Menu(view_menu, tearoff=0)
+        view_menu.add_cascade(label="Themes", menu=theme_menu)
+        
+        # Add theme options
+        available_themes = self.theme_manager.get_available_themes()
+        for theme_id, theme_name in available_themes.items():
+            theme_menu.add_command(
+                label=theme_name, 
+                command=lambda t=theme_id: self.change_theme(t)
+            )
+        
+        view_menu.add_separator()
+        view_menu.add_command(label="Settings...", command=self.show_settings)
+        
         # Help menu
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About AI Features", command=self.show_ai_help)
         help_menu.add_command(label="About", command=self.show_about)
+        
+        # Apply theme to menus
+        self.theme_manager.configure_widget_theme(menubar, "menu")
+        self.theme_manager.configure_widget_theme(file_menu, "menu")
+        self.theme_manager.configure_widget_theme(collection_menu, "menu")
+        self.theme_manager.configure_widget_theme(deck_menu, "menu")
+        self.theme_manager.configure_widget_theme(view_menu, "menu")
+        self.theme_manager.configure_widget_theme(theme_menu, "menu")
+        self.theme_manager.configure_widget_theme(help_menu, "menu")
     
     def import_collection(self):
         """Import collection from CSV"""
@@ -172,6 +207,26 @@ class MainWindow:
             "Built with Python and powered by AI for the best deck building experience!"
         )
     
+    def change_theme(self, theme_name: str):
+        """Change the application theme"""
+        self.theme_manager.apply_theme(theme_name)
+        self.update_status(f"Theme changed to {self.theme_manager.themes[theme_name]['name']}")
+    
+    def show_settings(self):
+        """Show settings dialog"""
+        if not self.settings_dialog:
+            self.settings_dialog = SettingsDialog(
+                self.root, 
+                self.theme_manager, 
+                on_settings_changed=self.on_settings_changed
+            )
+        self.settings_dialog.show()
+    
+    def on_settings_changed(self):
+        """Called when settings are changed"""
+        # Refresh UI elements that might be affected by settings changes
+        self.update_status("Settings updated")
+    
     def update_status(self, message):
         """Update the status bar"""
-        self.status_bar.config(text=message)
+        print(f"Status: {message}")  # For now print to console

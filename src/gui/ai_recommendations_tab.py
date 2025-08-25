@@ -11,6 +11,7 @@ from models.deck import Deck
 from models.collection import Collection
 from utils.ai_recommendations import CardRecommendationEngine, CardRecommendation
 from utils.smart_recommendations import IntelligentRecommendationEngine, SmartRecommendation
+from utils.enhanced_recommendations_sync import get_smart_recommendations
 
 class AIRecommendationsTab:
     """AI-powered card recommendations interface"""
@@ -397,7 +398,7 @@ class AIRecommendationsTab:
         thread.start()
     
     def get_recommendations(self):
-        """Get AI card recommendations using the smart engine"""
+        """Get AI card recommendations using the enhanced Scryfall-powered system"""
         current_deck = self.get_current_deck()
         if not current_deck:
             messagebox.showwarning("Warning", "No deck selected")
@@ -406,8 +407,8 @@ class AIRecommendationsTab:
         # Update header to show current deck
         self.update_deck_header()
         
-        self.loading_var.set("Getting AI recommendations...")
-        self.analysis_status_label.config(text="🤖 Generating intelligent recommendations...", foreground='blue')
+        self.loading_var.set("Getting enhanced AI recommendations...")
+        self.analysis_status_label.config(text="🤖 Generating Scryfall-powered recommendations...", foreground='blue')
         self.frame.update()
         
         def get_recs():
@@ -416,22 +417,22 @@ class AIRecommendationsTab:
                 format_name = self.format_var.get()
                 count = self.rec_count_var.get()
                 
-                # Use the new smart recommendation engine
-                smart_recommendations = self.smart_engine.generate_recommendations(
+                # Use the enhanced recommendation engine with Scryfall data
+                enhanced_recommendations = get_smart_recommendations(
                     current_deck, collection, count, format_name
                 )
                 
                 def update_recs():
-                    self.current_smart_recommendations = smart_recommendations
-                    self.display_smart_recommendations()
+                    self.current_smart_recommendations = enhanced_recommendations
+                    self.display_enhanced_recommendations()
                     self.loading_var.set("")
-                    self.analysis_status_label.config(text="✅ Smart recommendations ready", foreground='green')
+                    self.analysis_status_label.config(text="✅ Enhanced recommendations ready", foreground='green')
                 
                 self.frame.after(0, update_recs)
                 
             except Exception as e:
                 def show_error():
-                    messagebox.showerror("Recommendation Error", f"Smart recommendations failed: {str(e)}")
+                    messagebox.showerror("Recommendation Error", f"Enhanced recommendations failed: {str(e)}")
                     self.loading_var.set("")
                     self.analysis_status_label.config(text="❌ Recommendations failed", foreground='red')
                 
@@ -524,6 +525,79 @@ class AIRecommendationsTab:
         self.rec_tree.tag_configure('owned', background='lightgreen')
         self.rec_tree.tag_configure('craftable', background='lightyellow')
     
+    def display_enhanced_recommendations(self):
+        """Display the enhanced AI recommendations with Scryfall data"""
+        # Clear existing items
+        for item in self.rec_tree.get_children():
+            self.rec_tree.delete(item)
+        
+        if not self.current_smart_recommendations:
+            return
+        
+        # Filter by minimum confidence
+        min_confidence = self.min_confidence_var.get()
+        filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
+        
+        # Display enhanced recommendations with rich Scryfall data
+        for rec in filtered_recs:
+            # Determine ownership status and display
+            if rec.cost_consideration == "owned":
+                card_display = f"✅ {rec.card_name} (Owned)"
+                tag = 'owned'
+            else:
+                craft_icons = {
+                    "common_craft": "🔨", 
+                    "uncommon_craft": "🔧", 
+                    "rare_craft": "💎", 
+                    "mythic_craft": "👑"
+                }
+                craft_icon = craft_icons.get(rec.cost_consideration, "🔨")
+                card_display = f"{craft_icon} {rec.card_name}"
+                tag = 'craftable'
+            
+            # Add legality info if available
+            if rec.legality:
+                format_name = self.format_var.get().lower()
+                legality_status = rec.legality.get(format_name, "unknown")
+                if legality_status == "legal":
+                    card_display += " ✓"
+                elif legality_status == "not_legal":
+                    card_display += " ❌"
+                elif legality_status == "restricted":
+                    card_display += " ⚠️"
+            
+            # Enhanced reasons with Scryfall data
+            enhanced_reasons = rec.reasons.copy()
+            if rec.keywords:
+                keyword_summary = f"Keywords: {', '.join(rec.keywords[:3])}"
+                if len(rec.keywords) > 3:
+                    keyword_summary += f" (+{len(rec.keywords)-3} more)"
+                enhanced_reasons.append(keyword_summary)
+            
+            if rec.power_toughness:
+                enhanced_reasons.append(f"P/T: {rec.power_toughness}")
+            
+            # Format reasons for display
+            reasons_text = "; ".join(enhanced_reasons[:2])
+            if len(enhanced_reasons) > 2:
+                reasons_text += f" (+{len(enhanced_reasons)-2} more)"
+            
+            # Enhanced column data
+            values = (
+                card_display,
+                f"{rec.confidence:.1%}",
+                f"{rec.synergy_score:.1%}",
+                f"{rec.meta_score:.1%}",
+                f"{rec.deck_fit:.1%}",
+                reasons_text
+            )
+            
+            self.rec_tree.insert('', 'end', values=values, tags=(tag,))
+        
+        # Configure tag colors
+        self.rec_tree.tag_configure('owned', background='lightgreen')
+        self.rec_tree.tag_configure('craftable', background='lightyellow')
+    
     def display_smart_recommendations(self):
         """Display the smart AI recommendations"""
         # Clear existing items
@@ -566,7 +640,11 @@ class AIRecommendationsTab:
     
     def filter_recommendations(self, *args):
         """Filter recommendations by minimum confidence"""
-        self.display_recommendations()
+        # Use enhanced display if we have enhanced recommendations
+        if hasattr(self, 'current_smart_recommendations') and self.current_smart_recommendations:
+            self.display_enhanced_recommendations()
+        else:
+            self.display_recommendations()
     
     def refresh_all(self):
         """Refresh all analyses and recommendations"""
