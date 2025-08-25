@@ -30,6 +30,7 @@ class AIRecommendationsTab:
         self.sort_reverse = True  # Highest confidence first
         self.current_page = 0  # Current page for pagination
         self.items_per_page = 50  # Items per page
+        self.show_lands = True  # Toggle for land visibility
         
         self.create_widgets()
     
@@ -284,14 +285,30 @@ class AIRecommendationsTab:
         self.next_page_btn.pack(side=tk.LEFT, padx=2)
         
         # Filter controls
-        ttk.Label(rec_controls, text="Min Confidence:").pack(side=tk.LEFT, padx=(20, 5))
+        filter_frame = ttk.Frame(rec_controls)
+        filter_frame.pack(side=tk.LEFT, padx=(20, 0))
+        
+        # Land visibility toggle
+        self.show_lands_var = tk.BooleanVar(value=True)
+        lands_checkbox = ttk.Checkbutton(filter_frame, text="Show Lands", 
+                                        variable=self.show_lands_var,
+                                        command=self.toggle_land_visibility)
+        lands_checkbox.pack(side=tk.LEFT, padx=5)
+        
+        # Confidence filter
+        ttk.Label(filter_frame, text="Min Confidence:").pack(side=tk.LEFT, padx=(15, 5))
         self.min_confidence_var = tk.DoubleVar(value=0.0)
-        confidence_scale = ttk.Scale(rec_controls, from_=0.0, to=1.0, orient=tk.HORIZONTAL, 
+        confidence_scale = ttk.Scale(filter_frame, from_=0.0, to=1.0, orient=tk.HORIZONTAL, 
                                    length=100, variable=self.min_confidence_var, command=self.filter_recommendations)
         confidence_scale.pack(side=tk.LEFT, padx=5)
         
-        self.confidence_label = ttk.Label(rec_controls, text="0%")
+        self.confidence_label = ttk.Label(filter_frame, text="0%")
         self.confidence_label.pack(side=tk.LEFT, padx=5)
+        
+        # Total recommendations count
+        self.total_count_label = ttk.Label(rec_controls, text="Total: 0 recommendations", 
+                                         font=('TkDefaultFont', 9, 'bold'), foreground='darkblue')
+        self.total_count_label.pack(side=tk.RIGHT, padx=5)
         
         # Update confidence label
         def update_confidence_label(*args):
@@ -351,6 +368,11 @@ class AIRecommendationsTab:
         if self.current_smart_recommendations:
             min_confidence = self.min_confidence_var.get()
             filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
+            
+            # Apply land filter if needed
+            if not self.show_lands_var.get():
+                filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
+            
             try:
                 items_per_page = self.rec_count_var.get()
                 if items_per_page <= 0:
@@ -380,9 +402,14 @@ class AIRecommendationsTab:
             except (tk.TclError, ValueError):
                 items_per_page = 50
             
-            # Calculate total filtered results
+            # Calculate total filtered results (considering both confidence and land filters)
             min_confidence = self.min_confidence_var.get()
             filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
+            
+            # Apply land filter if needed
+            if not self.show_lands_var.get():
+                filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
+            
             total_pages = (len(filtered_recs) + items_per_page - 1) // items_per_page
             
             if self.current_page < total_pages - 1:
@@ -576,9 +603,25 @@ class AIRecommendationsTab:
         for item in self.rec_tree.get_children():
             self.rec_tree.delete(item)
         
+        if not self.current_recommendations:
+            self.update_total_count(0, 0)
+            return
+        
         # Filter by minimum confidence
         min_confidence = self.min_confidence_var.get()
         filtered_recs = [r for r in self.current_recommendations if r.confidence >= min_confidence]
+        
+        # Filter by land visibility if toggled off (for legacy recommendations)
+        if hasattr(self, 'show_lands_var') and not self.show_lands_var.get():
+            # For legacy recommendations, we need to check the card type differently
+            filtered_recs = [r for r in filtered_recs 
+                           if not (hasattr(r, 'card') and hasattr(r.card, 'type_line') and 
+                                  "Land" in r.card.type_line)]
+        
+        # Update total count display
+        total_before_filters = len(self.current_recommendations)
+        total_after_filters = len(filtered_recs)
+        self.update_total_count(total_before_filters, total_after_filters)
         
         # Sort recommendations
         sort_key_map = {
@@ -699,11 +742,22 @@ class AIRecommendationsTab:
         
         if not self.current_smart_recommendations:
             self.update_pagination_info(0)
+            self.update_total_count(0, 0)
             return
         
         # Filter by minimum confidence
         min_confidence = self.min_confidence_var.get()
         filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
+        
+        # Filter by land visibility if toggled off
+        if not self.show_lands_var.get():
+            # Filter out lands (cards with "Land" in their card_type)
+            filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
+        
+        # Update total count display
+        total_before_filters = len(self.current_smart_recommendations)
+        total_after_filters = len(filtered_recs)
+        self.update_total_count(total_before_filters, total_after_filters)
         
         # Sort recommendations
         sort_key_map = {
@@ -722,9 +776,9 @@ class AIRecommendationsTab:
         try:
             items_per_page = self.rec_count_var.get()
             if items_per_page <= 0:
-                items_per_page = 50  # Default fallback
+                items_per_page = 15  # Default fallback
         except (tk.TclError, ValueError):
-            items_per_page = 50  # Default fallback
+            items_per_page = 15  # Default fallback
         
         # Calculate pagination
         total_results = len(filtered_recs)
@@ -825,10 +879,24 @@ class AIRecommendationsTab:
             self.rec_tree.delete(item)
         
         if not self.current_smart_recommendations:
+            self.update_total_count(0, 0)
             return
         
+        # Apply filters (confidence and land visibility)
+        min_confidence = self.min_confidence_var.get()
+        filtered_recs = [r for r in self.current_smart_recommendations if r.confidence >= min_confidence]
+        
+        # Filter by land visibility if toggled off
+        if hasattr(self, 'show_lands_var') and not self.show_lands_var.get():
+            filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
+        
+        # Update total count display
+        total_before_filters = len(self.current_smart_recommendations)
+        total_after_filters = len(filtered_recs)
+        self.update_total_count(total_before_filters, total_after_filters)
+        
         # Display smart recommendations with ownership info
-        for rec in self.current_smart_recommendations:
+        for rec in filtered_recs:
             # Determine ownership status and display
             if rec.cost_consideration == "owned":
                 card_display = f"✅ {rec.card_name} (Owned)"
@@ -896,6 +964,27 @@ class AIRecommendationsTab:
     def filter_recommendations(self, *args):
         """Filter recommendations by minimum confidence"""
         self.current_page = 0  # Reset to first page when filtering
+        self.refresh_display()
+        
+    def update_total_count(self, total_recommendations, filtered_recommendations):
+        """Update the total recommendations count display"""
+        if total_recommendations == filtered_recommendations:
+            count_text = f"Total: {total_recommendations} recommendations"
+        else:
+            count_text = f"Total: {filtered_recommendations} of {total_recommendations} recommendations"
+        
+        # Add land filter info if lands are hidden
+        if hasattr(self, 'show_lands_var') and not self.show_lands_var.get():
+            land_count = sum(1 for r in self.current_smart_recommendations if "Land" in r.card_type)
+            count_text += f" (hiding {land_count} lands)"
+        
+        if hasattr(self, 'total_count_label'):
+            self.total_count_label.config(text=count_text)
+    
+    def toggle_land_visibility(self):
+        """Toggle the visibility of land recommendations"""
+        self.show_lands = self.show_lands_var.get()
+        self.current_page = 0  # Reset to first page when filter changes
         self.refresh_display()
     
     def refresh_all(self):
