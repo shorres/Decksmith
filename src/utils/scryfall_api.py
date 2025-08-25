@@ -45,7 +45,7 @@ class ScryfallAPI:
             'User-Agent': 'MTG Arena Deck Manager/1.0'
         })
         self.last_request_time = 0
-        self.min_request_interval = 0.05  # Reduced from 0.1 to 0.05 (50ms between requests)
+        self.min_request_interval = 0.1  # Reduced from 0.1 to 0.05 (50ms between requests)
     
     def _rate_limit(self):
         """Ensure we don't exceed rate limits"""
@@ -61,7 +61,7 @@ class ScryfallAPI:
         
         try:
             url = f"{self.BASE_URL}{endpoint}"
-            response = self.session.get(url, params=params, timeout=5)  # Reduced from 10 to 5 seconds
+            response = self.session.get(url, params=params, timeout=10)  # Reduced from 10 to 5 seconds
             
             if response.status_code == 200:
                 return response.json()
@@ -96,7 +96,7 @@ class ScryfallAPI:
         endpoint = "/cards/search"
         params = {
             "q": query,  # Use query directly instead of name:query
-            "order": "name",
+            "order": "cmc",
             "dir": "asc",
             "unique": "cards"
         }
@@ -106,7 +106,8 @@ class ScryfallAPI:
             return []
         
         cards = []
-        for card_data in data['data'][:limit]:
+        # Scryfall returns pages of results, process the full first page (up to 175 cards)
+        for card_data in data['data'][:min(limit, 175)]:  # Respect both our limit and Scryfall's page size
             try:
                 card = self._parse_card_data(card_data)
                 if card:

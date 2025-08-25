@@ -544,8 +544,9 @@ class AIRecommendationsTab:
                 count = self.rec_count_var.get()
                 
                 # Use the enhanced recommendation engine with Scryfall data
+                # Request a large pool of recommendations for better variety
                 enhanced_recommendations = get_smart_recommendations(
-                    current_deck, collection, count, format_name
+                    current_deck, collection, 200, format_name  # Always request 200 for large pool
                 )
                 
                 def update_recs():
