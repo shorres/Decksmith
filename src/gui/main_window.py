@@ -52,9 +52,21 @@ class MainWindow:
         self.notebook.add(self.deck_tab.frame, text="Decks")
         self.notebook.add(self.ai_tab.frame, text="AI Recommendations")
         
+        # Bind tab selection event to update AI tab when selected
+        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
+        
         # Status bar
         self.status_bar = ttk.Label(self.root, text="Ready", relief=tk.SUNKEN, anchor=tk.W)
         self.status_bar.grid(row=1, column=0, sticky="ew", padx=5, pady=2)
+    
+    def on_tab_changed(self, event):
+        """Handle tab change events"""
+        selection = event.widget.select()
+        tab_text = event.widget.tab(selection, "text")
+        
+        # Update AI tab when it's selected
+        if tab_text == "AI Recommendations":
+            self.ai_tab.on_tab_focus()
     
     def create_menu(self):
         """Create the main menu bar"""

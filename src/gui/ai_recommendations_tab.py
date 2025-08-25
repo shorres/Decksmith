@@ -28,9 +28,12 @@ class AIRecommendationsTab:
         """Create the AI recommendations tab widgets"""
         self.frame = ttk.Frame(self.parent)
         
+        # Create deck status header
+        self.create_deck_status_header()
+        
         # Create main paned window
         paned = ttk.PanedWindow(self.frame, orient=tk.VERTICAL)
-        paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 5))
         
         # Top panel - controls and deck analysis
         top_frame = ttk.Frame(paned)
@@ -42,6 +45,102 @@ class AIRecommendationsTab:
         
         self.create_control_panel(top_frame)
         self.create_recommendations_panel(bottom_frame)
+    
+    def create_deck_status_header(self):
+        """Create a header showing which deck is being analyzed"""
+        header_frame = ttk.Frame(self.frame)
+        header_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Main header with deck info
+        self.deck_header = ttk.LabelFrame(header_frame, text="🎯 AI Deck Analysis")
+        self.deck_header.pack(fill=tk.X, pady=5)
+        
+        # Deck status frame
+        deck_status = ttk.Frame(self.deck_header)
+        deck_status.pack(fill=tk.X, padx=10, pady=8)
+        
+        # Current deck label
+        deck_info_frame = ttk.Frame(deck_status)
+        deck_info_frame.pack(fill=tk.X)
+        
+        ttk.Label(deck_info_frame, text="Current Deck:", font=('TkDefaultFont', 9, 'bold')).pack(side=tk.LEFT)
+        
+        self.current_deck_label = ttk.Label(deck_info_frame, text="No deck selected", 
+                                          font=('TkDefaultFont', 11, 'bold'), 
+                                          foreground='red')
+        self.current_deck_label.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Deck details frame
+        self.deck_details_frame = ttk.Frame(deck_status)
+        self.deck_details_frame.pack(fill=tk.X, pady=(5, 0))
+        
+        # Format and card count
+        self.deck_format_label = ttk.Label(self.deck_details_frame, text="")
+        self.deck_format_label.pack(side=tk.LEFT)
+        
+        self.deck_size_label = ttk.Label(self.deck_details_frame, text="")
+        self.deck_size_label.pack(side=tk.LEFT, padx=(20, 0))
+        
+        # Analysis status
+        self.analysis_status_label = ttk.Label(self.deck_details_frame, text="", foreground='blue')
+        self.analysis_status_label.pack(side=tk.RIGHT)
+        
+        # Update the deck info initially
+        self.update_deck_header()
+    
+    def update_deck_header(self):
+        """Update the deck header with current deck information"""
+        current_deck = self.get_current_deck()
+        
+        if current_deck:
+            # Update deck name with visual indicator
+            self.current_deck_label.config(
+                text=f"📋 {current_deck.name}", 
+                foreground='darkgreen'
+            )
+            
+            # Update deck details
+            format_text = f"Format: {current_deck.format}"
+            self.deck_format_label.config(text=format_text)
+            
+            mainboard_count = sum(card.quantity for card in current_deck.get_mainboard_cards())
+            sideboard_count = sum(card.quantity for card in current_deck.get_sideboard_cards())
+            size_text = f"Cards: {mainboard_count} main"
+            if sideboard_count > 0:
+                size_text += f", {sideboard_count} side"
+            self.deck_size_label.config(text=size_text)
+            
+            # Show colors
+            color_distribution = current_deck.get_color_distribution()
+            if color_distribution:
+                color_symbols = {'W': '⚪', 'U': '🔵', 'B': '⚫', 'R': '🔴', 'G': '🟢'}
+                color_list = []
+                for color in sorted(color_distribution.keys()):
+                    symbol = color_symbols.get(color, color)
+                    if symbol:
+                        color_list.append(symbol)
+                color_display = ''.join(color_list)
+                self.deck_format_label.config(text=f"{format_text} | Colors: {color_display}")
+            
+            self.analysis_status_label.config(text="Ready for analysis")
+            
+        else:
+            # No deck selected
+            self.current_deck_label.config(
+                text="❌ No deck selected", 
+                foreground='red'
+            )
+            self.deck_format_label.config(text="Select a deck in the 'Decks' tab to begin analysis")
+            self.deck_size_label.config(text="")
+            self.analysis_status_label.config(text="")
+    
+    def on_tab_focus(self):
+        """Called when the AI recommendations tab gets focus"""
+        self.update_deck_header()
+    
+    def get_frame(self):
+        """Get the frame for this tab - useful for external access"""
+        return self.frame
     
     def create_control_panel(self, parent):
         """Create the control and analysis panel"""
@@ -192,48 +291,78 @@ class AIRecommendationsTab:
             messagebox.showwarning("Warning", "No deck selected")
             return
         
+        # Update header to show current deck
+        self.update_deck_header()
+        
         self.loading_var.set("Analyzing...")
+        self.analysis_status_label.config(text="🔍 Analyzing deck...", foreground='blue')
         self.frame.update()
         
         def analyze():
             try:
                 # Archetype analysis
                 archetype_scores = self.recommendation_engine.analyze_deck_archetype(current_deck)
-                archetype_text = "Deck Archetype Analysis:\\n\\n"
+                archetype_text = f"🏗️ DECK ARCHETYPE ANALYSIS for '{current_deck.name}'\n"
+                archetype_text += "=" * 60 + "\n\n"
                 
                 if archetype_scores:
                     sorted_archetypes = sorted(archetype_scores.items(), key=lambda x: x[1], reverse=True)
-                    for archetype, score in sorted_archetypes:
-                        archetype_text += f"{archetype}: {score:.1%} match\\n"
+                    archetype_text += "📊 Archetype Match Scores:\n"
+                    for i, (archetype, score) in enumerate(sorted_archetypes[:5], 1):  # Show top 5
+                        percentage = score * 100
+                        bar = "█" * int(percentage / 10) + "▒" * (10 - int(percentage / 10))
+                        archetype_text += f"  {i}. {archetype:15} [{bar}] {percentage:.1f}%\n"
+                        
                         if archetype in self.recommendation_engine.card_db.archetype_templates:
                             template = self.recommendation_engine.card_db.archetype_templates[archetype]
-                            archetype_text += f"  {template['description']}\\n"
+                            archetype_text += f"      💡 {template['description']}\n"
                     
                     primary_archetype = sorted_archetypes[0][0]
-                    archetype_text += f"\\nPrimary Archetype: {primary_archetype}\\n"
+                    primary_score = sorted_archetypes[0][1] * 100
+                    archetype_text += f"\n🎯 PRIMARY ARCHETYPE: {primary_archetype.upper()}"
+                    archetype_text += f" ({primary_score:.1f}% match)\n"
                 else:
-                    archetype_text += "Unable to identify clear archetype.\\n"
+                    archetype_text += "❓ Unable to identify clear archetype pattern.\n"
+                    archetype_text += "   This deck may be experimental or need refinement.\n"
                 
                 # Deck improvements
                 improvements = self.recommendation_engine.suggest_deck_improvements(current_deck)
-                improvements_text = "Suggested Improvements:\\n\\n"
-                for i, suggestion in enumerate(improvements, 1):
-                    improvements_text += f"{i}. {suggestion}\\n"
+                improvements_text = f"⚡ DECK IMPROVEMENT SUGGESTIONS for '{current_deck.name}'\n"
+                improvements_text += "=" * 60 + "\n\n"
                 
-                if not improvements:
-                    improvements_text += "Your deck looks well-balanced! No major issues detected.\\n"
+                if improvements:
+                    improvements_text += "🔧 Recommended Changes:\n\n"
+                    for i, suggestion in enumerate(improvements, 1):
+                        improvements_text += f"  {i}. 📝 {suggestion}\n\n"
+                else:
+                    improvements_text += "✅ DECK LOOKS GREAT!\n\n"
+                    improvements_text += "Your deck appears to be well-balanced with no major issues detected.\n"
+                    improvements_text += "Consider fine-tuning based on your local meta or playstyle preferences.\n"
                 
                 # Similar decks
                 similar_decks = self.recommendation_engine.find_similar_decks(current_deck)
-                similar_text = "Similar Successful Decks:\\n\\n"
-                for deck_info in similar_decks:
-                    similar_text += f"• {deck_info['name']} by {deck_info['pilot']}\\n"
-                    similar_text += f"  Event: {deck_info['event']}\\n"
-                    similar_text += f"  Similarity: {deck_info['similarity']:.1%}\\n"
-                    similar_text += f"  Key Differences: {', '.join(deck_info['key_differences'])}\\n\\n"
+                similar_text = f"🔍 SIMILAR SUCCESSFUL DECKS to '{current_deck.name}'\n"
+                similar_text += "=" * 60 + "\n\n"
                 
-                if not similar_decks:
-                    similar_text += "No similar decks found in the database.\\n"
+                if similar_decks:
+                    similar_text += "🏆 Tournament-Proven Similar Builds:\n\n"
+                    for i, deck_info in enumerate(similar_decks, 1):
+                        similarity_percentage = deck_info['similarity'] * 100
+                        stars = "⭐" * min(5, int(similarity_percentage / 20))
+                        
+                        similar_text += f"  {i}. 🎴 {deck_info['name']}\n"
+                        similar_text += f"     👤 Pilot: {deck_info['pilot']}\n"
+                        similar_text += f"     🏟️  Event: {deck_info['event']}\n"
+                        similar_text += f"     📊 Similarity: {stars} {similarity_percentage:.1f}%\n"
+                        if deck_info['key_differences']:
+                            similar_text += f"     🔄 Key Differences: {', '.join(deck_info['key_differences'])}\n"
+                        similar_text += "\n"
+                else:
+                    similar_text += "🔍 No similar decks found in the tournament database.\n\n"
+                    similar_text += "This could mean:\n"
+                    similar_text += "• Your deck is unique/innovative\n"
+                    similar_text += "• The archetype is underrepresented in competitive play\n"
+                    similar_text += "• Consider exploring established archetypes for reference\n"
                 
                 # Update UI in main thread
                 def update_ui():
@@ -247,13 +376,15 @@ class AIRecommendationsTab:
                     self.similar_text.insert(1.0, similar_text)
                     
                     self.loading_var.set("")
+                    self.analysis_status_label.config(text="✅ Analysis complete", foreground='green')
                 
                 self.frame.after(0, update_ui)
                 
             except Exception as e:
                 def show_error():
-                    messagebox.showerror("Error", f"Analysis failed: {str(e)}")
+                    messagebox.showerror("Analysis Error", f"Analysis failed: {str(e)}")
                     self.loading_var.set("")
+                    self.analysis_status_label.config(text="❌ Analysis failed", foreground='red')
                 
                 self.frame.after(0, show_error)
         
@@ -269,7 +400,11 @@ class AIRecommendationsTab:
             messagebox.showwarning("Warning", "No deck selected")
             return
         
+        # Update header to show current deck
+        self.update_deck_header()
+        
         self.loading_var.set("Getting recommendations...")
+        self.analysis_status_label.config(text="🤖 Generating AI recommendations...", foreground='blue')
         self.frame.update()
         
         def get_recs():
@@ -286,13 +421,15 @@ class AIRecommendationsTab:
                     self.current_recommendations = recommendations
                     self.display_recommendations()
                     self.loading_var.set("")
+                    self.analysis_status_label.config(text="✅ Recommendations ready", foreground='green')
                 
                 self.frame.after(0, update_recs)
                 
             except Exception as e:
                 def show_error():
-                    messagebox.showerror("Error", f"Recommendations failed: {str(e)}")
+                    messagebox.showerror("Recommendation Error", f"Recommendations failed: {str(e)}")
                     self.loading_var.set("")
+                    self.analysis_status_label.config(text="❌ Recommendations failed", foreground='red')
                 
                 self.frame.after(0, show_error)
         
@@ -333,6 +470,7 @@ class AIRecommendationsTab:
     
     def refresh_all(self):
         """Refresh all analyses and recommendations"""
+        self.update_deck_header()  # Update deck info first
         self.analyze_deck()
         self.get_recommendations()
     
