@@ -40,7 +40,7 @@ class MainWindow:
         
         # Add tabs
         self.collection_tab = CollectionTab(self.notebook)
-        self.deck_tab = DeckTab(self.notebook)
+        self.deck_tab = DeckTab(self.notebook, collection=self.collection_tab.collection)
         self.ai_tab = AIRecommendationsTab(
             self.notebook, 
             get_current_deck_func=lambda: self.deck_tab.current_deck,

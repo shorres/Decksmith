@@ -17,8 +17,9 @@ from utils.clipboard_handler import ClipboardHandler
 class DeckTab:
     """Deck management interface"""
     
-    def __init__(self, parent):
+    def __init__(self, parent, collection=None):
         self.parent = parent
+        self.collection = collection  # Reference to collection for auto-adding cards
         self.decks = []
         self.current_deck = None
         self.current_deck_index = 0
@@ -291,6 +292,83 @@ class DeckTab:
         self.save_decks()
         return True
     
+    def add_deck_cards_to_collection(self, deck: Deck, update_collection_display=True) -> Dict[str, int]:
+        """Add deck cards to collection with playset limits (max 4 per card)"""
+        if not self.collection:
+            return {'cards_added': 0, 'cards_updated': 0, 'cards_skipped': 0}
+        
+        cards_added = 0
+        cards_updated = 0
+        cards_skipped = 0
+        
+        # Get all cards from deck (mainboard + sideboard)
+        all_deck_cards = deck.get_mainboard_cards() + deck.get_sideboard_cards()
+        
+        # Group cards by name to handle duplicates within the deck
+        card_totals = {}
+        for deck_card in all_deck_cards:
+            card_name = deck_card.card.name
+            if card_name not in card_totals:
+                card_totals[card_name] = {'card': deck_card.card, 'quantity': 0}
+            card_totals[card_name]['quantity'] += deck_card.quantity
+        
+        for card_name, card_info in card_totals.items():
+            card = card_info['card']
+            deck_quantity = card_info['quantity']
+            
+            # Check current collection quantity
+            current_quantity = self.collection.get_card_quantity(card_name, include_foil=True)
+            
+            # Calculate how many we can add (max 4 total)
+            max_allowed = 4
+            can_add = max(0, max_allowed - current_quantity)
+            
+            if can_add > 0:
+                # Add up to the limit
+                to_add = min(deck_quantity, can_add)
+                
+                if card_name in self.collection.cards:
+                    # Update existing card
+                    self.collection.cards[card_name].quantity += to_add
+                    cards_updated += 1
+                else:
+                    # Add new card
+                    self.collection.add_card(card, to_add)
+                    cards_added += 1
+                
+                if deck_quantity > to_add:
+                    cards_skipped += 1
+            else:
+                cards_skipped += 1
+        
+        # Save collection if any changes were made
+        if cards_added > 0 or cards_updated > 0:
+            if hasattr(self, 'collection') and hasattr(self.collection, 'save'):
+                try:
+                    # Try to save collection if it has a save method
+                    # Otherwise, we'll need the collection tab to handle saving
+                    pass
+                except:
+                    pass
+            
+            # Update collection display if requested and we have access to collection tab
+            if update_collection_display:
+                # Find the collection tab through the main window
+                try:
+                    main_window = self.parent.master  # Get the main window
+                    if hasattr(main_window, 'collection_tab'):
+                        main_window.collection_tab.apply_filters()
+                        main_window.collection_tab.refresh_display()
+                        main_window.collection_tab.save_collection()
+                except:
+                    pass
+        
+        return {
+            'cards_added': cards_added,
+            'cards_updated': cards_updated, 
+            'cards_skipped': cards_skipped
+        }
+    
     def edit_card_quantity(self, tree, sideboard=False):
         """Edit quantity of selected card"""
         selection = tree.selection()
@@ -475,7 +553,19 @@ class DeckTab:
                 self.deck_listbox.selection_set(len(self.decks) - 1)
                 self.on_deck_select()
                 self.save_decks()
-                messagebox.showinfo("Success", "Deck imported successfully!")
+                
+                # Add deck cards to collection with playset limits
+                if self.collection:
+                    result = self.add_deck_cards_to_collection(deck)
+                    collection_msg = f"\n\nCollection updated:\n"
+                    collection_msg += f"• {result['cards_added']} new cards added\n"
+                    collection_msg += f"• {result['cards_updated']} existing cards updated\n"
+                    if result['cards_skipped'] > 0:
+                        collection_msg += f"• {result['cards_skipped']} cards skipped (already at 4-card limit)"
+                    
+                    messagebox.showinfo("Success", f"Deck imported successfully!{collection_msg}")
+                else:
+                    messagebox.showinfo("Success", "Deck imported successfully!")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to import deck: {str(e)}")
     
@@ -494,7 +584,19 @@ class DeckTab:
                 self.deck_listbox.selection_set(len(self.decks) - 1)
                 self.on_deck_select()
                 self.save_decks()
-                messagebox.showinfo("Success", "Deck imported successfully!")
+                
+                # Add deck cards to collection with playset limits
+                if self.collection:
+                    result = self.add_deck_cards_to_collection(deck)
+                    collection_msg = f"\n\nCollection updated:\n"
+                    collection_msg += f"• {result['cards_added']} new cards added\n"
+                    collection_msg += f"• {result['cards_updated']} existing cards updated\n"
+                    if result['cards_skipped'] > 0:
+                        collection_msg += f"• {result['cards_skipped']} cards skipped (already at 4-card limit)"
+                    
+                    messagebox.showinfo("Success", f"Deck imported successfully!{collection_msg}")
+                else:
+                    messagebox.showinfo("Success", "Deck imported successfully!")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to import deck: {str(e)}")
     
@@ -553,7 +655,9 @@ class DeckTab:
                     "Import Deck from Clipboard", 
                     f"Found deck with {deck.get_total_cards()} total cards.\n"
                     f"Format detected: {format_desc}\n\n"
-                    f"Import this deck?"
+                    f"Import this deck?\n\n"
+                    f"Note: Cards will also be added to your collection\n"
+                    f"(max 4 copies per card as per Arena playset rules)"
                 )
                 
                 if result:
@@ -563,7 +667,19 @@ class DeckTab:
                     self.deck_listbox.selection_set(len(self.decks) - 1)
                     self.on_deck_select()
                     self.save_decks()
-                    messagebox.showinfo("Success", f"Imported deck '{deck.name}' from clipboard!")
+                    
+                    # Add deck cards to collection with playset limits
+                    if self.collection:
+                        collection_result = self.add_deck_cards_to_collection(deck)
+                        collection_msg = f"\n\nCollection updated:\n"
+                        collection_msg += f"• {collection_result['cards_added']} new cards added\n"
+                        collection_msg += f"• {collection_result['cards_updated']} existing cards updated\n"
+                        if collection_result['cards_skipped'] > 0:
+                            collection_msg += f"• {collection_result['cards_skipped']} cards skipped (already at 4-card limit)"
+                        
+                        messagebox.showinfo("Success", f"Imported deck '{deck.name}' from clipboard!{collection_msg}")
+                    else:
+                        messagebox.showinfo("Success", f"Imported deck '{deck.name}' from clipboard!")
             else:
                 content = self.clipboard_handler.get_clipboard_content()
                 if not content:

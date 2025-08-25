@@ -24,6 +24,7 @@ The tool now supports importing and exporting decks directly from your system cl
 1. Copy a deck list from any source (Arena export, website, etc.)
 2. Click "Import Clipboard" in the Decks tab
 3. The tool will automatically detect the format and import your deck
+4. **NEW**: Cards are automatically added to your collection (max 4 per card)
 
 ### Export to Clipboard:
 1. Select a deck in the Decks tab
@@ -34,6 +35,14 @@ The tool now supports importing and exporting decks directly from your system cl
 ### Collection Import:
 - Use "Import Clipboard" in the Collection tab to add cards from clipboard to your collection
 - Perfect for importing from Arena collection exports or card lists from websites
+
+## 🃏 **Arena Playset Management**
+
+The tool automatically manages Arena playset limits:
+- **Maximum 4 copies** per card are added to your collection
+- When importing decks, cards are automatically added to your collection
+- Duplicate imports across decks won't exceed the 4-card limit
+- Import status shows how many cards were added, updated, or skipped due to limits
 
 ## Installation
 
