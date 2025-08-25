@@ -710,7 +710,7 @@ class AIRecommendationsTab:
             'name': lambda r: r.card_name.lower(),
             'confidence': lambda r: r.confidence,
             'synergy': lambda r: r.synergy_score,
-            'cmc': lambda r: getattr(r, 'cmc', 0),  # Use CMC from Scryfall data
+            'cmc': lambda r: 0 if "Land" in r.card_type else getattr(r, 'cmc', 0),  # Lands sort as CMC 0
             'fit': lambda r: r.deck_fit,
             'reasons': lambda r: len(r.reasons)
         }
@@ -787,11 +787,14 @@ class AIRecommendationsTab:
                 reasons_text += f" (+{len(enhanced_reasons)-2} more)"
             
             # Enhanced column data
+            # Handle CMC display - show "Land" for lands, otherwise show CMC as integer
+            cmc_display = "Land" if "Land" in rec.card_type else str(int(getattr(rec, 'cmc', 0)))
+            
             values = (
                 card_display,
                 f"{rec.confidence:.1%}",
                 f"{rec.synergy_score:.1%}",
-                str(int(getattr(rec, 'cmc', 0))),  # Show CMC as integer
+                cmc_display,  # Show "Land" for lands, CMC as integer for others
                 f"{rec.deck_fit:.1%}",
                 reasons_text
             )
