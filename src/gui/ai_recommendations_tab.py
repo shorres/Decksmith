@@ -125,7 +125,7 @@ class AIRecommendationsTab:
             # Show colors
             color_distribution = current_deck.get_color_distribution()
             if color_distribution:
-                color_symbols = {'W': '⚪', 'U': '🔵', 'B': '⚫', 'R': '🔴', 'G': '🟢'}
+                color_symbols = {'W': '[W]', 'U': '[U]', 'B': '[B]', 'R': '[R]', 'G': '[G]'}
                 color_list = []
                 for color in sorted(color_distribution.keys()):
                     symbol = color_symbols.get(color, color)
@@ -449,7 +449,7 @@ class AIRecommendationsTab:
                     similar_text += "🏆 Tournament-Proven Similar Builds:\n\n"
                     for i, deck_info in enumerate(similar_decks, 1):
                         similarity_percentage = deck_info['similarity'] * 100
-                        stars = "⭐" * min(5, int(similarity_percentage / 20))
+                        stars = "*" * min(5, int(similarity_percentage / 20))
                         
                         similar_text += f"  {i}. 🎴 {deck_info['name']}\n"
                         similar_text += f"     👤 Pilot: {deck_info['pilot']}\n"
