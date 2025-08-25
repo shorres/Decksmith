@@ -197,7 +197,7 @@ class EnhancedImportProgressDialog:
             # Get image URL
             image_url = None
             if hasattr(scryfall_card, 'image_uris') and scryfall_card.image_uris:
-                image_url = getattr(scryfall_card.image_uris, 'small', None)
+                image_url = scryfall_card.image_uris.get('small') or scryfall_card.image_uris.get('normal')
             
             if not image_url:
                 return

@@ -30,6 +30,7 @@ class ScryfallCard:
     set_name: str
     collector_number: str
     image_uri: Optional[str]
+    image_uris: Optional[Dict[str, str]]  # Add image_uris for multiple sizes
     scryfall_id: str
     legalities: Dict[str, str]  # Format legality information
 
@@ -157,12 +158,15 @@ class ScryfallAPI:
                 power = data.get('power')
                 toughness = data.get('toughness')
             
-            # Get image URI
+            # Get image URIs
             image_uri = None
+            image_uris = None
             if 'image_uris' in data:
-                image_uri = data['image_uris'].get('normal')
+                image_uris = data['image_uris']
+                image_uri = image_uris.get('normal')
             elif 'card_faces' in data and data['card_faces'] and 'image_uris' in data['card_faces'][0]:
-                image_uri = data['card_faces'][0]['image_uris'].get('normal')
+                image_uris = data['card_faces'][0]['image_uris']
+                image_uri = image_uris.get('normal')
             
             return ScryfallCard(
                 name=name,
@@ -179,6 +183,7 @@ class ScryfallAPI:
                 set_name=data.get('set_name', ''),
                 collector_number=data.get('collector_number', ''),
                 image_uri=image_uri,
+                image_uris=image_uris,
                 scryfall_id=data.get('id', ''),
                 legalities=data.get('legalities', {})
             )

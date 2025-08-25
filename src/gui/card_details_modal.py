@@ -263,8 +263,7 @@ class CardDetailsModal:
                 image_url = None
                 if self.scryfall_card and hasattr(self.scryfall_card, 'image_uris') and self.scryfall_card.image_uris:
                     # Prefer normal size, fall back to small
-                    image_url = getattr(self.scryfall_card.image_uris, 'normal', 
-                                      getattr(self.scryfall_card.image_uris, 'small', None))
+                    image_url = self.scryfall_card.image_uris.get('normal') or self.scryfall_card.image_uris.get('small')
                 
                 if not image_url:
                     self.parent.after(0, self.set_image_error)

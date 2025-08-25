@@ -545,37 +545,37 @@ class DeckTab:
         mainboard_count = self.current_deck.get_total_cards(include_sideboard=False)
         sideboard_count = len(self.current_deck.get_sideboard_cards())
         
-        stats_text = f"Total Cards: {mainboard_count}\\n"
-        stats_text += f"Sideboard: {sideboard_count}\\n"
-        stats_text += f"Format: {self.current_deck.format}\\n\\n"
+        stats_text = f"Total Cards: {mainboard_count}\n"
+        stats_text += f"Sideboard: {sideboard_count}\n"
+        stats_text += f"Format: {self.current_deck.format}\n\n"
         
         # Mana curve
         mana_curve = self.current_deck.get_mana_curve()
         if mana_curve:
-            stats_text += "Mana Curve:\\n"
+            stats_text += "Mana Curve:\n"
             for cmc in sorted(mana_curve.keys()):
                 cmc_label = f"{cmc}+" if cmc >= 7 else str(cmc)
-                stats_text += f"  {cmc_label}: {mana_curve[cmc]}\\n"
-            stats_text += "\\n"
+                stats_text += f"  {cmc_label}: {mana_curve[cmc]}\n"
+            stats_text += "\n"
         
         # Color distribution
         colors = self.current_deck.get_color_distribution()
         if colors:
-            stats_text += "Colors:\\n"
+            stats_text += "Colors:\n"
             for color, count in sorted(colors.items()):
-                stats_text += f"  {color}: {count}\\n"
-            stats_text += "\\n"
+                stats_text += f"  {color}: {count}\n"
+            stats_text += "\n"
         
         # Type distribution
         types = self.current_deck.get_type_distribution()
         if types:
-            stats_text += "Card Types:\\n"
+            stats_text += "Card Types:\n"
             for card_type, count in sorted(types.items()):
-                stats_text += f"  {card_type}: {count}\\n"
+                stats_text += f"  {card_type}: {count}\n"
         
         # Format legality
         is_legal = self.current_deck.is_legal_format()
-        stats_text += f"\\nFormat Legal: {'Yes' if is_legal else 'No'}"
+        stats_text += f"\nFormat Legal: {'Yes' if is_legal else 'No'}"
         
         self.stats_text.delete(1.0, tk.END)
         self.stats_text.insert(1.0, stats_text)
