@@ -10,8 +10,10 @@ from dataclasses import dataclass
 
 try:
     from ..models.card import Card
+    from .persistent_cache import get_cache
 except ImportError:
     from models.card import Card
+    from utils.persistent_cache import get_cache
 
 @dataclass
 class ScryfallCard:
@@ -45,7 +47,8 @@ class ScryfallAPI:
             'User-Agent': 'MTG Arena Deck Manager/1.0'
         })
         self.last_request_time = 0
-        self.min_request_interval = 0.1  # Reduced from 0.1 to 0.05 (50ms between requests)
+        self.min_request_interval = 0.1  # 100ms between requests
+        self.cache = get_cache()  # Get persistent cache instance
     
     def _rate_limit(self):
         """Ensure we don't exceed rate limits"""
@@ -161,22 +164,45 @@ class ScryfallAPI:
         return cards
     
     def get_card_by_name(self, name: str) -> Optional[ScryfallCard]:
-        """Get detailed card information by exact name"""
+        """Get detailed card information by exact name with caching"""
+        # Check cache first
+        cached_data = self.cache.get_card_data(name)
+        if cached_data:
+            return self._parse_cached_card_data(cached_data)
+        
+        # Fetch from API
         endpoint = "/cards/named"
         params = {"exact": name}
         
         data = self._make_request(endpoint, params)
         if data:
+            # Cache the raw data
+            self.cache.cache_card_data(name, data)
             return self._parse_card_data(data)
         return None
     
     def get_card_fuzzy(self, name: str) -> Optional[ScryfallCard]:
-        """Get card information by fuzzy name matching"""
+        """Get card information by fuzzy name matching with caching"""
+        # For fuzzy matching, use the normalized name as cache key
+        cache_key = name.strip().lower()
+        
+        # Check cache first
+        cached_data = self.cache.get_card_data(cache_key)
+        if cached_data:
+            return self._parse_cached_card_data(cached_data)
+        
+        # Fetch from API
         endpoint = "/cards/named"
         params = {"fuzzy": name}
         
         data = self._make_request(endpoint, params)
         if data:
+            # Cache using the actual card name for consistency
+            actual_name = data.get('name', cache_key)
+            self.cache.cache_card_data(actual_name, data)
+            # Also cache under the search term for future fuzzy searches
+            if actual_name.lower() != cache_key:
+                self.cache.cache_card_data(cache_key, data)
             return self._parse_card_data(data)
         return None
     
@@ -233,6 +259,11 @@ class ScryfallAPI:
         except Exception as e:
             print(f"Error parsing Scryfall card data: {e}")
             return None
+    
+    def _parse_cached_card_data(self, cached_data: Dict) -> Optional[ScryfallCard]:
+        """Parse cached card data (same as _parse_card_data but for cached data)"""
+        # Cached data is the raw Scryfall response, so we can reuse the same parser
+        return self._parse_card_data(cached_data)
     
     def convert_to_card_model(self, scryfall_card: ScryfallCard) -> Card:
         """Convert ScryfallCard to our Card model"""

@@ -13,10 +13,12 @@ try:
     from ..models.card import Card
     from ..models.deck import Deck, DeckCard
     from .scryfall_api import ScryfallAPI
+    from .persistent_cache import get_cache
 except ImportError:
     from models.card import Card
     from models.deck import Deck, DeckCard
     from utils.scryfall_api import ScryfallAPI
+    from utils.persistent_cache import get_cache
 
 @dataclass
 class SmartRecommendation:
@@ -42,8 +44,9 @@ class EnhancedRecommendationEngine:
     
     def __init__(self):
         self.scryfall = ScryfallAPI()
-        self.card_cache = {}  # Cache for Scryfall data
-        self.format_cache = {}  # Cache for format-legal cards
+        self.card_cache = {}  # Cache for Scryfall data (session-only for recommendations)
+        self.format_cache = {}  # Cache for format-legal cards (session-only for recommendations)
+        self.persistent_cache = get_cache()  # Persistent cache instance
         self.archetype_patterns = self._load_archetype_patterns()
         self.synergy_keywords = self._load_synergy_keywords()
     
@@ -114,17 +117,28 @@ class EnhancedRecommendationEngine:
         }
     
     def generate_recommendations(self, deck: Deck, collection=None, count: int = 15, format_name: str = "standard", randomize: bool = True) -> List[SmartRecommendation]:
-        """Generate intelligent recommendations using Scryfall data (synchronous)"""
+        """Generate intelligent recommendations using Scryfall data with meta caching"""
         if not deck or not deck.get_mainboard_cards():
             return []
+        
+        # Analyze current deck
+        deck_analysis = self._analyze_deck_advanced(deck)
+        
+        # Create cache key for meta recommendations based on deck characteristics
+        # This allows caching of meta-relevant recommendations for similar deck archetypes
+        cache_key = self._create_meta_cache_key(deck_analysis, format_name, count)
+        
+        # Check if we have cached recommendations for this archetype/format
+        if not randomize:  # Only use cache for non-randomized requests
+            cached_recommendations = self.persistent_cache.get_meta_data(cache_key)
+            if cached_recommendations:
+                print(f"Using cached recommendations for {deck_analysis['archetype']} in {format_name}")
+                return cached_recommendations[:count]
         
         # Add randomization for varied results
         if randomize:
             import time
             random.seed(int(time.time() * 1000) % 1000000)  # Use current time for seed variation
-        
-        # Analyze current deck
-        deck_analysis = self._analyze_deck_advanced(deck)
         
         recommendations = []
         current_cards = set(card.card.name.lower() for card in deck.get_mainboard_cards())
@@ -164,7 +178,24 @@ class EnhancedRecommendationEngine:
         if collection:
             self._update_collection_status(unique_recs, collection)
         
+        # Cache the recommendations for future use (only for non-randomized requests)
+        if not randomize and unique_recs:
+            self.persistent_cache.cache_meta_data(cache_key, unique_recs)
+            print(f"Cached recommendations for {deck_analysis['archetype']} in {format_name}")
+        
         return unique_recs[:count]
+    
+    def _create_meta_cache_key(self, deck_analysis: Dict, format_name: str, count: int) -> str:
+        """Create cache key for meta recommendations based on deck characteristics"""
+        # Create a stable key based on archetype, colors, and format
+        colors_str = ''.join(sorted(deck_analysis["colors"]))
+        archetype = deck_analysis["archetype"]
+        
+        # Include count range to avoid cache misses for different request sizes
+        count_range = "small" if count <= 50 else "medium" if count <= 100 else "large"
+        
+        cache_key = f"meta_recs_{format_name}_{archetype}_{colors_str}_{count_range}"
+        return cache_key
     
     def _analyze_deck_advanced(self, deck: Deck) -> Dict[str, Any]:
         """Advanced deck analysis using Scryfall data"""

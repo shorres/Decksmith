@@ -1,0 +1,15 @@
+{
+  "test_meta_aggro_red": {
+    "data": {
+      "archetype": "aggro",
+      "format": "standard",
+      "recommendations": [
+        "Lightning Bolt",
+        "Goblin Guide",
+        "Monastery Swiftspear"
+      ]
+    },
+    "timestamp": 1756155119.8978736,
+    "cached_at": "2025-08-25T15:51:59.897875"
+  }
+}

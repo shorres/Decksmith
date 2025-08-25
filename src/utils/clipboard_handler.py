@@ -16,7 +16,7 @@ class ClipboardHandler:
     def __init__(self):
         """Initialize clipboard handler with Scryfall API"""
         self.scryfall_api = ScryfallAPI()
-        self._card_cache = {}  # Cache cards to avoid duplicate API calls
+        self._card_cache = {}  # Session cache for recently imported cards
     
     def _create_enriched_card(self, name: str) -> Card:
         """
