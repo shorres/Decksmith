@@ -10,7 +10,6 @@ import re
 
 from utils.ai_recommendations import CardRecommendationEngine
 from utils.enhanced_recommendations_sync import get_smart_recommendations
-from utils.performance_optimizer import get_performance_optimizer, debounce_update, LazyTreeView
 
 class AIRecommendationsTab:
     """AI-powered card recommendations interface"""
@@ -144,18 +143,11 @@ class AIRecommendationsTab:
             self.analysis_status_label.config(text="")
     
     def on_tab_focus(self):
-        """Called when the AI recommendations tab gets focus - optimized with minimal theme redraw"""
-        optimizer = get_performance_optimizer()
-        
-        # Use frozen UI to prevent theme recalculation during tab switch
-        def _tab_focus_work():
-            if optimizer.debounce_tab_switch(self._delayed_tab_update, "AI Recommendations"):
-                self._delayed_tab_update()
-        
-        optimizer.with_frozen_ui(_tab_focus_work)
+        """Called when the AI recommendations tab gets focus"""
+        self._delayed_tab_update()
     
     def _delayed_tab_update(self):
-        """Delayed tab update to reduce switching lag"""
+        """Update tab content when focused"""
         # Only update header if deck actually changed
         current_deck = self.get_current_deck()
         if hasattr(self, '_last_deck_id') and current_deck:
@@ -674,16 +666,7 @@ class AIRecommendationsTab:
         thread.start()
     
     def display_enhanced_recommendations(self):
-        """Display the enhanced AI recommendations with theme-aware lazy loading"""
-        optimizer = get_performance_optimizer()
-        
-        # Skip updates if UI is frozen (during tab switches)
-        if getattr(optimizer, 'ui_frozen', False):
-            return
-            
-        # Use lazy tree view for efficient updates
-        lazy_tree = LazyTreeView(self.rec_tree)
-        
+        """Display the enhanced AI recommendations"""
         if not self.current_smart_recommendations:
             self.update_total_count(0, 0)
             return
@@ -697,12 +680,7 @@ class AIRecommendationsTab:
             # Filter out lands (cards with "Land" in their card_type)
             filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
         
-        # Check if data has changed before updating
-        data_key = (len(filtered_recs), min_confidence, self.show_lands_var.get(), self.sort_column, self.sort_reverse)
-        if lazy_tree.update_data(data_key):
-            return  # No changes needed
-            
-        # Clear existing items only if updating
+        # Clear existing items before updating
         for item in self.rec_tree.get_children():
             self.rec_tree.delete(item)
         
@@ -801,33 +779,13 @@ class AIRecommendationsTab:
             self.rec_tree.insert('', 'end', values=values, tags=tags)
         
         # Configure tag colors with minimal contrast for better readability
-        try:
-            import sv_ttk
-            theme = sv_ttk.get_theme()
-            if theme == "dark":
-                # Dark theme - subtle highlighting for craftable cards only
-                self.rec_tree.tag_configure('craftable', foreground="light grey")
-                
-                # Configure confidence level row colors for dark theme
-                self.rec_tree.tag_configure('high_confidence', background='#1a331a')  # Very dark green
-                self.rec_tree.tag_configure('medium_confidence', background='#332e1a')  # Very dark yellow
-                self.rec_tree.tag_configure('low_confidence', background='#331a1a')  # Very dark red
-            else:
-                # Light theme - subtle highlighting for craftable cards only
-                self.rec_tree.tag_configure('craftable', foreground='#b8860b')
-                
-                # Configure confidence level row colors for light theme
-                self.rec_tree.tag_configure('high_confidence', background='#e8f5e8')
-                self.rec_tree.tag_configure('medium_confidence', background='#fff2cc')
-                self.rec_tree.tag_configure('low_confidence', background='#ffeaa7')
-        except:
-            # Fallback - minimal styling
-            self.rec_tree.tag_configure('craftable', foreground='#b8860b')
-            
-            # Fallback confidence colors - light theme
-            self.rec_tree.tag_configure('high_confidence', background='#e8f5e8')
-            self.rec_tree.tag_configure('medium_confidence', background='#fff2cc')
-            self.rec_tree.tag_configure('low_confidence', background='#ffeaa7')
+        # Using light theme colors since we're using built-in ttk themes
+        self.rec_tree.tag_configure('craftable', foreground='#b8860b')
+        
+        # Configure confidence level row colors
+        self.rec_tree.tag_configure('high_confidence', background='#e8f5e8')
+        self.rec_tree.tag_configure('medium_confidence', background='#fff2cc')
+        self.rec_tree.tag_configure('low_confidence', background='#ffeaa7')
     
     def update_column_headers(self):
         """Update column headers with sort indicators"""
@@ -1025,13 +983,6 @@ class AIRecommendationsTab:
         x = (details_dialog.winfo_screenwidth() // 2) - (350)
         y = (details_dialog.winfo_screenheight() // 2) - (300)
         details_dialog.geometry(f"700x600+{x}+{y}")
-        
-        # Apply theme
-        try:
-            import sv_ttk
-            theme = sv_ttk.get_theme()
-        except:
-            theme = "dark"
         
         # Main container with padding
         main_frame = ttk.Frame(details_dialog)

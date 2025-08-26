@@ -62,13 +62,12 @@ class MainWindow:
         self.status_bar.grid(row=1, column=0, sticky="ew", padx=5, pady=2)
     
     def on_tab_changed(self, event):
-        """Handle tab change events with minimal theme redraw"""
+        """Handle tab change events"""
         selection = event.widget.select()
         tab_text = event.widget.tab(selection, "text")
         
-        # Temporarily disable theme updates during tab switches for better performance
         try:
-            # Call appropriate tab focus method with theme-aware optimization
+            # Call appropriate tab focus method
             if tab_text == "Collection":
                 self.collection_tab.on_tab_focus()
             elif tab_text == "Decks":

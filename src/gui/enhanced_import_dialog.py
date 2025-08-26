@@ -66,13 +66,6 @@ class EnhancedImportProgressDialog:
         y = (self.dialog.winfo_screenheight() // 2) - (200)
         self.dialog.geometry(f"500x400+{x}+{y}")
         
-        # Apply theme
-        try:
-            import sv_ttk
-            # Theme is already applied globally, no need for widget-specific application
-        except:
-            pass
-        
         # Main frame
         main_frame = ttk.Frame(self.dialog)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)

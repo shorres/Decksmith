@@ -48,13 +48,20 @@ def main():
         # Import after path setup
         import tkinter as tk
         from tkinter import ttk
-        from ttkthemes import ThemedTk
         from gui.main_window import MainWindow
         
-        # Create themed root window
-        root = ThemedTk(theme='arc')  # Start with arc theme
+        # Create standard root window
+        root = tk.Tk()
         
-        # Create main window and pass the root (which has theme capabilities)
+        # Apply a clean built-in theme using ttk.Style
+        style = ttk.Style()
+        # Try 'clam' first (modern and clean), fallback to 'default'
+        try:
+            style.theme_use('clam')  # Clean, modern look without heavy rendering
+        except tk.TclError:
+            style.theme_use('default')  # Fallback to system default
+        
+        # Create main window
         app = MainWindow(root)
         
         # Start the application

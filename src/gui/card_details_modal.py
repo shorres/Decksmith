@@ -52,13 +52,6 @@ class CardDetailsModal:
         y = (self.dialog.winfo_screenheight() // 2) - (250)
         self.dialog.geometry(f"600x500+{x}+{y}")
         
-        # Apply theme
-        try:
-            import sv_ttk
-            sv_ttk.use_dark_theme()
-        except:
-            pass
-        
         # Create main layout
         self.create_layout()
         
