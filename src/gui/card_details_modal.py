@@ -18,11 +18,9 @@ except ImportError:
 try:
     from ..utils.scryfall_api import scryfall_api
     from ..models.card import Card
-    from .sun_valley_theme import get_theme_manager
 except ImportError:
     from utils.scryfall_api import scryfall_api
     from models.card import Card
-    from gui.sun_valley_theme import get_theme_manager
 
 
 class CardDetailsModal:

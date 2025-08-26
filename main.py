@@ -47,12 +47,14 @@ def main():
     try:
         # Import after path setup
         import tkinter as tk
+        from tkinter import ttk
+        from ttkthemes import ThemedTk
         from gui.main_window import MainWindow
         
-        # Create root window
-        root = tk.Tk()
+        # Create themed root window
+        root = ThemedTk(theme='arc')  # Start with arc theme
         
-        # Create main window
+        # Create main window and pass the root (which has theme capabilities)
         app = MainWindow(root)
         
         # Start the application

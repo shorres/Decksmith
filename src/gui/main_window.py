@@ -17,9 +17,6 @@ class MainWindow:
     def __init__(self, root):
         self.root = root
         
-        # No theme manager - using default tkinter theme for better performance
-        self.theme_manager = None
-        
         self.setup_window()
         self.create_widgets()
     
@@ -108,11 +105,10 @@ class MainWindow:
         deck_menu.add_command(label="Export to CSV", command=self.export_deck_csv)
         deck_menu.add_command(label="Export to Arena", command=self.export_deck_arena)
         
-        # View menu (simplified)
+        # View menu
         view_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="View", menu=view_menu)
-        view_menu.add_command(label="Toggle Theme (Light/Dark)", command=self.toggle_theme)
-        view_menu.add_separator()
+        
         view_menu.add_command(label="Refresh", command=self.refresh_view)
         
         # Help menu
@@ -124,30 +120,6 @@ class MainWindow:
     def refresh_view(self):
         """Refresh the current view"""
         self.update_status("View refreshed")
-    
-    def toggle_theme(self):
-        """Toggle between light and dark themes"""
-        try:
-            import sv_ttk
-            
-            # Simple theme toggle without complex manager
-            current_theme = getattr(self, '_current_theme', 'dark')
-            new_theme = 'light' if current_theme == 'dark' else 'dark'
-            
-            sv_ttk.set_theme(new_theme)
-            self._current_theme = new_theme
-            
-            theme_name = "Dark" if new_theme == "dark" else "Light"
-            self.update_status(f"Switched to {theme_name} theme")
-            
-        except Exception as e:
-            messagebox.showerror("Theme Error", f"Failed to change theme: {str(e)}")
-            self.update_status("Theme change failed")
-    
-    def _refresh_theme_on_tabs(self):
-        """Refresh theme application on all tabs"""
-        # sv_ttk applies globally, no per-tab refresh needed
-        pass
     
     def import_collection(self):
         """Import collection from CSV"""

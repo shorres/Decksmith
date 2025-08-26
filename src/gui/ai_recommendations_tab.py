@@ -11,7 +11,6 @@ import re
 from utils.ai_recommendations import CardRecommendationEngine
 from utils.enhanced_recommendations_sync import get_smart_recommendations
 from utils.performance_optimizer import get_performance_optimizer, debounce_update, LazyTreeView
-from .sun_valley_theme import get_theme_manager
 
 class AIRecommendationsTab:
     """AI-powered card recommendations interface"""
@@ -40,9 +39,6 @@ class AIRecommendationsTab:
         
         # Create deck status header
         self.create_deck_status_header()
-        
-        # Apply initial theme
-        self.apply_theme()
         
         # Create main paned window
         paned = ttk.PanedWindow(self.frame, orient=tk.VERTICAL)
@@ -1258,34 +1254,3 @@ class AIRecommendationsTab:
             explanation += f"🎲 Archetype alignment: {getattr(recommendation, 'archetype_fit', 0):.1%}\n"
         
         messagebox.showinfo("Recommendation Explanation", explanation)
-    
-    def apply_theme(self):
-        """Apply Sun Valley theme to widgets"""
-        theme_manager = get_theme_manager()
-        if not theme_manager:
-            return
-        
-        try:
-            # Apply theme to header elements
-            if hasattr(self, 'current_deck_label'):
-                theme_manager.configure_widget_theme(self.current_deck_label, "header")
-            
-            if hasattr(self, 'deck_format_label'):
-                theme_manager.configure_widget_theme(self.deck_format_label, "stats")
-            
-            if hasattr(self, 'deck_size_label'):
-                theme_manager.configure_widget_theme(self.deck_size_label, "stats")
-            
-            if hasattr(self, 'analysis_status_label'):
-                theme_manager.configure_widget_theme(self.analysis_status_label, "progress")
-            
-            # Apply theme to treeview
-            if hasattr(self, 'rec_tree'):
-                theme_manager.apply_treeview_tags(self.rec_tree)
-            
-        except Exception as e:
-            print(f"Error applying theme to AI recommendations tab: {e}")
-    
-    def refresh_theme(self):
-        """Refresh theme after theme change"""
-        self.apply_theme()

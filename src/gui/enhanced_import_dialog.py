@@ -25,13 +25,11 @@ try:
     from ..models.deck import Deck
     from ..models.card import Card
     from ..models.deck import DeckCard
-    from .sun_valley_theme import get_theme_manager
 except ImportError:
     from utils.scryfall_api import scryfall_api
     from models.deck import Deck
     from models.card import Card
     from models.deck import DeckCard
-    from gui.sun_valley_theme import get_theme_manager
 
 
 class EnhancedImportProgressDialog:
