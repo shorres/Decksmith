@@ -1,4 +1,3 @@
-tkinter
 pandas
 openpyxl
 requests
