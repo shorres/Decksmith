@@ -17,9 +17,10 @@ The Magic Tool application can be successfully packaged into a standalone execut
 ## ⚠️ IMPORTANT: Spec File Confusion
 
 **Use `magic_tool.spec` (lowercase, underscore)** - This is the working configuration with:
-- Proper hidden imports (sv_ttk, pyperclip, tkinter modules)
+- Proper hidden imports (pyperclip, tkinter modules)
 - Data directory inclusion (src/, data/)
 - Directory distribution setup
+- Default tkinter theme for better performance
 - Tested and verified working
 
 **Avoid `Magic Tool.spec` (capitalized, space)** - This is a basic auto-generated file that will cause import errors.
@@ -32,7 +33,8 @@ hiddenimports=[
     'tkinter', 'tkinter.ttk', 'tkinter.filedialog',
     'tkinter.messagebox', 'tkinter.simpledialog',
     'PIL', 'PIL.Image', 'PIL.ImageTk', 'requests',
-    'pyperclip', 'sv_ttk'  # Essential for GUI
+    'pyperclip'  # For clipboard functionality
+    # sv_ttk removed for better performance
 ],
 datas=[
     ('src/', 'src/'),      # Include source code
@@ -136,17 +138,19 @@ pyinstaller --clean magic_tool.spec
 ### Working Spec File Features
 The `magic_tool.spec` file includes:
 - ✅ Automatic data directory inclusion: `datas=[('src/', 'src/'), ('data/', 'data/')]`
-- ✅ Hidden import detection: `hiddenimports=['sv_ttk', 'pyperclip', 'tkinter.simpledialog', 'tkinter.messagebox', 'tkinter.filedialog']`
+- ✅ Hidden import detection: `hiddenimports=['pyperclip', 'tkinter.simpledialog', 'tkinter.messagebox', 'tkinter.filedialog']`
 - ✅ GUI mode: `console=False`
 - ✅ Directory distribution: `COLLECT` method
+- ✅ Default tkinter theme for better performance (sv_ttk removed)
 - ✅ Cross-platform compatibility
 
 ### Key Differences from Auto-Generated Spec
 ```python
 # Working magic_tool.spec has:
-hiddenimports=['sv_ttk', 'pyperclip', 'tkinter.simpledialog', 'tkinter.messagebox', 'tkinter.filedialog'],
+hiddenimports=['pyperclip', 'tkinter.simpledialog', 'tkinter.messagebox', 'tkinter.filedialog'],
 datas=[('src/', 'src/'), ('data/', 'data/')],
 console=False,  # GUI mode
+# sv_ttk removed for better performance
 
 # Auto-generated Magic Tool.spec has:
 hiddenimports=[],  # Empty - causes import errors
@@ -246,11 +250,14 @@ The final packaged Magic Tool will be a directory containing:
 ### "ImportError: cannot import name 'MagicToolGUI'"
 - ✅ Fixed in current `main.py` - imports `MainWindow` correctly
 
-### "No module named 'sv_ttk'" 
+### "No module named 'pyperclip'" 
 - ✅ Fixed in `magic_tool.spec` with proper hiddenimports
 
 ### "lost sys.stdin" error
 - ✅ Fixed in current `main.py` with stdin/stdout handling
+
+### Performance Issues
+- ✅ Removed sv_ttk theme for better performance - using default tkinter theme
 
 ### Building creates wrong spec file
 - ⚠️ Always use: `pyinstaller --clean magic_tool.spec`

@@ -10,7 +10,6 @@ import os
 from .collection_tab import CollectionTab
 from .deck_tab import DeckTab
 from .ai_recommendations_tab import AIRecommendationsTab
-from .sun_valley_theme import initialize_theme, get_theme_manager
 
 class MainWindow:
     """Main application window"""
@@ -18,7 +17,7 @@ class MainWindow:
     def __init__(self, root):
         self.root = root
         
-        # Theme is already applied in main.py, no need to reapply
+        # No theme manager - using default tkinter theme for better performance
         self.theme_manager = None
         
         self.setup_window()

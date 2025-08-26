@@ -48,13 +48,9 @@ def main():
         # Import after path setup
         import tkinter as tk
         from gui.main_window import MainWindow
-        from gui.sun_valley_theme import initialize_theme
         
         # Create root window
         root = tk.Tk()
-        
-        # Initialize theme
-        # theme_manager = initialize_theme(root)
         
         # Create main window
         app = MainWindow(root)

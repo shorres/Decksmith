@@ -31,7 +31,7 @@ hiddenimports = [
     'datetime',
     'threading',
     'pyperclip',  # For clipboard handling
-    'sv_ttk',     # Sun Valley theme
+    # Removed sv_ttk for better performance
 ]
 
 # Data files to include
