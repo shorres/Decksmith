@@ -13,7 +13,7 @@ from models.card import Card
 from models.deck import Deck, DeckCard
 from utils.csv_handler import CSVHandler
 from utils.clipboard_handler import ClipboardHandler
-from utils.performance_optimizer import get_performance_optimizer, LazyTreeView
+from utils.simple_performance import get_performance_optimizer
 from gui.autocomplete_entry import AutocompleteEntry
 
 class DeckTab:
@@ -34,15 +34,12 @@ class DeckTab:
         self.refresh_display()
     
     def on_tab_focus(self):
-        """Called when the deck tab gets focus - optimized with minimal theme redraw"""
+        """Called when the deck tab gets focus - simplified optimization"""
         optimizer = get_performance_optimizer()
         
-        # Use frozen UI to prevent theme recalculation during tab switch
-        def _tab_focus_work():
-            if optimizer.debounce_tab_switch(self._perform_tab_focus, "Deck Tab"):
-                self._perform_tab_focus()
-        
-        optimizer.with_frozen_ui(_tab_focus_work)
+        # Use debounced update to prevent excessive tab switching
+        if optimizer.debounce_tab_switch(self._perform_tab_focus, "Deck Tab"):
+            self._perform_tab_focus()
     
     def _perform_tab_focus(self):
         """Internal method to perform the actual tab focus update"""
@@ -537,24 +534,21 @@ class DeckTab:
                 self.sideboard_tree.delete(item)
             return
         
-        # Use lazy tree views for efficient updates
-        mainboard_lazy = LazyTreeView(self.mainboard_tree)
-        sideboard_lazy = LazyTreeView(self.sideboard_tree)
-        
         # Get current data for comparison
         mainboard_cards = self.current_deck.get_mainboard_cards()
         sideboard_cards = self.current_deck.get_sideboard_cards()
         
-        # Create data keys for change detection
+        # Simple change detection using data comparison
         mainboard_key = tuple((dc.card.name, dc.quantity) for dc in mainboard_cards)
         sideboard_key = tuple((dc.card.name, dc.quantity) for dc in sideboard_cards)
         
-        # Only update if data has changed
-        mainboard_changed = mainboard_lazy.update_data(mainboard_key)
-        sideboard_changed = sideboard_lazy.update_data(sideboard_key)
+        # Check if data has changed since last update
+        mainboard_changed = not hasattr(self, '_last_mainboard_key') or self._last_mainboard_key != mainboard_key
+        sideboard_changed = not hasattr(self, '_last_sideboard_key') or self._last_sideboard_key != sideboard_key
         
-        # Clear and refresh mainboard if changed
-        if not mainboard_changed:
+        # Update trees only if data changed
+        if mainboard_changed:
+            # Clear and refresh mainboard
             for item in self.mainboard_tree.get_children():
                 self.mainboard_tree.delete(item)
             
@@ -568,9 +562,12 @@ class DeckTab:
                     ','.join(card.colors)
                 )
                 self.mainboard_tree.insert('', 'end', values=values)
+            
+            # Store key for next comparison
+            self._last_mainboard_key = mainboard_key
         
-        # Clear and refresh sideboard if changed
-        if not sideboard_changed:
+        if sideboard_changed:
+            # Clear and refresh sideboard
             for item in self.sideboard_tree.get_children():
                 self.sideboard_tree.delete(item)
                 
@@ -584,6 +581,9 @@ class DeckTab:
                     ','.join(card.colors)
                 )
                 self.sideboard_tree.insert('', 'end', values=values)
+            
+            # Store key for next comparison  
+            self._last_sideboard_key = sideboard_key
     
     def update_statistics(self):
         """Update deck statistics display"""

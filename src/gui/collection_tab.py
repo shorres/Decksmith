@@ -13,7 +13,7 @@ from models.card import Card
 from models.collection import Collection, CollectionCard
 from utils.csv_handler import CSVHandler
 from utils.clipboard_handler import ClipboardHandler
-from utils.performance_optimizer import get_performance_optimizer, LazyTreeView
+from utils.simple_performance import get_performance_optimizer
 from gui.scryfall_autocomplete import ScryfallAutocompleteEntry
 from gui.card_details_modal import show_card_details_modal
 from utils.scryfall_api import scryfall_api
@@ -32,15 +32,12 @@ class CollectionTab:
         self.refresh_display()
     
     def on_tab_focus(self):
-        """Called when the collection tab gets focus - optimized with minimal theme redraw"""
+        """Called when the collection tab gets focus - simplified optimization"""
         optimizer = get_performance_optimizer()
         
-        # Use frozen UI to prevent theme recalculation during tab switch
-        def _tab_focus_work():
-            if optimizer.debounce_tab_switch(self._perform_tab_focus, "Collection Tab"):
-                self._perform_tab_focus()
-        
-        optimizer.with_frozen_ui(_tab_focus_work)
+        # Use debounced update to prevent excessive tab switching
+        if optimizer.debounce_tab_switch(self._perform_tab_focus, "Collection Tab"):
+            self._perform_tab_focus()
     
     def _perform_tab_focus(self):
         """Internal method to perform the actual tab focus update"""
@@ -245,21 +242,17 @@ class CollectionTab:
         """Refresh the card list display with theme-aware lazy loading optimization"""
         optimizer = get_performance_optimizer()
         
-        # Skip updates if UI is frozen (during tab switches)
-        if getattr(optimizer, 'ui_frozen', False):
-            return
-            
-        # Use lazy tree view for efficient updates
-        lazy_tree = LazyTreeView(self.tree)
-        
-        # Create data key for change detection
+        # Simple change detection using data comparison
         data_key = tuple((cc.card.name, cc.quantity, cc.quantity_foil) for cc in self.filtered_cards)
         
+        # Check if data has changed since last update
+        data_changed = not hasattr(self, '_last_data_key') or self._last_data_key != data_key
+        
         # Only update if data has changed
-        if lazy_tree.update_data(data_key):
+        if not data_changed:
             return  # No changes needed
         
-        # Clear existing items only if updating
+        # Clear existing items for refresh
         for item in self.tree.get_children():
             self.tree.delete(item)
         
@@ -276,6 +269,9 @@ class CollectionTab:
                 collection_card.quantity_foil
             )
             self.tree.insert('', 'end', values=values)
+        
+        # Store key for next comparison
+        self._last_data_key = data_key
         
         # Update statistics
         self.update_statistics()

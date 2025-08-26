@@ -63,7 +63,7 @@ def refresh_display(self):
 - ✅ Minimal widget operations reduce theme overhead
 
 ## Files Modified for Theme Performance:
-- ✅ `src/utils/performance_optimizer.py` - Added UI freezing capability
+- ✅ `src/utils/simple_performance.py` - Simplified UI optimization capability
 - ✅ `src/gui/main_window.py` - Theme-aware tab switching
 - ✅ `src/gui/collection_tab.py` - Frozen UI during focus
 - ✅ `src/gui/deck_tab.py` - Theme-optimized refreshes
