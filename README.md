@@ -16,7 +16,7 @@ A comprehensive desktop application for managing your Magic: The Gathering Arena
 📋 **Import/Export**: Support for CSV, Arena formats, and clipboard operations  
 💾 **Portable Data**: All your data stays in the application folder
 
-## Auto-Enrichment
+## Smart Import & Auto-Enrichment
 
 Import simple card lists and get complete card data automatically:
 
@@ -33,12 +33,7 @@ Counterspell,3
 ✓ Oracle Text: Complete rules text
 ```
 
-## Supported Import Formats
-
-- **CSV Collections**: `name,quantity,quantity_foil`
-- **Arena Format**: `4 Lightning Bolt (M21) 159`
-- **Simple Format**: `4 Lightning Bolt` or just `Lightning Bolt`
-- **Clipboard**: Copy/paste from any source
+**Supported formats**: CSV Collections, Arena Format (`4 Lightning Bolt (M21) 159`), Simple Format (`4 Lightning Bolt`), or direct clipboard paste.
 
 ## Installation
 
@@ -72,12 +67,7 @@ Counterspell,3
 4. **Import**: Start by importing your collection via CSV or clipboard
 5. **Build**: Create decks with AI recommendations and Scryfall integration
 
-## Usage
-
-1. **Collection**: Add cards manually or import from CSV/clipboard
-2. **Decks**: Build decks with smart autocomplete from your collection
-3. **AI Recommendations**: Get card suggestions and deck analysis
-4. **Import/Export**: Use clipboard or files to transfer data
+*Your data stays portable in the application folder - no system-wide installation needed!*
 
 ## Project Structure
 
