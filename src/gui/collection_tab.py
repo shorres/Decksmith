@@ -17,6 +17,7 @@ from utils.simple_performance import get_performance_optimizer
 from gui.scryfall_autocomplete import ScryfallAutocompleteEntry
 from gui.card_details_modal import show_card_details_modal
 from utils.scryfall_api import scryfall_api
+from utils.window_utils import center_window_on_parent, get_main_window
 
 class CollectionTab:
     """Collection management interface"""
@@ -597,9 +598,19 @@ class AddCardDialog:
         self.result = None
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Add Card")
-        self.dialog.geometry("400x500")
         self.dialog.transient(parent)
         self.dialog.grab_set()
+        
+        # Set size and center on the main application window
+        dialog_width = 400
+        dialog_height = 500
+        
+        # Try to center on the main application window
+        main_window = get_main_window(parent)
+        if main_window and main_window != parent:
+            center_window_on_parent(self.dialog, main_window, dialog_width, dialog_height)
+        else:
+            center_window_on_parent(self.dialog, parent, dialog_width, dialog_height)
         
         self.create_widgets()
         self.dialog.wait_window()

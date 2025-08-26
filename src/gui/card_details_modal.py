@@ -18,9 +18,11 @@ except ImportError:
 try:
     from ..utils.scryfall_api import scryfall_api
     from ..models.card import Card
+    from ..utils.window_utils import center_window_on_parent, get_main_window
 except ImportError:
     from utils.scryfall_api import scryfall_api
     from models.card import Card
+    from utils.window_utils import center_window_on_parent, get_main_window
 
 
 class CardDetailsModal:
@@ -41,16 +43,20 @@ class CardDetailsModal:
         """Create the modal dialog"""
         self.dialog = tk.Toplevel(self.parent)
         self.dialog.title(f"Card Details - {self.card.name}")
-        self.dialog.geometry("650x600")
         self.dialog.resizable(True, True)
         self.dialog.transient(self.parent)
         self.dialog.grab_set()
         
-        # Center the dialog
-        self.dialog.update_idletasks()
-        x = (self.dialog.winfo_screenwidth() // 2) - (325)
-        y = (self.dialog.winfo_screenheight() // 2) - (300)
-        self.dialog.geometry(f"650x600+{x}+{y}")
+        # Set size and center on the main application window
+        dialog_width = 650
+        dialog_height = 600
+        
+        # Try to center on the main application window
+        main_window = get_main_window(self.parent)
+        if main_window and main_window != self.parent:
+            center_window_on_parent(self.dialog, main_window, dialog_width, dialog_height)
+        else:
+            center_window_on_parent(self.dialog, self.parent, dialog_width, dialog_height)
         
         # Create main layout
         self.create_layout()

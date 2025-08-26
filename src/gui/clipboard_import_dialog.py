@@ -25,6 +25,7 @@ try:
     from ..models.card import Card
     from ..models.deck import DeckCard
     from .enhanced_import_dialog import EnhancedImportProgressDialog
+    from ..utils.window_utils import center_window_on_parent, get_main_window
 except ImportError:
     from utils.scryfall_api import scryfall_api
     from utils.clipboard_handler import ClipboardHandler
@@ -32,6 +33,7 @@ except ImportError:
     from models.card import Card
     from models.deck import DeckCard
     from gui.enhanced_import_dialog import EnhancedImportProgressDialog
+    from utils.window_utils import center_window_on_parent, get_main_window
 
 
 class ClipboardImporter:

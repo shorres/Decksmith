@@ -10,6 +10,7 @@ import re
 
 from utils.ai_recommendations import CardRecommendationEngine
 from utils.enhanced_recommendations_sync import get_smart_recommendations
+from utils.window_utils import center_window_on_parent, get_main_window
 
 class AIRecommendationsTab:
     """AI-powered card recommendations interface"""
@@ -1269,16 +1270,22 @@ class AIRecommendationsTab:
         # Create enhanced card details dialog
         details_dialog = tk.Toplevel(self.frame)
         details_dialog.title(f"Card Details - {card_name}")
-        details_dialog.geometry("700x600")
         details_dialog.resizable(True, True)
         details_dialog.transient(self.frame.winfo_toplevel())
         details_dialog.grab_set()
         
-        # Center the dialog
-        details_dialog.update_idletasks()
-        x = (details_dialog.winfo_screenwidth() // 2) - (350)
-        y = (details_dialog.winfo_screenheight() // 2) - (300)
-        details_dialog.geometry(f"700x600+{x}+{y}")
+        # Set size and center on the main application window
+        dialog_width = 700
+        dialog_height = 600
+        
+        # Try to center on the main application window
+        main_window = get_main_window(self.frame)
+        if main_window:
+            center_window_on_parent(details_dialog, main_window, dialog_width, dialog_height)
+        else:
+            # Fallback to parent window
+            parent_window = self.frame.winfo_toplevel()
+            center_window_on_parent(details_dialog, parent_window, dialog_width, dialog_height)
         
         # Main container with padding
         main_frame = ttk.Frame(details_dialog)

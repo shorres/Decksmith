@@ -15,6 +15,7 @@ from utils.csv_handler import CSVHandler
 from utils.clipboard_handler import ClipboardHandler
 from utils.simple_performance import get_performance_optimizer
 from gui.autocomplete_entry import AutocompleteEntry
+from utils.window_utils import center_window_on_parent, get_main_window
 
 class DeckTab:
     """Deck management interface"""
@@ -987,16 +988,20 @@ class DeckTab:
         # Create simple details dialog
         details_dialog = tk.Toplevel(self.parent)
         details_dialog.title(f"Card Details - {card_name}")
-        details_dialog.geometry("600x400")
         details_dialog.resizable(True, True)
         details_dialog.transient(self.parent)
         details_dialog.grab_set()
         
-        # Center the dialog
-        details_dialog.update_idletasks()
-        x = (details_dialog.winfo_screenwidth() // 2) - (300)
-        y = (details_dialog.winfo_screenheight() // 2) - (200)
-        details_dialog.geometry(f"600x400+{x}+{y}")
+        # Set size and center on the main application window
+        dialog_width = 600
+        dialog_height = 400
+        
+        # Try to center on the main application window
+        main_window = get_main_window(self.parent)
+        if main_window and main_window != self.parent:
+            center_window_on_parent(details_dialog, main_window, dialog_width, dialog_height)
+        else:
+            center_window_on_parent(details_dialog, self.parent, dialog_width, dialog_height)
         
         # Main frame
         main_frame = ttk.Frame(details_dialog)

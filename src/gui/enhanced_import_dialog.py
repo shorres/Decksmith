@@ -25,11 +25,13 @@ try:
     from ..models.deck import Deck
     from ..models.card import Card
     from ..models.deck import DeckCard
+    from ..utils.window_utils import center_window_on_parent, get_main_window
 except ImportError:
     from utils.scryfall_api import scryfall_api
     from models.deck import Deck
     from models.card import Card
     from models.deck import DeckCard
+    from utils.window_utils import center_window_on_parent, get_main_window
 
 
 class EnhancedImportProgressDialog:
@@ -44,8 +46,6 @@ class EnhancedImportProgressDialog:
         self.progress_var = None
         self.status_var = None
         self.card_image_label = None
-        self.card_name_var = None
-        self.card_details_var = None
         self.current_image = None
         self.image_cache = {}
         
@@ -55,16 +55,9 @@ class EnhancedImportProgressDialog:
         """Setup the progress dialog window"""
         self.dialog = tk.Toplevel(self.parent)
         self.dialog.title(self.title)
-        self.dialog.geometry("500x400")
         self.dialog.resizable(False, False)
         self.dialog.transient(self.parent)
         self.dialog.grab_set()
-        
-        # Center the dialog
-        self.dialog.update_idletasks()
-        x = (self.dialog.winfo_screenwidth() // 2) - (250)
-        y = (self.dialog.winfo_screenheight() // 2) - (200)
-        self.dialog.geometry(f"500x400+{x}+{y}")
         
         # Main frame
         main_frame = ttk.Frame(self.dialog)
@@ -78,28 +71,34 @@ class EnhancedImportProgressDialog:
                                font=('TkDefaultFont', 14, 'bold'))
         title_label.pack()
         
-        # Card display section
-        card_frame = ttk.LabelFrame(main_frame, text="Current Card", padding=10)
-        card_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
-        
-        # Card image (if PIL available)
+        # Card image section - fixed height to prevent layout shifts
         if PIL_AVAILABLE:
-            self.card_image_label = ttk.Label(card_frame, text="🎴\nLoading...", 
+            card_frame = ttk.Frame(main_frame)
+            card_frame.pack(fill=tk.X, pady=(0, 15))
+            
+            # Create a fixed-height container for the image to prevent layout shifts
+            image_container = ttk.Frame(card_frame, height=180)
+            image_container.pack(fill=tk.X)
+            image_container.pack_propagate(False)  # Prevent container from shrinking
+            
+            self.card_image_label = ttk.Label(image_container, text="🎴\nLoading...", 
                                              anchor='center', width=25)
-            self.card_image_label.pack(pady=(0, 10))
+            self.card_image_label.pack(expand=True, fill=tk.BOTH)
+        else:
+            # Show a simple status without image if PIL not available
+            card_frame = ttk.Frame(main_frame)
+            card_frame.pack(fill=tk.X, pady=(0, 15))
+            
+            # Fixed height container even without PIL for consistency
+            status_container = ttk.Frame(card_frame, height=60)
+            status_container.pack(fill=tk.X)
+            status_container.pack_propagate(False)
+            
+            self.card_image_label = ttk.Label(status_container, text="🎴\nImporting cards...", 
+                                             anchor='center', width=25)
+            self.card_image_label.pack(expand=True, fill=tk.BOTH)
         
-        # Card details
-        self.card_name_var = tk.StringVar(value="Waiting for cards...")
-        card_name_label = ttk.Label(card_frame, textvariable=self.card_name_var,
-                                   font=('TkDefaultFont', 11, 'bold'))
-        card_name_label.pack(pady=(0, 5))
-        
-        self.card_details_var = tk.StringVar(value="Import will begin shortly...")
-        card_details_label = ttk.Label(card_frame, textvariable=self.card_details_var,
-                                      wraplength=400)
-        card_details_label.pack()
-        
-        # Progress section (below card info)
+        # Progress section
         progress_frame = ttk.LabelFrame(main_frame, text="Progress", padding=10)
         progress_frame.pack(fill=tk.X, pady=(0, 15))
         
@@ -124,12 +123,19 @@ class EnhancedImportProgressDialog:
                                        command=self.cancel_import)
         self.cancel_button.pack(side=tk.RIGHT, padx=(10, 0))
         
-        self.minimize_button = ttk.Button(button_frame, text="Minimize",
-                                         command=self.minimize_dialog)
-        self.minimize_button.pack(side=tk.RIGHT)
-        
         # Handle window close
         self.dialog.protocol("WM_DELETE_WINDOW", self.cancel_import)
+        
+        # Set size and center on parent window - increased height for card images
+        dialog_width = 400
+        dialog_height = 450 if PIL_AVAILABLE else 280  # Increased to accommodate fixed image container
+        
+        # Try to center on the main application window
+        main_window = get_main_window(self.parent)
+        if main_window and main_window != self.parent:
+            center_window_on_parent(self.dialog, main_window, dialog_width, dialog_height)
+        else:
+            center_window_on_parent(self.dialog, self.parent, dialog_width, dialog_height)
     
     def update_progress(self, current: int, total: int, status: str = ""):
         """Update progress bar and status with improved responsiveness"""
@@ -153,28 +159,21 @@ class EnhancedImportProgressDialog:
             pass
     
     def update_card_display(self, card_name: str, scryfall_card=None):
-        """Update the card display with current card info"""
+        """Update the card display with current card image"""
         if self.cancelled or not self.dialog:
             return
             
         try:
             self.current_card_name = card_name
-            if self.card_name_var:
-                self.card_name_var.set(card_name)
             
-            if scryfall_card:
-                details = f"Type: {getattr(scryfall_card, 'type_line', 'Unknown')}\n"
-                details += f"Cost: {getattr(scryfall_card, 'mana_cost', 'N/A')}\n"
-                details += f"Set: {getattr(scryfall_card, 'set_code', 'N/A').upper()}"
-                if self.card_details_var:
-                    self.card_details_var.set(details)
-                
+            if self.card_image_label:
                 # Load card image if available
-                if PIL_AVAILABLE and hasattr(scryfall_card, 'image_uris'):
+                if PIL_AVAILABLE and scryfall_card and hasattr(scryfall_card, 'image_uris'):
                     self._load_card_image(scryfall_card)
-            else:
-                if self.card_details_var:
-                    self.card_details_var.set("Loading card data...")
+                else:
+                    # Show card name if no image available
+                    display_name = card_name[:20] + ('...' if len(card_name) > 20 else '')
+                    self.card_image_label.configure(text=f"🎴\n{display_name}", image='')
                 
         except tk.TclError:
             pass
@@ -242,14 +241,6 @@ class EnhancedImportProgressDialog:
         """Cancel the import process"""
         self.cancelled = True
         self.close_dialog()
-    
-    def minimize_dialog(self):
-        """Minimize the dialog"""
-        try:
-            if self.dialog:
-                self.dialog.iconify()
-        except tk.TclError:
-            pass
     
     def close_dialog(self):
         """Close the dialog"""
