@@ -201,27 +201,7 @@ class AIRecommendationsTab:
         self.synergy_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         synergy_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
         
-        # Suggestions tab
-        suggestions_frame = ttk.Frame(analysis_notebook)
-        analysis_notebook.add(suggestions_frame, text="Improvements")
-        
-        self.suggestions_text = tk.Text(suggestions_frame, height=6, wrap=tk.WORD)
-        suggestions_scroll = ttk.Scrollbar(suggestions_frame, orient=tk.VERTICAL, command=self.suggestions_text.yview)
-        self.suggestions_text.configure(yscrollcommand=suggestions_scroll.set)
-        
-        self.suggestions_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
-        suggestions_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
-        
-        # Similar decks tab
-        similar_frame = ttk.Frame(analysis_notebook)
-        analysis_notebook.add(similar_frame, text="Similar Decks")
-        
-        self.similar_text = tk.Text(similar_frame, height=6, wrap=tk.WORD)
-        similar_scroll = ttk.Scrollbar(similar_frame, orient=tk.VERTICAL, command=self.similar_text.yview)
-        self.similar_text.configure(yscrollcommand=similar_scroll.set)
-        
-        self.similar_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
-        similar_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
+
         
         # Control buttons
         control_frame = ttk.Frame(parent)
@@ -460,45 +440,6 @@ class AIRecommendationsTab:
                     archetype_text += "❓ Unable to identify clear archetype pattern.\n"
                     archetype_text += "   This deck may be experimental or need refinement.\n"
                 
-                # Deck improvements
-                improvements = self.recommendation_engine.suggest_deck_improvements(current_deck)
-                improvements_text = f"⚡ DECK IMPROVEMENT SUGGESTIONS for '{current_deck.name}'\n"
-                improvements_text += "=" * 60 + "\n\n"
-                
-                if improvements:
-                    improvements_text += "🔧 Recommended Changes:\n\n"
-                    for i, suggestion in enumerate(improvements, 1):
-                        improvements_text += f"  {i}. 📝 {suggestion}\n\n"
-                else:
-                    improvements_text += "✅ DECK LOOKS GREAT!\n\n"
-                    improvements_text += "Your deck appears to be well-balanced with no major issues detected.\n"
-                    improvements_text += "Consider fine-tuning based on your local meta or playstyle preferences.\n"
-                
-                # Similar decks
-                similar_decks = self.recommendation_engine.find_similar_decks(current_deck)
-                similar_text = f"🔍 SIMILAR SUCCESSFUL DECKS to '{current_deck.name}'\n"
-                similar_text += "=" * 60 + "\n\n"
-                
-                if similar_decks:
-                    similar_text += "🏆 Tournament-Proven Similar Builds:\n\n"
-                    for i, deck_info in enumerate(similar_decks, 1):
-                        similarity_percentage = deck_info['similarity'] * 100
-                        stars = "*" * min(5, int(similarity_percentage / 20))
-                        
-                        similar_text += f"  {i}. 🎴 {deck_info['name']}\n"
-                        similar_text += f"     👤 Pilot: {deck_info['pilot']}\n"
-                        similar_text += f"     🏟️  Event: {deck_info['event']}\n"
-                        similar_text += f"     📊 Similarity: {stars} {similarity_percentage:.1f}%\n"
-                        if deck_info['key_differences']:
-                            similar_text += f"     🔄 Key Differences: {', '.join(deck_info['key_differences'])}\n"
-                        similar_text += "\n"
-                else:
-                    similar_text += "🔍 No similar decks found in the tournament database.\n\n"
-                    similar_text += "This could mean:\n"
-                    similar_text += "• Your deck is unique/innovative\n"
-                    similar_text += "• The archetype is underrepresented in competitive play\n"
-                    similar_text += "• Consider exploring established archetypes for reference\n"
-
                 
                 # Update UI in main thread
                 def update_ui():
@@ -514,12 +455,6 @@ class AIRecommendationsTab:
                     synergy_analysis = self._analyze_card_synergies(current_deck)
                     self.synergy_text.delete(1.0, tk.END)
                     self.synergy_text.insert(1.0, synergy_analysis)
-                    
-                    self.suggestions_text.delete(1.0, tk.END)
-                    self.suggestions_text.insert(1.0, improvements_text)
-                    
-                    self.similar_text.delete(1.0, tk.END)
-                    self.similar_text.insert(1.0, similar_text)
                     
                     self.loading_var.set("")
                     self.analysis_status_label.config(text="✅ Analysis complete", foreground='black')

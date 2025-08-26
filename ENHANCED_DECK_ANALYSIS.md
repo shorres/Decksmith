@@ -1,6 +1,6 @@
 # Enhanced Deck Analysis Features
 
-The AI Recommendations tab now includes three powerful new analysis features:
+The AI Recommendations tab now focuses on three powerful analysis features that provide actionable deck building insights:
 
 ## 🏥 1. Comprehensive Deck Health Score
 
@@ -14,6 +14,7 @@ The AI Recommendations tab now includes three powerful new analysis features:
   - ⚖️ Card Balance: Analyzes threat/answer ratio
   - ⚡ Mana Efficiency: Evaluates cost distribution
 - **Health Recommendations**: Specific suggestions when scores are low
+- **Archetype Detection**: Shows your deck's archetype match percentages
 
 **Health Score Breakdown**:
 - 80-100: 🟢 Excellent deck health
@@ -79,21 +80,27 @@ The AI Recommendations tab now includes three powerful new analysis features:
 1. **Open the AI Recommendations tab**
 2. **Select a deck** in the Decks tab first
 3. **Click "Analyze Current Deck"**
-4. **Explore the new tabs**:
-   - View health score in "Archetype & Health"
+4. **Explore the three focused tabs**:
+   - View archetype analysis and health score in "Archetype & Health"
    - See visual mana curve in "Mana Curve" 
    - Check synergies in "Card Synergy"
 
 ## Benefits
 
-- **Better Deck Building**: Visual feedback helps optimize curve and balance
+- **Focused Analysis**: Three essential metrics without clutter
+- **Visual Feedback**: Charts and graphs for better understanding
+- **Quantified Health**: Objective scoring system for deck quality
 - **Synergy Discovery**: Find hidden interactions between cards
-- **Health Monitoring**: Quantified feedback on deck construction
-- **Professional Analysis**: Tournament-level deck evaluation tools
+- **Professional Tools**: Tournament-level deck evaluation
 
-## Technical Implementation
+## Why This Design?
 
-- **Canvas-based Charts**: Smooth visual mana curve rendering
-- **Advanced Heuristics**: Intelligent synergy pattern detection
-- **Performance Optimized**: Fast analysis even for large decks
-- **Extensible Design**: Easy to add new synergy themes and metrics
+This streamlined approach focuses on the most valuable deck analysis features:
+
+- ✅ **Health Score**: Objective, actionable feedback
+- ✅ **Visual Curve**: Immediately shows mana distribution problems
+- ✅ **Synergy Matrix**: Discovers card relationships and themes
+- ❌ **Generic Improvements**: Removed - often too vague to be useful
+- ❌ **Similar Decks**: Removed - limited practical deck building value
+
+The result is a cleaner, more focused tool that provides better actionable insights for deck building.

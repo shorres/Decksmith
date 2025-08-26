@@ -1,10 +1,14 @@
 {
-  "name": "My Collection",
-  "last_updated": null,
-  "cards": {
-    "Lightning Bolt": {
+  "name": "CSV Import 2025-08-26 09:25",
+  "format": "Standard",
+  "description": "",
+  "created_date": "2025-08-26T09:25:57.694404",
+  "last_modified": null,
+  "cards": [
+    {
+      "name": "Lightning Bolt",
       "quantity": 4,
-      "quantity_foil": 0,
+      "sideboard": false,
       "card_data": {
         "name": "Lightning Bolt",
         "mana_cost": "{R}",
@@ -23,9 +27,10 @@
         "arena_id": null
       }
     },
-    "Counterspell": {
+    {
+      "name": "Counterspell",
       "quantity": 3,
-      "quantity_foil": 0,
+      "sideboard": false,
       "card_data": {
         "name": "Counterspell",
         "mana_cost": "{U}{U}",
@@ -44,9 +49,10 @@
         "arena_id": null
       }
     },
-    "Sol Ring": {
+    {
+      "name": "Sol Ring",
       "quantity": 1,
-      "quantity_foil": 0,
+      "sideboard": false,
       "card_data": {
         "name": "Sol Ring",
         "mana_cost": "{1}",
@@ -63,9 +69,10 @@
         "arena_id": null
       }
     },
-    "Black Lotus": {
+    {
+      "name": "Black Lotus",
       "quantity": 1,
-      "quantity_foil": 0,
+      "sideboard": false,
       "card_data": {
         "name": "Black Lotus",
         "mana_cost": "{0}",
@@ -82,5 +89,5 @@
         "arena_id": null
       }
     }
-  }
+  ]
 }
