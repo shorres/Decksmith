@@ -199,6 +199,11 @@ Remove-Item release -Recurse -Force
     actions: read
   ```
 - **File Path Issues**: Ensure proper path handling in PowerShell scripts
+  ```powershell
+  # Convert Windows paths to Unix format for GitHub Actions
+  $packagePathForGitHub = $packagePath -replace '\\', '/'
+  ```
+- **Pattern Match Errors**: Files not found due to path separator issues (Windows \ vs Unix /)
 - **Missing Hidden Imports**: Add all required imports to PyInstaller command
 
 ---
