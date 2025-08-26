@@ -101,7 +101,7 @@ class DeckTab:
         ttk.Label(info_frame, text="Format:").pack(anchor=tk.W, padx=5, pady=(10,0))
         self.format_var = tk.StringVar(value="Standard")
         format_combo = ttk.Combobox(info_frame, textvariable=self.format_var)
-        format_combo['values'] = ('Standard', 'Historic', 'Explorer', 'Alchemy', 'Brawl')
+        format_combo['values'] = ('Standard', 'Historic', 'Explorer', 'Alchemy', 'Brawl', 'Pioneer', 'Commander', 'cEDH', 'Modern')
         format_combo.pack(fill=tk.X, padx=5, pady=2)
         format_combo.bind('<<ComboboxSelected>>', self.on_format_change)
         
