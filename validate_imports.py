@@ -12,14 +12,8 @@ Usage: python validate_imports.py
 import os
 import sys
 
-import sys
-import importlib
-from typing import List, Tuple
-import traceback
-
-# Critical modules that MUST be available in the executable
+# Critical system imports that must be available for the executable to work
 CRITICAL_IMPORTS = [
-    # Core Python modules
     'tkinter',
     'tkinter.ttk', 
     'tkinter.filedialog',
@@ -41,8 +35,7 @@ CRITICAL_IMPORTS = [
     'sys',
     'pathlib',
     'logging',
-    
-    # External dependencies
+    # HTTP and networking
     'requests',
     'requests.adapters',
     'requests.auth', 
@@ -51,19 +44,20 @@ CRITICAL_IMPORTS = [
     'requests.sessions',
     'urllib3',
     'urllib3.connection',
-    'urllib3.connectionpool',
+    'urllib3.connectionpool', 
     'urllib3.poolmanager',
     'urllib3.util',
     'urllib3.util.retry',
     'certifi',
     'charset_normalizer',
     'pyperclip',
+    # Image processing
     'PIL',
     'PIL.Image',
     'PIL.ImageTk',
 ]
 
-# Application-specific modules that should work in development
+# Application-specific imports (these may have path issues in dev but should work in build)
 APP_IMPORTS = [
     'src.models.card',
     'src.models.deck', 
@@ -76,15 +70,18 @@ APP_IMPORTS = [
     'src.gui.ai_recommendations_tab',
 ]
 
-def validate_import(module_name: str) -> Tuple[bool, str]:
+def validate_import(module_name: str) -> tuple[bool, str]:
     """
-    Validate that a module can be imported successfully.
+    Test if a module can be imported successfully.
     
+    Args:
+        module_name: Name of the module to test
+        
     Returns:
         Tuple of (success: bool, error_message: str)
     """
     try:
-        importlib.import_module(module_name)
+        __import__(module_name)
         return True, ""
     except Exception as e:
         return False, str(e)
@@ -96,7 +93,7 @@ def run_import_validation() -> bool:
     Returns:
         True if all critical imports pass, False otherwise
     """
-    print("🔍 Decksmith Import Validation")
+    print("DECKSMITH IMPORT VALIDATION")
     print("=" * 40)
     
     all_passed = True
@@ -104,62 +101,61 @@ def run_import_validation() -> bool:
     failed_app = []
     
     # Test critical imports
-    print("\n📦 Testing Critical Dependencies:")
+    print("\nTesting Critical Dependencies:")
     for module in CRITICAL_IMPORTS:
         success, error = validate_import(module)
         if success:
-            print(f"  ✅ {module}")
+            print(f"  [OK] {module}")
         else:
-            print(f"  ❌ {module}: {error}")
-            failed_critical.append((module, error))
+            print(f"  [FAIL] {module}: {error}")
+            failed_critical.append(module)
             all_passed = False
     
-    # Test application imports
-    print(f"\n🏠 Testing Application Modules:")
+    # Test app imports
+    print(f"\nTesting Application Modules:")
     for module in APP_IMPORTS:
         success, error = validate_import(module)
         if success:
-            print(f"  ✅ {module}")
+            print(f"  [OK] {module}")
         else:
-            print(f"  ⚠️  {module}: {error}")
-            failed_app.append((module, error))
+            print(f"  [WARN] {module}: {error}")
+            failed_app.append(module)
     
     # Summary
-    print(f"\n📊 Validation Summary:")
+    print(f"\nValidation Summary:")
     print(f"  Critical imports: {len(CRITICAL_IMPORTS) - len(failed_critical)}/{len(CRITICAL_IMPORTS)} passed")
     print(f"  App imports: {len(APP_IMPORTS) - len(failed_app)}/{len(APP_IMPORTS)} passed")
     
+    # Report failures
     if failed_critical:
-        print(f"\n❌ CRITICAL FAILURES ({len(failed_critical)}):")
-        for module, error in failed_critical:
-            print(f"  • {module}: {error}")
-        print("\n⚠️  These modules MUST be fixed before building the executable!")
+        print(f"\nCRITICAL FAILURES ({len(failed_critical)}):")
+        for module in failed_critical:
+            print(f"  * {module}")
+        print("   [ERROR] DO NOT build executable until issues are resolved")
+        return False
     
     if failed_app:
-        print(f"\n⚠️  APP MODULE ISSUES ({len(failed_app)}):")
-        for module, error in failed_app:
-            print(f"  • {module}: {error}")
+        print(f"\nAPP MODULE ISSUES ({len(failed_app)}):")
+        for module in failed_app:
+            print(f"  * {module}")
         print("  These may indicate development environment issues.")
     
-    if all_passed:
-        print("\n🎯 ALL CRITICAL IMPORTS PASSED!")
-        print("   ✅ Safe to build executable")
-    else:
-        print(f"\n🚨 VALIDATION FAILED!")
-        print("   ❌ DO NOT build executable until issues are resolved")
+    if not failed_critical:
+        print("\nALL CRITICAL IMPORTS PASSED!")
+        print("   [OK] Safe to build executable")
     
-    return all_passed
+    return True
 
 def validate_spec_file() -> bool:
     """
     Validate that the spec file includes all critical imports.
     """
-    print(f"\n🔧 Validating PyInstaller Spec File:")
+    print(f"\nValidating PyInstaller Spec File:")
     
     # Check if spec file exists
     if not os.path.exists('decksmith_release.spec'):
-        print(f"  ⚠️  Spec file not found (decksmith_release.spec)")
-        print(f"     This is expected during GitHub Actions builds")
+        print(f"  [INFO] Spec file not found (decksmith_release.spec)")
+        print(f"         This is expected during GitHub Actions builds")
         return True
     
     try:
@@ -172,29 +168,33 @@ def validate_spec_file() -> bool:
                 missing_imports.append(module)
         
         if missing_imports:
-            print(f"  ❌ Missing from spec file: {len(missing_imports)} modules")
+            print(f"  [FAIL] Missing from spec file: {len(missing_imports)} modules")
             for module in missing_imports:
-                print(f"    • {module}")
+                print(f"    * {module}")
             return False
         else:
-            print(f"  ✅ All critical imports found in spec file")
+            print(f"  [OK] All critical imports found in spec file")
             return True
             
     except Exception as e:
-        print(f"  ❌ Error reading spec file: {e}")
+        print(f"  [ERROR] Error reading spec file: {e}")
         return False
 
 if __name__ == "__main__":
     print("Starting comprehensive import validation...")
     
+    # Run import validation
     imports_valid = run_import_validation()
+    
+    # Validate spec file
     spec_valid = validate_spec_file()
     
+    # Final result
     if imports_valid and spec_valid:
-        print(f"\n🎉 VALIDATION COMPLETE - ALL CHECKS PASSED!")
-        print("   Ready for executable build")
+        print(f"\n[SUCCESS] VALIDATION COMPLETE - ALL CHECKS PASSED!")
+        print(f"   Ready for executable build")
         sys.exit(0)
     else:
-        print(f"\n💥 VALIDATION FAILED!")
-        print("   Fix issues before building")
+        print(f"\n[FAILED] VALIDATION FAILED!")
+        print(f"   Please fix issues before building")
         sys.exit(1)
