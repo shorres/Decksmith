@@ -221,7 +221,7 @@ class AIRecommendationsTab:
         
         # Loading indicator
         self.loading_var = tk.StringVar(value="")
-        self.loading_label = ttk.Label(control_frame, textvariable=self.loading_var, foreground="light goldenrod")
+        self.loading_label = ttk.Label(control_frame, textvariable=self.loading_var, foreground="dim gray")
         self.loading_label.pack(side=tk.RIGHT, padx=5)
     
     def create_recommendations_panel(self, parent):
@@ -292,7 +292,7 @@ class AIRecommendationsTab:
         
         # Total recommendations count
         self.total_count_label = ttk.Label(rec_controls, text="Total: 0 recommendations", 
-                                         font=('TkDefaultFont', 9, 'bold'), foreground='light grey')
+                                         font=('TkDefaultFont', 9, 'bold'), foreground='black')
         self.total_count_label.pack(side=tk.RIGHT, padx=5)
         
         # Load More button (for manual loading)
@@ -403,7 +403,7 @@ class AIRecommendationsTab:
         self.update_deck_header()
         
         self.loading_var.set("Analyzing...")
-        self.analysis_status_label.config(text="🔍 Analyzing deck...", foreground='light goldenrod')
+        self.analysis_status_label.config(text="🔍 Analyzing deck...", foreground='cornflower blue')
         self.frame.update()
         
         def analyze():
@@ -484,7 +484,7 @@ class AIRecommendationsTab:
                     self.similar_text.insert(1.0, similar_text)
                     
                     self.loading_var.set("")
-                    self.analysis_status_label.config(text="✅ Analysis complete", foreground='green')
+                    self.analysis_status_label.config(text="✅ Analysis complete", foreground='black')
                 
                 self.frame.after(0, update_ui)
                 
@@ -522,7 +522,7 @@ class AIRecommendationsTab:
             self.rec_tree.delete(item)
         
         self.loading_var.set("Getting enhanced AI recommendations...")
-        self.analysis_status_label.config(text="🤖 Generating Scryfall-powered recommendations...", foreground='light goldenrod')
+        self.analysis_status_label.config(text="🤖 Generating Scryfall-powered recommendations...", foreground='dim gray')
         self.frame.update()
         
         def get_recs():
@@ -553,7 +553,7 @@ class AIRecommendationsTab:
                     status_msg = f"✅ {len(enhanced_recommendations)} recommendations loaded"
                     if self.has_more_recommendations:
                         status_msg += " (scroll down for more)"
-                    self.analysis_status_label.config(text=status_msg, foreground='spring green')
+                    self.analysis_status_label.config(text=status_msg, foreground='black')
                     
                     # Update Load More button state
                     if self.has_more_recommendations:
@@ -630,7 +630,7 @@ class AIRecommendationsTab:
                         status_msg = f"✅ {len(self.current_smart_recommendations)} recommendations loaded"
                         if self.has_more_recommendations:
                             status_msg += " (scroll for more)"
-                        self.analysis_status_label.config(text=status_msg, foreground='spring green')
+                        self.analysis_status_label.config(text=status_msg, foreground='black')
                         
                         # Update Load More button state
                         self.load_more_button.config(
@@ -780,12 +780,12 @@ class AIRecommendationsTab:
         
         # Configure tag colors with minimal contrast for better readability
         # Using light theme colors since we're using built-in ttk themes
-        self.rec_tree.tag_configure('craftable', foreground='#b8860b')
+        self.rec_tree.tag_configure('craftable', foreground="dark slate gray")
         
         # Configure confidence level row colors
-        self.rec_tree.tag_configure('high_confidence', background='#e8f5e8')
-        self.rec_tree.tag_configure('medium_confidence', background='#fff2cc')
-        self.rec_tree.tag_configure('low_confidence', background='#ffeaa7')
+        self.rec_tree.tag_configure('high_confidence', background="green3")
+        self.rec_tree.tag_configure('medium_confidence', background="green2")
+        self.rec_tree.tag_configure('low_confidence', background="green1")
     
     def update_column_headers(self):
         """Update column headers with sort indicators"""
