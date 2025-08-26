@@ -64,7 +64,7 @@ class MainWindow:
     
     def setup_window(self):
         """Configure the main window"""
-        self.root.title("Magic: The Gathering Arena Deck Manager")
+        self.root.title("Decksmith")
         self.root.geometry("1200x800")
         self.root.minsize(800, 600)
         
