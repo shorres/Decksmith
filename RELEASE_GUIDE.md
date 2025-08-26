@@ -4,7 +4,7 @@
 
 ```powershell
 # The ONE-LINER: Just push a tag, GitHub Actions does everything!
-git tag v1.0.3 && git push origin v1.0.3
+git tag v1.0.4; git push origin v1.0.4
 ```
 
 **What happens automatically:**
@@ -21,9 +21,9 @@ git tag v1.0.3 && git push origin v1.0.3
 # Build locally and upload manually
 .\build_release.ps1 -Version "1.0.3" -CreateBranch
 # Test: & ".\release\1.0.3\Decksmith v1.0.3.exe" 
-git add . && git commit -m "Release v1.0.3"
-git checkout main && git merge release/1.0.3 && git push
-git tag v1.0.3 && git push origin v1.0.3
+git add .; git commit -m "Release v1.0.3"
+git checkout main; git merge release/1.0.3; git push
+git tag v1.0.3; git push origin v1.0.3
 # Then upload ZIP at: https://github.com/shorres/Magic-Tool/releases
 ```
 
