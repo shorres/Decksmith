@@ -17,7 +17,7 @@ from utils.simple_performance import get_performance_optimizer
 from gui.scryfall_autocomplete import ScryfallAutocompleteEntry
 from gui.card_details_modal import show_card_details_modal
 from utils.scryfall_api import scryfall_api
-from utils.window_utils import center_window_on_parent, get_main_window
+from utils.window_utils import center_window_on_parent, center_window_on_screen, get_main_window
 
 class CollectionTab:
     """Collection management interface"""
@@ -387,7 +387,7 @@ class CollectionTab:
     
     def add_card(self):
         """Add a new card to the collection"""
-        dialog = AddCardDialog(self.frame)
+        dialog = AddCardDialog(self.parent)
         if dialog.result:
             card_data, quantity, foil = dialog.result
             card = Card(**card_data)
@@ -601,16 +601,41 @@ class AddCardDialog:
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
-        # Set size and center on the main application window
+        # Set size and center on the parent window
         dialog_width = 400
         dialog_height = 500
         
-        # Try to center on the main application window
-        main_window = get_main_window(parent)
-        if main_window and main_window != parent:
-            center_window_on_parent(self.dialog, main_window, dialog_width, dialog_height)
-        else:
-            center_window_on_parent(self.dialog, parent, dialog_width, dialog_height)
+        # Simple approach: find the root window by traversing up the hierarchy
+        current = parent
+        main_window = None
+        
+        try:
+            # Keep going up until we find the root Tk window
+            while current:
+                if hasattr(current, 'winfo_class'):
+                    try:
+                        class_name = current.winfo_class()
+                        if class_name == 'Tk':
+                            main_window = current
+                            break
+                    except:
+                        pass
+                        
+                if hasattr(current, 'master') and current.master:
+                    current = current.master
+                elif hasattr(current, 'parent') and current.parent:  
+                    current = current.parent
+                else:
+                    break
+            
+            if main_window and hasattr(main_window, 'winfo_x'):
+                center_window_on_parent(self.dialog, main_window, dialog_width, dialog_height)
+            else:
+                center_window_on_screen(self.dialog, dialog_width, dialog_height)
+                
+        except (AttributeError, tk.TclError):
+            # Final fallback to screen centering
+            center_window_on_screen(self.dialog, dialog_width, dialog_height)
         
         self.create_widgets()
         self.dialog.wait_window()
