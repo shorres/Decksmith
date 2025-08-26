@@ -196,21 +196,7 @@ jobs:
         }
         
         # Create README for users
-        $readmeContent = @"
-# Decksmith v$version
-
-## Installation
-1. Extract all files to a folder of your choice
-2. Run 'Decksmith v$version.exe' to start the application
-
-## Data Storage
-- Your decks will be saved in the 'data/decks' folder
-- Collections are stored in the 'data/collections' folder  
-- Cache files are stored in the 'data/cache' folder
-
-## Support
-For issues or questions, visit: https://github.com/shorres/Magic-Tool
-"@
+        $readmeContent = "# Decksmith v$version`n`n## Installation`n1. Extract all files to a folder of your choice`n2. Run 'Decksmith v$version.exe' to start the application`n`n## Data Storage`n- Your decks will be saved in the 'data/decks' folder`n- Collections are stored in the 'data/collections' folder`n- Cache files are stored in the 'data/cache' folder`n`n## Support`nFor issues or questions, visit: https://github.com/shorres/Magic-Tool"
         $readmeContent | Out-File -FilePath "$packageDir\README.txt" -Encoding UTF8
         
         # Create enhanced ZIP package
