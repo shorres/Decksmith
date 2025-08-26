@@ -19,7 +19,7 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     
@@ -117,7 +117,7 @@ jobs:
       id: package
     
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ steps.package.outputs.PACKAGE_NAME }}
         path: ${{ steps.package.outputs.PACKAGE_PATH }}
