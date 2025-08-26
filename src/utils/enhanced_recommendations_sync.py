@@ -161,7 +161,7 @@ class EnhancedRecommendationEngine:
         
         # 3. Get synergy-based recommendations
         synergy_recs = self._get_synergy_recommendations_scryfall(
-            deck, deck_analysis, current_cards, limit=40 * base_multiplier
+            deck, deck_analysis, current_cards, format_name, limit=40 * base_multiplier
         )
         recommendations.extend(synergy_recs)
         
@@ -333,7 +333,7 @@ class EnhancedRecommendationEngine:
                     continue
                 
                 # Skip cards that don't fit colors
-                if not self._is_color_compatible_scryfall_card(card, colors):
+                if not self._is_color_compatible_scryfall_card(card, colors, format_name):
                     continue
                 
                 # Calculate recommendation score
@@ -365,8 +365,8 @@ class EnhancedRecommendationEngine:
                     "keywords": {}
                 }
                 
-                synergy_score = self._calculate_color_synergy(card, temp_analysis)
-                deck_fit_score = self._calculate_deck_fit_score(card, temp_analysis)
+                synergy_score = self._calculate_color_synergy(card, temp_analysis, format_name)
+                deck_fit_score = self._calculate_deck_fit_score(card, temp_analysis, format_name)
                 meta_score = self._calculate_meta_score(card, "midrange")
                 
                 # Extract keywords
@@ -455,8 +455,8 @@ class EnhancedRecommendationEngine:
                 }
                 
                 archetype_score = self._calculate_archetype_synergy(card, temp_analysis)
-                synergy_score = self._calculate_color_synergy(card, temp_analysis)
-                deck_fit_score = self._calculate_deck_fit_score(card, temp_analysis)
+                synergy_score = self._calculate_color_synergy(card, temp_analysis, format_name)
+                deck_fit_score = self._calculate_deck_fit_score(card, temp_analysis, format_name)
                 
                 if archetype_score < 0.4:
                     continue
@@ -501,7 +501,7 @@ class EnhancedRecommendationEngine:
         
         return recommendations
     
-    def _get_synergy_recommendations_scryfall(self, deck: Deck, deck_analysis: Dict, current_cards: Set[str], limit: int = 6) -> List[SmartRecommendation]:
+    def _get_synergy_recommendations_scryfall(self, deck: Deck, deck_analysis: Dict, current_cards: Set[str], format_name: str = "standard", limit: int = 6) -> List[SmartRecommendation]:
         """Get synergy-based recommendations using advanced scoring"""
         recommendations = []
         
@@ -659,13 +659,13 @@ class EnhancedRecommendationEngine:
         gaps.sort(key=lambda x: x[1], reverse=True)
         return [cmc for cmc, _ in gaps]
     
-    def _calculate_advanced_synergy_score(self, card, deck_analysis: Dict, synergy_type: str, weight: float) -> float:
+    def _calculate_advanced_synergy_score(self, card, deck_analysis: Dict, synergy_type: str, weight: float, format_name: str = "standard") -> float:
         """Calculate advanced synergy score based on multiple factors"""
         base_score = 0.0
         
         # Type-specific synergy calculation
         if synergy_type == "color_synergy":
-            base_score = self._calculate_color_synergy(card, deck_analysis)
+            base_score = self._calculate_color_synergy(card, deck_analysis, format_name)
         elif synergy_type.startswith("archetype_"):
             base_score = self._calculate_archetype_synergy(card, deck_analysis)
         elif synergy_type.startswith("curve_"):
@@ -687,38 +687,63 @@ class EnhancedRecommendationEngine:
         
         return min(synergy_score, 1.0)
     
-    def _calculate_color_synergy(self, card, deck_analysis: Dict) -> float:
-        """Calculate color-based synergy score with balanced distribution"""
+    def _calculate_color_synergy(self, card, deck_analysis: Dict, format_name: str = "standard") -> float:
+        """Calculate color-based synergy score with format-specific weighting"""
         deck_colors = set(deck_analysis.get("colors", []))
         card_colors = set(getattr(card, 'colors', []))
+        
+        # Determine if this is a singleton format where color identity is critical
+        singleton_formats = {"commander", "edh", "brawl", "oathbreaker"}
+        is_singleton = format_name.lower() in singleton_formats
         
         if not deck_colors:
             return 0.6 if not card_colors else 0.4  # Neutral for colorless in colorless deck
         
         if not card_colors:
-            return 0.7  # Colorless cards are generally playable
+            return 0.75 if is_singleton else 0.7  # Colorless cards slightly better in singleton
         
-        # Perfect match gets good but not perfect score
+        # Perfect color identity match
         if card_colors <= deck_colors:  # Card colors are subset of deck colors
             color_overlap = len(card_colors.intersection(deck_colors))
             deck_size = len(deck_colors)
             
-            # Scale based on deck's color commitment
-            if deck_size == 1:  # Mono-colored deck
-                return 0.75 + (color_overlap * 0.05)  # Max 0.8
-            elif deck_size == 2:  # Two-color deck
-                return 0.65 + (color_overlap * 0.08)  # Max 0.81
-            else:  # Three+ color deck
-                return 0.55 + (color_overlap * 0.1)   # Max 0.85
+            if is_singleton:
+                # In singleton formats, perfect color identity is MUCH more important
+                if deck_size == 1:  # Mono-colored commander
+                    return 0.88 + (color_overlap * 0.05)  # Max 0.93
+                elif deck_size == 2:  # Two-color commander
+                    return 0.82 + (color_overlap * 0.06)  # Max 0.94
+                elif deck_size == 3:  # Three-color commander
+                    return 0.78 + (color_overlap * 0.07)  # Max 0.99
+                else:  # Four+ color commander
+                    return 0.75 + (color_overlap * 0.08)  # Max 0.99
+            else:
+                # Standard constructed formats - color flexibility is less critical
+                if deck_size == 1:  # Mono-colored deck
+                    return 0.75 + (color_overlap * 0.05)  # Max 0.8
+                elif deck_size == 2:  # Two-color deck
+                    return 0.65 + (color_overlap * 0.08)  # Max 0.81
+                else:  # Three+ color deck
+                    return 0.55 + (color_overlap * 0.1)   # Max 0.85
         
-        # Partial match gets lower score
+        # Cards with colors outside commander's identity are UNPLAYABLE in singleton
+        if is_singleton:
+            # If any card color is not in deck colors, this card cannot be played
+            if not card_colors <= deck_colors:
+                return 0.05  # Nearly unplayable - severe penalty
+        
+        # Partial match gets lower score (only relevant for non-singleton)
         overlap = len(card_colors.intersection(deck_colors))
         if overlap > 0:
             overlap_ratio = overlap / len(card_colors)
-            return 0.3 + (overlap_ratio * 0.25)  # Max 0.55
+            if is_singleton:
+                # Even partial matches are problematic in singleton formats
+                return 0.15 + (overlap_ratio * 0.15)  # Max 0.30
+            else:
+                return 0.3 + (overlap_ratio * 0.25)  # Max 0.55
         
-        # No overlap - very low synergy
-        return 0.15
+        # No overlap - very low synergy, catastrophic in singleton
+        return 0.02 if is_singleton else 0.15
     
     def _calculate_archetype_synergy(self, card, deck_analysis: Dict) -> float:
         """Calculate archetype-specific synergy with realistic scoring"""
@@ -977,26 +1002,37 @@ class EnhancedRecommendationEngine:
         
         return min(base_score, 1.0)
     
-    def _calculate_deck_fit_score(self, card, deck_analysis: Dict) -> float:
+    def _calculate_deck_fit_score(self, card, deck_analysis: Dict, format_name: str = "standard") -> float:
         """Calculate how well card fits the deck's strategy"""
         score = 0.4
         
-        # Color fit (25%)
-        color_score = self._calculate_color_synergy(card, deck_analysis)
-        score += color_score * 0.25
+        # Color fit (25% - more important in singleton formats)
+        color_score = self._calculate_color_synergy(card, deck_analysis, format_name)
         
-        # Curve fit (25%)
+        # Increase color weight for singleton formats
+        singleton_formats = {"commander", "edh", "brawl", "oathbreaker"}
+        is_singleton = format_name.lower() in singleton_formats
+        color_weight = 0.4 if is_singleton else 0.25  # Higher weight for singleton
+        
+        score += color_score * color_weight
+        
+        # Adjust other weights for singleton formats
+        curve_weight = 0.15 if is_singleton else 0.25  # Less important in singleton
+        archetype_weight = 0.25 if is_singleton else 0.30  # Slightly less important  
+        versatility_weight = 0.2 if is_singleton else 0.2  # Same importance
+        
+        # Curve fit
         curve_score = self._calculate_curve_synergy(card, deck_analysis)
-        score += curve_score * 0.25
+        score += curve_score * curve_weight
         
-        # Archetype fit (30%)
+        # Archetype fit
         archetype_score = self._calculate_archetype_synergy(card, deck_analysis)
-        score += archetype_score * 0.30
+        score += archetype_score * archetype_weight
         
-        # Versatility bonus (20%)
+        # Versatility bonus
         oracle_text = getattr(card, 'oracle_text', '').lower()
         if any(word in oracle_text for word in ['choose', 'either', 'or', 'mode', 'additional cost']):
-            score += 0.15
+            score += versatility_weight * 0.75  # 15% of base score
         
         # Multi-use bonus
         if any(word in oracle_text for word in ['tap:', 'activated ability', 'enters']):
@@ -1004,19 +1040,32 @@ class EnhancedRecommendationEngine:
         
         return min(score, 1.0)
     
-    def _generate_synergy_reasons(self, card, deck_analysis: Dict, synergy_type: str, synergy_score: float) -> List[str]:
+    def _generate_synergy_reasons(self, card, deck_analysis: Dict, synergy_type: str, synergy_score: float, format_name: str = "standard") -> List[str]:
         """Generate detailed reasons for the recommendation"""
         reasons = []
         
-        # Primary synergy reason
+        # Primary synergy reason with format-specific details
         if synergy_type == "color_synergy":
             colors = deck_analysis.get("colors", [])
             card_colors = getattr(card, 'colors', [])
+            singleton_formats = {"commander", "edh", "brawl", "oathbreaker"}
+            is_singleton = format_name.lower() in singleton_formats
+            
             if set(card_colors) <= set(colors):
-                reasons.append(f"Perfect color match ({'/'.join(card_colors) if card_colors else 'Colorless'})")
+                if is_singleton:
+                    reasons.append(f"✓ Legal in color identity ({'/'.join(card_colors) if card_colors else 'Colorless'})")
+                else:
+                    reasons.append(f"Perfect color match ({'/'.join(card_colors) if card_colors else 'Colorless'})")
             else:
                 overlap = set(card_colors) & set(colors)
-                reasons.append(f"Color overlap with {'/'.join(overlap)}")
+                if is_singleton:
+                    off_colors = set(card_colors) - set(colors)
+                    if off_colors:
+                        reasons.append(f"⚠ Color identity violation ({'/'.join(off_colors)} not allowed)")
+                    else:
+                        reasons.append(f"Color identity compatible")
+                else:
+                    reasons.append(f"Color overlap with {'/'.join(overlap)}")
         
         elif synergy_type.startswith("archetype_"):
             archetype_keyword = synergy_type.split("_", 1)[1]
@@ -1030,13 +1079,18 @@ class EnhancedRecommendationEngine:
             keyword = synergy_type.split("_", 1)[1]
             reasons.append(f"Synergizes with existing {keyword} cards")
         
-        # Quality indicators
+        # Quality indicators with format context
         if synergy_score > 0.8:
-            reasons.append("Excellent synergy potential")
+            if format_name.lower() in {"commander", "edh"}:
+                reasons.append("Excellent Commander staple")
+            else:
+                reasons.append("Excellent synergy potential")
         elif synergy_score > 0.6:
             reasons.append("Good synergy with current cards")
         elif synergy_score > 0.4:
             reasons.append("Reasonable fit for deck")
+        elif synergy_score < 0.2 and format_name.lower() in {"commander", "edh", "brawl"}:
+            reasons.append("Not playable in this color identity")
         
         # Efficiency notes
         cmc = getattr(card, 'cmc', 0)
@@ -1132,8 +1186,8 @@ class EnhancedRecommendationEngine:
                     if cmc <= 3:
                         reasons.append("Strong early-to-mid game presence")
                     
-                    synergy_score = self._calculate_color_synergy(card, temp_analysis)
-                    deck_fit_score = self._calculate_deck_fit_score(card, temp_analysis)
+                    synergy_score = self._calculate_color_synergy(card, temp_analysis, format_name)
+                    deck_fit_score = self._calculate_deck_fit_score(card, temp_analysis, format_name)
                     meta_score = self._calculate_meta_score(card, "midrange")
                     
                     keywords = self._extract_keywords_from_text(card.oracle_text)
@@ -1265,8 +1319,8 @@ class EnhancedRecommendationEngine:
         
         return keywords
     
-    def _is_color_compatible_scryfall_card(self, card, deck_colors: List[str]) -> bool:
-        """Check color compatibility using Scryfall card"""
+    def _is_color_compatible_scryfall_card(self, card, deck_colors: List[str], format_name: str = "standard") -> bool:
+        """Check color compatibility using Scryfall card with format-specific rules"""
         if not deck_colors:
             return True
         
@@ -1276,8 +1330,18 @@ class EnhancedRecommendationEngine:
         if not card_colors:
             return True
         
-        # Check if all card colors are in deck colors
-        return all(color in deck_colors for color in card_colors)
+        # For singleton formats, check color identity more strictly
+        singleton_formats = {"commander", "edh", "brawl", "oathbreaker"}
+        is_singleton = format_name.lower() in singleton_formats
+        
+        if is_singleton:
+            # In singleton formats, ALL colors in the card must be in commander's identity
+            # This is stricter than just mana cost - includes colors in rules text too
+            card_color_identity = getattr(card, 'color_identity', card_colors)
+            return all(color in deck_colors for color in card_color_identity)
+        else:
+            # In constructed formats, just check mana cost colors
+            return all(color in deck_colors for color in card_colors)
     
     def _calculate_staple_confidence(self, card, format_name: str) -> float:
         """Calculate confidence score for format staples with balanced distribution"""

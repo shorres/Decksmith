@@ -28,7 +28,7 @@ class AIRecommendationsTab:
         self.total_available_recommendations = 0
         self.is_loading_more = False
         self.has_more_recommendations = True
-        self.batch_size = 50  # Fetch recommendations in batches of 50
+        self.batch_size = 100  # Fetch recommendations in batches of 100
         
         self.create_widgets()
     
