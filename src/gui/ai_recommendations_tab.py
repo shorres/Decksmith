@@ -171,9 +171,9 @@ class AIRecommendationsTab:
         analysis_notebook = ttk.Notebook(analysis_frame)
         analysis_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Archetype analysis tab
+        # Archetype & Health Score analysis tab
         archetype_frame = ttk.Frame(analysis_notebook)
-        analysis_notebook.add(archetype_frame, text="Archetype")
+        analysis_notebook.add(archetype_frame, text="Archetype & Health")
         
         self.archetype_text = tk.Text(archetype_frame, height=6, wrap=tk.WORD)
         archetype_scroll = ttk.Scrollbar(archetype_frame, orient=tk.VERTICAL, command=self.archetype_text.yview)
@@ -181,6 +181,25 @@ class AIRecommendationsTab:
         
         self.archetype_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         archetype_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
+        
+        # Visual Mana Curve tab
+        curve_frame = ttk.Frame(analysis_notebook)
+        analysis_notebook.add(curve_frame, text="Mana Curve")
+        
+        # Create canvas for visual mana curve
+        self.curve_canvas = tk.Canvas(curve_frame, height=200, bg='white')
+        self.curve_canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Card Synergy Matrix tab
+        synergy_frame = ttk.Frame(analysis_notebook)
+        analysis_notebook.add(synergy_frame, text="Card Synergy")
+        
+        self.synergy_text = tk.Text(synergy_frame, height=6, wrap=tk.WORD)
+        synergy_scroll = ttk.Scrollbar(synergy_frame, orient=tk.VERTICAL, command=self.synergy_text.yview)
+        self.synergy_text.configure(yscrollcommand=synergy_scroll.set)
+        
+        self.synergy_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        synergy_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
         
         # Suggestions tab
         suggestions_frame = ttk.Frame(analysis_notebook)
@@ -479,11 +498,22 @@ class AIRecommendationsTab:
                     similar_text += "• Your deck is unique/innovative\n"
                     similar_text += "• The archetype is underrepresented in competitive play\n"
                     similar_text += "• Consider exploring established archetypes for reference\n"
+
                 
                 # Update UI in main thread
                 def update_ui():
+                    # Update archetype text with health score
+                    enhanced_archetype_text = self._add_deck_health_score(current_deck, archetype_text)
                     self.archetype_text.delete(1.0, tk.END)
-                    self.archetype_text.insert(1.0, archetype_text)
+                    self.archetype_text.insert(1.0, enhanced_archetype_text)
+                    
+                    # Update visual mana curve
+                    self._draw_visual_mana_curve(current_deck)
+                    
+                    # Update card synergy analysis
+                    synergy_analysis = self._analyze_card_synergies(current_deck)
+                    self.synergy_text.delete(1.0, tk.END)
+                    self.synergy_text.insert(1.0, synergy_analysis)
                     
                     self.suggestions_text.delete(1.0, tk.END)
                     self.suggestions_text.insert(1.0, improvements_text)
@@ -508,6 +538,347 @@ class AIRecommendationsTab:
         thread = threading.Thread(target=analyze)
         thread.daemon = True
         thread.start()
+    
+    def _add_deck_health_score(self, deck, existing_text):
+        """Add comprehensive deck health score to the archetype analysis"""
+        if not deck:
+            return existing_text
+        
+        # Calculate various health metrics
+        mainboard = deck.get_mainboard_cards()
+        if not mainboard:
+            return existing_text + "\n⚠️ No mainboard cards to analyze."
+        
+        total_cards = sum(card.quantity for card in mainboard)
+        curve = deck.get_mana_curve()
+        colors = deck.get_color_distribution()
+        types = deck.get_type_distribution()
+        
+        # Curve health (0-100)
+        curve_score = self._calculate_curve_health(curve, total_cards)
+        
+        # Color consistency (0-100)
+        color_score = self._calculate_color_consistency(colors, total_cards)
+        
+        # Card balance (0-100) - threats vs answers
+        balance_score = self._calculate_card_balance(types, total_cards)
+        
+        # Mana efficiency (0-100)
+        efficiency_score = self._calculate_mana_efficiency(curve, total_cards)
+        
+        # Overall health score
+        overall_score = (curve_score + color_score + balance_score + efficiency_score) / 4
+        
+        # Create health score display
+        health_text = f"\n🏥 DECK HEALTH ANALYSIS\n"
+        health_text += "=" * 30 + "\n\n"
+        
+        # Overall score with visual indicator
+        health_emoji = "🟢" if overall_score >= 80 else "🟡" if overall_score >= 60 else "🔴"
+        health_text += f"📊 OVERALL HEALTH: {health_emoji} {overall_score:.0f}/100\n\n"
+        
+        # Individual scores
+        health_text += f"📈 Mana Curve:     {self._get_score_bar(curve_score)} {curve_score:.0f}/100\n"
+        health_text += f"🎨 Color Balance:  {self._get_score_bar(color_score)} {color_score:.0f}/100\n"
+        health_text += f"⚖️  Card Balance:   {self._get_score_bar(balance_score)} {balance_score:.0f}/100\n"
+        health_text += f"⚡ Mana Efficiency: {self._get_score_bar(efficiency_score)} {efficiency_score:.0f}/100\n\n"
+        
+        # Health recommendations
+        if overall_score < 70:
+            health_text += "💡 HEALTH RECOMMENDATIONS:\n"
+            if curve_score < 60:
+                health_text += "   • Consider adjusting mana curve distribution\n"
+            if color_score < 60:
+                health_text += "   • Improve mana base or reduce color requirements\n"
+            if balance_score < 60:
+                health_text += "   • Balance threats and answers better\n"
+            if efficiency_score < 60:
+                health_text += "   • Consider more efficient mana costs\n"
+        else:
+            health_text += "✅ Deck health looks good! Minor optimizations available.\n"
+        
+        return health_text + "\n" + existing_text
+    
+    def _calculate_curve_health(self, curve, total_cards):
+        """Calculate mana curve health score (0-100)"""
+        if total_cards == 0:
+            return 0
+        
+        # Ideal curve percentages for a balanced deck
+        ideal = {0: 0.05, 1: 0.15, 2: 0.25, 3: 0.20, 4: 0.15, 5: 0.10, 6: 0.05, 7: 0.05}
+        
+        score = 100
+        for cmc, ideal_pct in ideal.items():
+            actual_pct = curve.get(cmc, 0) / total_cards
+            # Penalize deviations from ideal
+            deviation = abs(actual_pct - ideal_pct)
+            score -= deviation * 200  # Scale penalty
+        
+        return max(0, min(100, score))
+    
+    def _calculate_color_consistency(self, colors, total_cards):
+        """Calculate color consistency score (0-100)"""
+        if not colors or total_cards == 0:
+            return 100  # Colorless is perfectly consistent
+        
+        num_colors = len(colors)
+        if num_colors == 1:
+            return 100  # Mono-color is perfectly consistent
+        elif num_colors == 2:
+            return 85   # Two-color is very good
+        elif num_colors == 3:
+            return 70   # Three-color is okay but challenging
+        elif num_colors == 4:
+            return 50   # Four-color is difficult
+        else:
+            return 30   # Five-color is very challenging
+    
+    def _calculate_card_balance(self, types, total_cards):
+        """Calculate balance between threats and answers (0-100)"""
+        if total_cards == 0:
+            return 0
+        
+        # Categorize card types
+        threats = types.get('Creature', 0) + types.get('Planeswalker', 0)
+        answers = types.get('Instant', 0) + types.get('Sorcery', 0)
+        support = types.get('Artifact', 0) + types.get('Enchantment', 0)
+        
+        threat_ratio = threats / total_cards
+        answer_ratio = answers / total_cards
+        
+        # Ideal ratios vary by archetype, but aim for reasonable balance
+        if threat_ratio < 0.2:  # Too few threats
+            return 60
+        elif threat_ratio > 0.8:  # Too many threats, not enough interaction
+            return 60
+        elif answer_ratio < 0.1:  # Too few answers
+            return 70
+        else:
+            return 90  # Good balance
+    
+    def _calculate_mana_efficiency(self, curve, total_cards):
+        """Calculate mana efficiency score (0-100)"""
+        if total_cards == 0:
+            return 0
+        
+        # Penalize high-cost cards without ramp/fixing
+        high_cost_cards = sum(count for cmc, count in curve.items() if cmc >= 5)
+        high_cost_ratio = high_cost_cards / total_cards
+        
+        if high_cost_ratio > 0.3:  # Too many expensive cards
+            return 60
+        elif high_cost_ratio < 0.05:  # Too few win conditions
+            return 75
+        else:
+            return 90
+    
+    def _get_score_bar(self, score):
+        """Get visual score bar for health metrics"""
+        filled = int(score / 10)
+        bar = "█" * filled + "░" * (10 - filled)
+        return f"[{bar}]"
+    
+    def _draw_visual_mana_curve(self, deck):
+        """Draw visual mana curve chart on canvas"""
+        if not deck:
+            return
+        
+        # Clear canvas
+        self.curve_canvas.delete("all")
+        
+        # Get curve data
+        curve = deck.get_mana_curve()
+        if not curve:
+            self.curve_canvas.create_text(
+                self.curve_canvas.winfo_width() / 2, 
+                self.curve_canvas.winfo_height() / 2,
+                text="No mana curve data available", 
+                font=("Arial", 12), 
+                fill="gray"
+            )
+            return
+        
+        # Canvas dimensions
+        width = 400
+        height = 180
+        margin = 40
+        bar_width = 35
+        
+        # Update canvas size
+        self.curve_canvas.config(width=width, height=height)
+        
+        # Calculate max value for scaling
+        max_count = max(curve.values()) if curve else 1
+        if max_count == 0:
+            max_count = 1
+        
+        # Draw title
+        self.curve_canvas.create_text(width/2, 20, text="Mana Curve Distribution", 
+                                    font=("Arial", 12, "bold"), fill="black")
+        
+        # Draw bars for CMCs 0-7+
+        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#F0A0A0', '#FFB74D']
+        
+        for cmc in range(8):
+            count = curve.get(cmc, 0)
+            if count > 0 or cmc <= 4:  # Always show 0-4, only show higher if they have cards
+                # Calculate bar position and height
+                x = margin + cmc * (bar_width + 5)
+                bar_height = (count / max_count) * (height - 80) if count > 0 else 3  # Minimum 3px for empty bars
+                y = height - margin - bar_height
+                
+                # Draw bar
+                color = colors[cmc % len(colors)]
+                self.curve_canvas.create_rectangle(x, y, x + bar_width, height - margin, 
+                                                 fill=color, outline="black", width=1)
+                
+                # Draw count on top of bar
+                if count > 0:
+                    self.curve_canvas.create_text(x + bar_width/2, y - 10, 
+                                                text=str(count), font=("Arial", 10, "bold"))
+                
+                # Draw CMC label
+                cmc_label = f"{cmc}+" if cmc >= 7 else str(cmc)
+                self.curve_canvas.create_text(x + bar_width/2, height - margin + 15, 
+                                            text=cmc_label, font=("Arial", 10))
+        
+        # Draw percentage indicators
+        total_cards = sum(curve.values())
+        if total_cards > 0:
+            y_pos = height - 10
+            x_start = margin
+            for cmc in range(8):
+                count = curve.get(cmc, 0)
+                if count > 0:
+                    percentage = (count / total_cards) * 100
+                    x = x_start + cmc * (bar_width + 5)
+                    self.curve_canvas.create_text(x + bar_width/2, y_pos, 
+                                                text=f"{percentage:.0f}%", 
+                                                font=("Arial", 8), fill="gray")
+    
+    def _analyze_card_synergies(self, deck):
+        """Analyze card synergies and relationships in the deck"""
+        if not deck:
+            return "No deck to analyze."
+        
+        mainboard = deck.get_mainboard_cards()
+        if not mainboard:
+            return "No cards in mainboard to analyze."
+        
+        synergy_text = f"🔗 CARD SYNERGY MATRIX for '{deck.name}'\n"
+        synergy_text += "=" * 50 + "\n\n"
+        
+        # Define synergy keywords and their relationships
+        synergy_keywords = {
+            'tribal': ['human', 'elf', 'goblin', 'zombie', 'wizard', 'warrior', 'soldier', 'beast'],
+            'graveyard': ['graveyard', 'exile', 'discard', 'mill', 'delve', 'flashback'],
+            'artifacts': ['artifact', 'equipment', 'vehicle', 'treasure', 'food'],
+            'spells': ['instant', 'sorcery', 'spell', 'prowess', 'storm'],
+            'lifegain': ['lifegain', 'lifelink', 'gain life', 'life total'],
+            'tokens': ['token', 'create', 'populate'],
+            'counters': ['+1/+1', 'counter', 'proliferate'],
+            'combat': ['first strike', 'double strike', 'trample', 'vigilance', 'haste'],
+            'draw': ['draw', 'card draw', 'library'],
+            'mana': ['mana', 'ramp', 'treasure', 'ritual']
+        }
+        
+        # Analyze cards for synergy themes
+        theme_cards = {}
+        for theme, keywords in synergy_keywords.items():
+            theme_cards[theme] = []
+            
+            for deck_card in mainboard:
+                card = deck_card.card
+                # Check card name, type, and text for synergy keywords
+                card_text = f"{card.name} {card.card_type} {card.text or ''}".lower()
+                
+                for keyword in keywords:
+                    if keyword in card_text:
+                        if deck_card not in theme_cards[theme]:
+                            theme_cards[theme].append(deck_card)
+                        break
+        
+        # Display synergy analysis
+        synergy_found = False
+        
+        for theme, cards in theme_cards.items():
+            if len(cards) >= 2:  # Need at least 2 cards to have synergy
+                synergy_found = True
+                synergy_text += f"🎯 {theme.upper()} SYNERGY ({len(cards)} cards):\n"
+                
+                for deck_card in sorted(cards, key=lambda x: x.card.name):
+                    synergy_text += f"   • {deck_card.quantity}x {deck_card.card.name}"
+                    if deck_card.card.card_type:
+                        synergy_text += f" ({deck_card.card.card_type.split()[0]})"
+                    synergy_text += "\n"
+                
+                # Calculate synergy strength
+                synergy_strength = min(len(cards) / 4, 1.0) * 100  # Scale to percentage
+                strength_bar = "█" * int(synergy_strength / 20) + "░" * (5 - int(synergy_strength / 20))
+                synergy_text += f"   💪 Synergy Strength: [{strength_bar}] {synergy_strength:.0f}%\n\n"
+        
+        if not synergy_found:
+            synergy_text += "🔍 LIMITED SYNERGIES DETECTED\n\n"
+            synergy_text += "This deck appears to focus on individual card power rather than\n"
+            synergy_text += "synergistic interactions. Consider these synergy opportunities:\n\n"
+            
+            # Analyze deck for potential synergy improvements
+            colors = deck.get_color_distribution()
+            types = deck.get_type_distribution()
+            
+            if types.get('Creature', 0) >= 8:
+                synergy_text += "• TRIBAL SYNERGY: With many creatures, consider tribal themes\n"
+            
+            if 'U' in colors and (types.get('Instant', 0) + types.get('Sorcery', 0)) >= 6:
+                synergy_text += "• SPELL SYNERGY: Blue + spells suggest prowess or spell-based strategy\n"
+            
+            if 'B' in colors:
+                synergy_text += "• GRAVEYARD SYNERGY: Black offers many graveyard-based interactions\n"
+                
+            if len(colors) >= 3:
+                synergy_text += "• MULTICOLOR SYNERGY: Consider cards that reward playing multiple colors\n"
+        else:
+            # Suggest additional synergies
+            synergy_text += "💡 SYNERGY EXPANSION OPPORTUNITIES:\n\n"
+            
+            strongest_theme = max(theme_cards.keys(), 
+                                key=lambda x: len(theme_cards[x]) if theme_cards[x] else 0)
+            if theme_cards[strongest_theme]:
+                synergy_text += f"• Double down on {strongest_theme} synergy for maximum effect\n"
+                synergy_text += f"• Look for cards that explicitly reward {strongest_theme} strategies\n"
+        
+        # Card interaction matrix (simplified)
+        synergy_text += "\n" + "=" * 50 + "\n"
+        synergy_text += "🎴 NOTABLE CARD INTERACTIONS:\n\n"
+        
+        # Look for obvious interactions (simplified heuristic)
+        interaction_count = 0
+        for i, deck_card1 in enumerate(mainboard):
+            for deck_card2 in mainboard[i+1:]:
+                card1_text = (deck_card1.card.text or "").lower()
+                card2_text = (deck_card2.card.text or "").lower()
+                
+                # Simple interaction detection
+                if (("creature" in card1_text and "creatures" in card2_text) or
+                    ("instant" in card1_text and "sorcery" in card2_text) or
+                    ("artifact" in card1_text and "artifact" in card2_text)):
+                    
+                    if interaction_count < 5:  # Limit to top 5 interactions
+                        synergy_text += f"• {deck_card1.card.name} ↔ {deck_card2.card.name}\n"
+                        interaction_count += 1
+        
+        if interaction_count == 0:
+            synergy_text += "No obvious card interactions detected.\n"
+            synergy_text += "Focus on individual card quality and mana curve.\n"
+        
+        return synergy_text
+    
+    def _on_curve_canvas_resize(self, event):
+        """Handle canvas resize event to redraw mana curve"""
+        current_deck = self.get_current_deck()
+        if current_deck:
+            # Small delay to ensure canvas dimensions are updated
+            self.frame.after(100, lambda: self._draw_visual_mana_curve(current_deck))
     
     def get_recommendations(self):
         """Get AI card recommendations using lazy loading for better performance"""
