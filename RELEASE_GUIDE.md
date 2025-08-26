@@ -190,7 +190,16 @@ Remove-Item release -Recurse -Force
   # Update these in .github/workflows/release.yml
   uses: actions/upload-artifact@v4    # was @v3
   uses: actions/setup-python@v5       # was @v4
+  uses: softprops/action-gh-release@v2 # was @v1
   ```
+- **Permission Errors (403)**: Add permissions to workflow:
+  ```yaml
+  permissions:
+    contents: write
+    actions: read
+  ```
+- **File Path Issues**: Ensure proper path handling in PowerShell scripts
+- **Missing Hidden Imports**: Add all required imports to PyInstaller command
 
 ---
 
@@ -215,9 +224,13 @@ Get-Content src\__version__.py
 # List existing tags
 git tag -l
 
-# Delete tag (if mistake)
+# Delete tag (if mistake or need to retest)
 git tag -d v1.0.3
 git push origin :refs/tags/v1.0.3
+
+# Recreate tag (for testing workflow fixes)
+git tag v1.0.3
+git push origin v1.0.3
 
 # Check build size
 Get-Item "release\1.0.3\Magic Tool v1.0.3.exe" | Select-Object Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}}
