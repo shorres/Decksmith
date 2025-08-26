@@ -11,10 +11,10 @@ version_info = {}
 if version_file.exists():
     exec(open(version_file).read(), version_info)
     app_version = version_info.get('__version__', '1.0.0')
-    app_name = version_info.get('__app_name__', 'Magic Tool')
+    app_name = version_info.get('__app_name__', 'Decksmith')
 else:
     app_version = '1.0.0'
-    app_name = 'Magic Tool'
+    app_name = 'Decksmith'
 
 block_cipher = None
 
@@ -33,7 +33,17 @@ a = Analysis(
         'tkinter.messagebox',
         'tkinter.simpledialog',
         'requests',
+        'requests.adapters',
+        'requests.auth',
+        'requests.cookies',
+        'requests.models',
+        'requests.sessions',
         'urllib3',
+        'urllib3.connection',
+        'urllib3.connectionpool',
+        'urllib3.poolmanager',
+        'urllib3.util',
+        'urllib3.util.retry',
         'certifi',
         'charset_normalizer',
         'json',
@@ -52,6 +62,10 @@ a = Analysis(
         'PIL',
         'PIL.Image',
         'PIL.ImageTk',
+        'io',
+        'sys',
+        'pathlib',
+        'logging',
     ],
     hookspath=[],
     hooksconfig={},
