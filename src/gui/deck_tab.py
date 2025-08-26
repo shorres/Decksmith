@@ -105,22 +105,29 @@ class DeckTab:
         format_combo.pack(fill=tk.X, padx=5, pady=2)
         format_combo.bind('<<ComboboxSelected>>', self.on_format_change)
         
-        # Statistics frame
+        # Statistics frame - make it scrollable but optimize height
         stats_frame = ttk.LabelFrame(parent, text="Deck Statistics")
         stats_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        self.stats_text = tk.Text(stats_frame, height=8, width=20)
-        self.stats_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Create text widget with scrollbar but optimize for no-scroll viewing
+        stats_container = ttk.Frame(stats_frame)
+        stats_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Import/Export buttons
+        self.stats_text = tk.Text(stats_container, height=12, width=20, wrap=tk.WORD, font=('TkDefaultFont', 8))
+        stats_scrollbar = ttk.Scrollbar(stats_container, orient=tk.VERTICAL, command=self.stats_text.yview)
+        self.stats_text.configure(yscrollcommand=stats_scrollbar.set)
+        
+        self.stats_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        stats_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Import/Export buttons - more spacing without Arena export
         buttons_frame = ttk.Frame(parent)
         buttons_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        ttk.Button(buttons_frame, text="Import CSV", command=self.import_deck_csv).pack(fill=tk.X, pady=1)
-        ttk.Button(buttons_frame, text="Import Clipboard", command=self.import_deck_clipboard).pack(fill=tk.X, pady=1)
-        ttk.Button(buttons_frame, text="Export CSV", command=self.export_deck_csv).pack(fill=tk.X, pady=1)
-        ttk.Button(buttons_frame, text="Export Arena", command=self.export_deck_arena).pack(fill=tk.X, pady=1)
-        ttk.Button(buttons_frame, text="Copy to Clipboard", command=self.export_deck_clipboard).pack(fill=tk.X, pady=1)
+        ttk.Button(buttons_frame, text="Import CSV", command=self.import_deck_csv).pack(fill=tk.X, pady=2)
+        ttk.Button(buttons_frame, text="Import Clipboard", command=self.import_deck_clipboard).pack(fill=tk.X, pady=2)
+        ttk.Button(buttons_frame, text="Export CSV", command=self.export_deck_csv).pack(fill=tk.X, pady=2)
+        ttk.Button(buttons_frame, text="Copy to Clipboard", command=self.export_deck_clipboard).pack(fill=tk.X, pady=2)
     
     def create_deck_contents(self, parent):
         """Create the deck contents display"""
@@ -601,7 +608,7 @@ class DeckTab:
             self._last_sideboard_key = sideboard_key
     
     def update_statistics(self):
-        """Update deck statistics display"""
+        """Update deck statistics display with enhanced visual formatting"""
         if not self.current_deck:
             self.stats_text.delete(1.0, tk.END)
             return
@@ -609,37 +616,68 @@ class DeckTab:
         mainboard_count = self.current_deck.get_total_cards(include_sideboard=False)
         sideboard_count = len(self.current_deck.get_sideboard_cards())
         
-        stats_text = f"Total Cards: {mainboard_count}\n"
+        # Basic deck info
+        stats_text = f"📊 DECK OVERVIEW\n"
+        stats_text += "=" * 20 + "\n"
+        stats_text += f"Total Cards: {mainboard_count}\n"
         stats_text += f"Sideboard: {sideboard_count}\n"
         stats_text += f"Format: {self.current_deck.format}\n\n"
         
-        # Mana curve
+        # Enhanced mana curve with visual bars
         mana_curve = self.current_deck.get_mana_curve()
         if mana_curve:
-            stats_text += "Mana Curve:\n"
-            for cmc in sorted(mana_curve.keys()):
-                cmc_label = f"{cmc}+" if cmc >= 7 else str(cmc)
-                stats_text += f"  {cmc_label}: {mana_curve[cmc]}\n"
+            stats_text += f"⚡ MANA CURVE\n"
+            stats_text += "=" * 15 + "\n"
+            max_count = max(mana_curve.values()) if mana_curve.values() else 1
+            total_cards = sum(mana_curve.values())
+            
+            for cmc in range(8):  # Show 0-7+
+                count = mana_curve.get(cmc, 0)
+                if count > 0 or cmc <= 4:  # Always show 0-4, higher only if cards exist
+                    cmc_label = f"CMC {cmc}+" if cmc >= 7 else f"CMC {cmc}"
+                    pct = (count / total_cards) * 100 if total_cards > 0 else 0
+                    # Create proportional bar (max 8 chars for compact display)
+                    bar_length = int((count / max_count) * 8) if max_count > 0 else 0
+                    bar = "█" * bar_length + "░" * (8 - bar_length)
+                    stats_text += f"{cmc_label:>6}: [{bar}] {count:>2} ({pct:>4.0f}%)\n"
             stats_text += "\n"
         
-        # Color distribution
+        # Enhanced color distribution
         colors = self.current_deck.get_color_distribution()
         if colors:
-            stats_text += "Colors:\n"
+            stats_text += f"🎨 COLORS\n"
+            stats_text += "=" * 10 + "\n"
+            max_color = max(colors.values()) if colors.values() else 1
+            total_colored = sum(colors.values())
+            
             for color, count in sorted(colors.items()):
-                stats_text += f"  {color}: {count}\n"
+                pct = (count / total_colored) * 100 if total_colored > 0 else 0
+                bar_length = int((count / max_color) * 8) if max_color > 0 else 0
+                bar = "█" * bar_length + "░" * (8 - bar_length)
+                stats_text += f"{color:>8}: [{bar}] {count:>2} ({pct:>4.0f}%)\n"
             stats_text += "\n"
         
-        # Type distribution
+        # Enhanced type distribution
         types = self.current_deck.get_type_distribution()
         if types:
-            stats_text += "Card Types:\n"
-            for card_type, count in sorted(types.items()):
-                stats_text += f"  {card_type}: {count}\n"
+            stats_text += f"📋 CARD TYPES\n"
+            stats_text += "=" * 15 + "\n"
+            max_type = max(types.values()) if types.values() else 1
+            total_types = sum(types.values())
+            
+            for card_type, count in sorted(types.items(), key=lambda x: x[1], reverse=True)[:6]:  # Top 6 types
+                pct = (count / total_types) * 100 if total_types > 0 else 0
+                bar_length = int((count / max_type) * 8) if max_type > 0 else 0
+                bar = "█" * bar_length + "░" * (8 - bar_length)
+                stats_text += f"{card_type:>10}: [{bar}] {count:>2} ({pct:>3.0f}%)\n"
+            stats_text += "\n"
         
-        # Format legality
+        # Format legality with visual indicator
         is_legal = self.current_deck.is_legal_format()
-        stats_text += f"\nFormat Legal: {'Yes' if is_legal else 'No'}"
+        legality_icon = "✅" if is_legal else "❌"
+        stats_text += f"⚖️  FORMAT LEGALITY\n"
+        stats_text += "=" * 18 + "\n"
+        stats_text += f"{legality_icon} {self.current_deck.format}: {'Legal' if is_legal else 'Not Legal'}\n"
         
         self.stats_text.delete(1.0, tk.END)
         self.stats_text.insert(1.0, stats_text)
@@ -748,26 +786,6 @@ class DeckTab:
         if filename:
             try:
                 CSVHandler.export_deck_to_csv(self.current_deck, filename)
-                messagebox.showinfo("Success", "Deck exported successfully!")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to export deck: {str(e)}")
-    
-    def export_deck_arena(self):
-        """Export current deck to Arena format"""
-        if not self.current_deck:
-            messagebox.showwarning("Warning", "No deck selected")
-            return
-        
-        filename = filedialog.asksaveasfilename(
-            title="Export Deck (Arena Format)",
-            defaultextension=".txt",
-            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
-            initialfile=f"{self.current_deck.name}.txt"
-        )
-        
-        if filename:
-            try:
-                CSVHandler.export_deck_to_arena_format(self.current_deck, filename)
                 messagebox.showinfo("Success", "Deck exported successfully!")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to export deck: {str(e)}")

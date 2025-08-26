@@ -39,20 +39,20 @@ class AIRecommendationsTab:
         # Create deck status header
         self.create_deck_status_header()
         
-        # Create main paned window
-        paned = ttk.PanedWindow(self.frame, orient=tk.VERTICAL)
-        paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 5))
+        # Create main paned window - horizontal split
+        main_paned = ttk.PanedWindow(self.frame, orient=tk.HORIZONTAL)
+        main_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 5))
         
-        # Top panel - controls and deck analysis
-        top_frame = ttk.Frame(paned)
-        paned.add(top_frame, weight=1)
+        # Left panel - compact controls and analysis
+        left_frame = ttk.Frame(main_paned)
+        main_paned.add(left_frame, weight=1)
         
-        # Bottom panel - recommendations
-        bottom_frame = ttk.Frame(paned)
-        paned.add(bottom_frame, weight=2)
+        # Right panel - recommendations (gets most space)
+        right_frame = ttk.Frame(main_paned)
+        main_paned.add(right_frame, weight=3)
         
-        self.create_control_panel(top_frame)
-        self.create_recommendations_panel(bottom_frame)
+        self.create_compact_control_panel(left_frame)
+        self.create_recommendations_panel(right_frame)
     
     def create_deck_status_header(self):
         """Create a header showing which deck is being analyzed"""
@@ -161,89 +161,88 @@ class AIRecommendationsTab:
         """Get the frame for this tab - useful for external access"""
         return self.frame
     
-    def create_control_panel(self, parent):
-        """Create the control and analysis panel"""
-        # Analysis frame
-        analysis_frame = ttk.LabelFrame(parent, text="Deck Analysis")
-        analysis_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+    def create_compact_control_panel(self, parent):
+        """Create a compact control and analysis panel optimized for horizontal layout"""
         
-        # Create notebook for different analysis views
-        analysis_notebook = ttk.Notebook(analysis_frame)
-        analysis_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Archetype & Health Score analysis tab
-        archetype_frame = ttk.Frame(analysis_notebook)
-        analysis_notebook.add(archetype_frame, text="Archetype & Health")
-        
-        self.archetype_text = tk.Text(archetype_frame, height=6, wrap=tk.WORD)
-        archetype_scroll = ttk.Scrollbar(archetype_frame, orient=tk.VERTICAL, command=self.archetype_text.yview)
-        self.archetype_text.configure(yscrollcommand=archetype_scroll.set)
-        
-        self.archetype_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
-        archetype_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
-        
-        # Visual Mana Curve tab
-        curve_frame = ttk.Frame(analysis_notebook)
-        analysis_notebook.add(curve_frame, text="Mana Curve")
-        
-        # Create canvas for visual mana curve
-        self.curve_canvas = tk.Canvas(curve_frame, height=200, bg='white')
-        self.curve_canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Card Synergy Matrix tab
-        synergy_frame = ttk.Frame(analysis_notebook)
-        analysis_notebook.add(synergy_frame, text="Card Synergy")
-        
-        self.synergy_text = tk.Text(synergy_frame, height=6, wrap=tk.WORD)
-        synergy_scroll = ttk.Scrollbar(synergy_frame, orient=tk.VERTICAL, command=self.synergy_text.yview)
-        self.synergy_text.configure(yscrollcommand=synergy_scroll.set)
-        
-        self.synergy_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
-        synergy_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
-        
-
-        
-        # Control buttons
+        # Control buttons at top - more compact
         control_frame = ttk.Frame(parent)
-        control_frame.pack(fill=tk.X, padx=5, pady=5)
+        control_frame.pack(fill=tk.X, padx=5, pady=(5, 10))
         
-        ttk.Button(control_frame, text="Analyze Current Deck", command=self.analyze_deck).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="Get Recommendations", command=self.get_recommendations).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="Refresh", command=self.refresh_all).pack(side=tk.LEFT, padx=5)
+        # Buttons in a more compact arrangement
+        btn_frame1 = ttk.Frame(control_frame)
+        btn_frame1.pack(fill=tk.X, pady=2)
         
-        # Format selection
-        ttk.Label(control_frame, text="Format:").pack(side=tk.LEFT, padx=(20, 5))
+        ttk.Button(btn_frame1, text="Analyze Deck", command=self.analyze_deck).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame1, text="Get Recommendations", command=self.get_recommendations).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame1, text="Refresh", command=self.refresh_all).pack(side=tk.LEFT, padx=2)
+        
+        # Format selection in second row
+        btn_frame2 = ttk.Frame(control_frame)
+        btn_frame2.pack(fill=tk.X, pady=2)
+        
+        ttk.Label(btn_frame2, text="Format:").pack(side=tk.LEFT)
         self.format_var = tk.StringVar(value="Standard")
-        format_combo = ttk.Combobox(control_frame, textvariable=self.format_var, width=12)
+        format_combo = ttk.Combobox(btn_frame2, textvariable=self.format_var, width=12)
         format_combo['values'] = ('Standard', 'Historic', 'Explorer', 'Pioneer', 'Modern', 'Legacy', 'Commander', 'EDH', 'Brawl')
         format_combo.pack(side=tk.LEFT, padx=5)
         
         # Loading indicator
         self.loading_var = tk.StringVar(value="")
-        self.loading_label = ttk.Label(control_frame, textvariable=self.loading_var, foreground="dim gray")
-        self.loading_label.pack(side=tk.RIGHT, padx=5)
+        self.loading_label = ttk.Label(btn_frame2, textvariable=self.loading_var, foreground="dim gray")
+        self.loading_label.pack(side=tk.RIGHT)
+        
+        # Compact Analysis frame with smaller tabs
+        analysis_frame = ttk.LabelFrame(parent, text="Quick Analysis")
+        analysis_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Create smaller notebook for different analysis views
+        analysis_notebook = ttk.Notebook(analysis_frame)
+        analysis_notebook.pack(fill=tk.BOTH, expand=True, padx=3, pady=3)
+        
+        # Archetype & Health Score analysis tab
+        archetype_frame = ttk.Frame(analysis_notebook)
+        analysis_notebook.add(archetype_frame, text="Health")
+        
+        self.archetype_text = tk.Text(archetype_frame, height=4, wrap=tk.WORD, font=('TkDefaultFont', 8))
+        archetype_scroll = ttk.Scrollbar(archetype_frame, orient=tk.VERTICAL, command=self.archetype_text.yview)
+        self.archetype_text.configure(yscrollcommand=archetype_scroll.set)
+        
+        self.archetype_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=2, pady=2)
+        archetype_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=2)
+        
+        # Card Synergy Matrix tab - smaller height
+        synergy_frame = ttk.Frame(analysis_notebook)
+        analysis_notebook.add(synergy_frame, text="Synergy")
+        
+        self.synergy_text = tk.Text(synergy_frame, height=4, wrap=tk.WORD, font=('TkDefaultFont', 8))
+        synergy_scroll = ttk.Scrollbar(synergy_frame, orient=tk.VERTICAL, command=self.synergy_text.yview)
+        self.synergy_text.configure(yscrollcommand=synergy_scroll.set)
+        
+        self.synergy_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=2, pady=2)
+        synergy_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=2)
     
     def create_recommendations_panel(self, parent):
         """Create the recommendations display panel"""
         rec_frame = ttk.LabelFrame(parent, text="AI Card Recommendations")
         rec_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Recommendation list
+        # Recommendation list with increased height for better visibility
         columns = ('Card', 'Confidence', 'Synergy', 'CMC', 'Reasons')
-        self.rec_tree = ttk.Treeview(rec_frame, columns=columns, show='headings', height=12)
+        self.rec_tree = ttk.Treeview(rec_frame, columns=columns, show='headings', height=20)
         
-        # Configure columns
+        # Configure columns with better proportional widths for horizontal layout
         self.rec_tree.heading('Card', text='Card Name')
         self.rec_tree.heading('Confidence', text='Confidence')
         self.rec_tree.heading('Synergy', text='Synergy')
         self.rec_tree.heading('CMC', text='CMC')
         self.rec_tree.heading('Reasons', text='Reasons/Notes')
         
-        self.rec_tree.column('Card', width=150)
+        # Adjusted column widths to fit better in horizontal layout
+        self.rec_tree.column('Card', width=160)
         self.rec_tree.column('Confidence', width=80)
         self.rec_tree.column('Synergy', width=70)
         self.rec_tree.column('CMC', width=50)
-        self.rec_tree.column('Reasons', width=400)  # Expanded to take up space from removed Archetype Fit
+        self.rec_tree.column('Reasons', width=350)  # Reduced to fit better in available space
         
         # Scrollbar
         rec_scrollbar = ttk.Scrollbar(rec_frame, orient=tk.VERTICAL, command=self.rec_tree.yview)
@@ -448,9 +447,6 @@ class AIRecommendationsTab:
                     self.archetype_text.delete(1.0, tk.END)
                     self.archetype_text.insert(1.0, enhanced_archetype_text)
                     
-                    # Update visual mana curve
-                    self._draw_visual_mana_curve(current_deck)
-                    
                     # Update card synergy analysis
                     synergy_analysis = self._analyze_card_synergies(current_deck)
                     self.synergy_text.delete(1.0, tk.END)
@@ -504,15 +500,35 @@ class AIRecommendationsTab:
         # Overall health score
         overall_score = (curve_score + color_score + balance_score + efficiency_score) / 4
         
-        # Create health score display
-        health_text = f"\n🏥 DECK HEALTH ANALYSIS\n"
+        # Create health score display with separate mana curve section
+        health_text = f"\n📊 MANA CURVE BREAKDOWN\n"
+        health_text += "=" * 25 + "\n"
+        
+        # Add vertical mana curve display above health analysis
+        if curve:
+            total_cards = sum(curve.values())
+            if total_cards > 0:
+                max_count = max(curve.values())
+                for cmc in range(8):
+                    count = curve.get(cmc, 0)
+                    if count > 0 or cmc <= 4:  # Show 0-4 always, higher only if cards exist
+                        label = f"CMC {cmc}+" if cmc >= 7 else f"CMC {cmc}"
+                        pct = (count / total_cards) * 100
+                        # Create proportional bar like other health metrics
+                        bar_length = int((count / max_count) * 10) if max_count > 0 else 0
+                        bar = "█" * bar_length + "░" * (10 - bar_length)
+                        health_text += f"{label:>6}: [{bar}] {count:>2} cards ({pct:>4.0f}%)\n"
+        else:
+            health_text += "No mana curve data available\n"
+        
+        health_text += f"\n🏥 DECK HEALTH ANALYSIS\n"
         health_text += "=" * 30 + "\n\n"
         
         # Overall score with visual indicator
         health_emoji = "🟢" if overall_score >= 80 else "🟡" if overall_score >= 60 else "🔴"
         health_text += f"📊 OVERALL HEALTH: {health_emoji} {overall_score:.0f}/100\n\n"
         
-        # Individual scores
+        # Individual scores - clean format without inline curve
         health_text += f"📈 Mana Curve:     {self._get_score_bar(curve_score)} {curve_score:.0f}/100\n"
         health_text += f"🎨 Color Balance:  {self._get_score_bar(color_score)} {color_score:.0f}/100\n"
         health_text += f"⚖️  Card Balance:   {self._get_score_bar(balance_score)} {balance_score:.0f}/100\n"
@@ -612,84 +628,6 @@ class AIRecommendationsTab:
         filled = int(score / 10)
         bar = "█" * filled + "░" * (10 - filled)
         return f"[{bar}]"
-    
-    def _draw_visual_mana_curve(self, deck):
-        """Draw visual mana curve chart on canvas"""
-        if not deck:
-            return
-        
-        # Clear canvas
-        self.curve_canvas.delete("all")
-        
-        # Get curve data
-        curve = deck.get_mana_curve()
-        if not curve:
-            self.curve_canvas.create_text(
-                self.curve_canvas.winfo_width() / 2, 
-                self.curve_canvas.winfo_height() / 2,
-                text="No mana curve data available", 
-                font=("Arial", 12), 
-                fill="gray"
-            )
-            return
-        
-        # Canvas dimensions
-        width = 400
-        height = 180
-        margin = 40
-        bar_width = 35
-        
-        # Update canvas size
-        self.curve_canvas.config(width=width, height=height)
-        
-        # Calculate max value for scaling
-        max_count = max(curve.values()) if curve else 1
-        if max_count == 0:
-            max_count = 1
-        
-        # Draw title
-        self.curve_canvas.create_text(width/2, 20, text="Mana Curve Distribution", 
-                                    font=("Arial", 12, "bold"), fill="black")
-        
-        # Draw bars for CMCs 0-7+
-        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#F0A0A0', '#FFB74D']
-        
-        for cmc in range(8):
-            count = curve.get(cmc, 0)
-            if count > 0 or cmc <= 4:  # Always show 0-4, only show higher if they have cards
-                # Calculate bar position and height
-                x = margin + cmc * (bar_width + 5)
-                bar_height = (count / max_count) * (height - 80) if count > 0 else 3  # Minimum 3px for empty bars
-                y = height - margin - bar_height
-                
-                # Draw bar
-                color = colors[cmc % len(colors)]
-                self.curve_canvas.create_rectangle(x, y, x + bar_width, height - margin, 
-                                                 fill=color, outline="black", width=1)
-                
-                # Draw count on top of bar
-                if count > 0:
-                    self.curve_canvas.create_text(x + bar_width/2, y - 10, 
-                                                text=str(count), font=("Arial", 10, "bold"))
-                
-                # Draw CMC label
-                cmc_label = f"{cmc}+" if cmc >= 7 else str(cmc)
-                self.curve_canvas.create_text(x + bar_width/2, height - margin + 15, 
-                                            text=cmc_label, font=("Arial", 10))
-        
-        # Draw percentage indicators
-        total_cards = sum(curve.values())
-        if total_cards > 0:
-            y_pos = height - 10
-            x_start = margin
-            for cmc in range(8):
-                count = curve.get(cmc, 0)
-                if count > 0:
-                    percentage = (count / total_cards) * 100
-                    x = x_start + cmc * (bar_width + 5)
-                    self.curve_canvas.create_text(x + bar_width/2, y_pos, 
-                                                text=f"{percentage:.0f}%", 
-                                                font=("Arial", 8), fill="gray")
     
     def _analyze_card_synergies(self, deck):
         """Analyze card synergies and relationships in the deck"""
@@ -807,13 +745,6 @@ class AIRecommendationsTab:
             synergy_text += "Focus on individual card quality and mana curve.\n"
         
         return synergy_text
-    
-    def _on_curve_canvas_resize(self, event):
-        """Handle canvas resize event to redraw mana curve"""
-        current_deck = self.get_current_deck()
-        if current_deck:
-            # Small delay to ensure canvas dimensions are updated
-            self.frame.after(100, lambda: self._draw_visual_mana_curve(current_deck))
     
     def get_recommendations(self):
         """Get AI card recommendations using lazy loading for better performance"""
