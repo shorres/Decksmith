@@ -1,5 +1,5 @@
 """
-Simplified performance optimizations for Magic Tool GUI
+Simplified performance optimizations for Decksmith GUI
 Focused on essential optimizations after theme switcher removal
 """
 

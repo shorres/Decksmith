@@ -1,4 +1,4 @@
-# Magic Tool Release Guide 🚀
+# Decksmith Release Guide 🚀
 
 ## ⚡ Quick Release (Recommended)
 
@@ -20,7 +20,7 @@ git tag v1.0.3 && git push origin v1.0.3
 ```powershell
 # Build locally and upload manually
 .\build_release.ps1 -Version "1.0.3" -CreateBranch
-# Test: & ".\release\1.0.3\Magic Tool v1.0.3.exe" 
+# Test: & ".\release\1.0.3\Decksmith v1.0.3.exe" 
 git add . && git commit -m "Release v1.0.3"
 git checkout main && git merge release/1.0.3 && git push
 git tag v1.0.3 && git push origin v1.0.3
@@ -32,8 +32,8 @@ git tag v1.0.3 && git push origin v1.0.3
 ## 📦 What Users Get
 
 ```
-Magic-Tool-v1.0.3-Windows.zip
-└── Magic Tool v1.0.3.exe  (13.9 MB - everything included)
+Decksmith-v1.0.3-Windows.zip
+└── Decksmith v1.0.3.exe  (13.9 MB - everything included)
 ```
 
 ---
@@ -71,7 +71,7 @@ Get-Content src\__version__.py
 git tag -l
 
 # Test build size
-Get-Item "release\1.0.3\Magic Tool v1.0.3.exe" | Select-Object @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}}
+Get-Item "release\1.0.3\Decksmith v1.0.3.exe" | Select-Object @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}}
 ```
 
 ---

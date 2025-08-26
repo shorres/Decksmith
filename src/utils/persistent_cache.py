@@ -1,5 +1,5 @@
 """
-Persistent cache for Magic Tool to reduce API calls
+Persistent cache for Decksmith to reduce API calls
 Implements different caching strategies for different data types
 """
 

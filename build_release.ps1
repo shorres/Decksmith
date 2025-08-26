@@ -12,8 +12,8 @@ $Green = "Green"
 $Yellow = "Yellow"
 $Blue = "Blue"
 
-Write-Host "Magic Tool Release Builder" -ForegroundColor $Blue
-Write-Host "===========================" -ForegroundColor $Blue
+Write-Host "Decksmith Release Builder" -ForegroundColor $Blue
+Write-Host "=========================" -ForegroundColor $Blue
 
 # Check if virtual environment is activated
 if (-not $env:VIRTUAL_ENV) {
@@ -94,8 +94,8 @@ VSVersionInfo(
         StringStruct(u'FileVersion', u'$Version'),
         StringStruct(u'InternalName', u'MagicTool'),
         StringStruct(u'LegalCopyright', u''),
-        StringStruct(u'OriginalFilename', u'Magic Tool v$Version.exe'),
-        StringStruct(u'ProductName', u'Magic Tool'),
+        StringStruct(u'OriginalFilename', u'Decksmith v$Version.exe'),
+        StringStruct(u'ProductName', u'Decksmith'),
         StringStruct(u'ProductVersion', u'$Version')])
       ]),
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
@@ -113,7 +113,7 @@ $dataPath = Join-Path $PWD "data"
 $mainPath = Join-Path $PWD "main.py"
 $versionPath = Join-Path $PWD "$releaseDir\version_info.txt"
 
-$buildCommand = "pyinstaller --onefile --windowed --name `"Magic Tool v$Version`" --distpath `"$releaseDir`" --workpath `"$releaseDir\build`" --specpath `"$releaseDir`" `"$mainPath`""
+$buildCommand = "pyinstaller --onefile --windowed --name `"Decksmith v$Version`" --distpath `"$releaseDir`" --workpath `"$releaseDir\build`" --specpath `"$releaseDir`" `"$mainPath`""
 
 # Add version info if on Windows
 $buildCommand += " --version-file=`"$versionPath`""
@@ -135,8 +135,8 @@ if ($LASTEXITCODE -ne 0) {
 
 # Create release package
 Write-Host "Creating minimal release package..." -ForegroundColor $Yellow
-$packageName = "Magic-Tool-v$Version-Windows.zip"
-$exePath = "$releaseDir\Magic Tool v$Version.exe"
+$packageName = "Decksmith-v$Version-Windows.zip"
+$exePath = "$releaseDir\Decksmith v$Version.exe"
 
 if (Test-Path $exePath) {
     # Create minimal release directory structure
@@ -144,7 +144,7 @@ if (Test-Path $exePath) {
     New-Item -ItemType Directory -Path $releasePackageDir -Force | Out-Null
     
     # Copy only the executable (no README or other files)
-    Copy-Item $exePath -Destination "$releasePackageDir\Magic Tool v$Version.exe"
+    Copy-Item $exePath -Destination "$releasePackageDir\Decksmith v$Version.exe"
     
     # Create the minimal ZIP package with just the executable
     Compress-Archive -Path "$releasePackageDir\*" -DestinationPath "$releaseDir\$packageName" -Force
@@ -155,7 +155,7 @@ if (Test-Path $exePath) {
     Write-Host "Minimal build completed successfully!" -ForegroundColor $Green
     Write-Host "Executable: $exePath" -ForegroundColor $Green  
     Write-Host "Minimal Package: $releaseDir\$packageName" -ForegroundColor $Green
-    Write-Host "Package contains: Magic Tool v$Version.exe only" -ForegroundColor $Green
+    Write-Host "Package contains: Decksmith v$Version.exe only" -ForegroundColor $Green
     
     # Test the executable
     Write-Host "Testing executable..." -ForegroundColor $Yellow
@@ -172,7 +172,7 @@ if (Test-Path $exePath) {
 Write-Host "`nBuild Summary:" -ForegroundColor $Blue
 Write-Host "- Version: $Version" -ForegroundColor White
 Write-Host "- Release directory: $releaseDir" -ForegroundColor White  
-Write-Host "- Executable: Magic Tool v$Version.exe" -ForegroundColor White
+Write-Host "- Executable: Decksmith v$Version.exe" -ForegroundColor White
 Write-Host "- Package: $packageName" -ForegroundColor White
 
 if ($CreateBranch) {

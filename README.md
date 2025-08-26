@@ -1,4 +1,4 @@
-# Magic: The Gathering Arena Deck Manager
+# Decksmith
 
 A comprehensive tool for managing your Magic: The Gathering Arena collection and decks with advanced AI recommendations and Scryfall integration.
 
