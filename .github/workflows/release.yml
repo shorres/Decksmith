@@ -101,10 +101,10 @@ jobs:
             $criticalPackages = @('requests', 'urllib3', 'certifi', 'charset_normalizer', 'PIL', 'pyperclip')
             foreach ($package in $criticalPackages) {
               try {
-                python -c "import $package; print('✓ $package: OK')"
+                python -c "import ${package}; print('✓ ${package} OK')"
               }
               catch {
-                Write-Host "✗ $package: FAILED" -ForegroundColor Red
+                Write-Host "✗ ${package} FAILED" -ForegroundColor Red
                 pip show $package
               }
             }

@@ -123,7 +123,7 @@ $mainPath = Join-Path $PWD "main.py"
 $versionPath = Join-Path $PWD "$releaseDir\version_info.txt"
 $iconPath = Join-Path $PWD "assets\decksmith_icon.ico"
 
-$buildCommand = "pyinstaller --onefile --windowed --name `"Decksmith v$Version`" --distpath `"$releaseDir`" --workpath `"$releaseDir\build`" --specpath `"$releaseDir`" `"$mainPath`""
+$buildCommand = "pyinstaller --onedir --windowed --name `"Decksmith v$Version`" --distpath `"$releaseDir`" --workpath `"$releaseDir\build`" --specpath `"$releaseDir`" `"$mainPath`""
 
 # Add version info if on Windows
 $buildCommand += " --version-file=`"$versionPath`""
@@ -152,38 +152,77 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Create release package
-Write-Host "Creating minimal release package..." -ForegroundColor $Yellow
+Write-Host "Creating directory-based release package..." -ForegroundColor $Yellow
 $packageName = "Decksmith-v$Version-Windows.zip"
-$exePath = "$releaseDir\Decksmith v$Version.exe"
+$appDir = "$releaseDir\Decksmith v$Version"
 
-if (Test-Path $exePath) {
-    # Create minimal release directory structure
+if (Test-Path $appDir) {
+    # Create directory-based release package structure
     $releasePackageDir = "$releaseDir\package"
     New-Item -ItemType Directory -Path $releasePackageDir -Force | Out-Null
     
-    # Copy only the executable (no README or other files)
-    Copy-Item $exePath -Destination "$releasePackageDir\Decksmith v$Version.exe"
+    # Copy the entire application directory
+    Copy-Item $appDir -Destination "$releasePackageDir\Decksmith v$Version" -Recurse
     
-    # Create the minimal ZIP package with just the executable
+    # Create data directory for user files
+    $dataDir = "$releasePackageDir\data"
+    New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+    New-Item -ItemType Directory -Path "$dataDir\cache" -Force | Out-Null
+    New-Item -ItemType Directory -Path "$dataDir\collections" -Force | Out-Null
+    New-Item -ItemType Directory -Path "$dataDir\decks" -Force | Out-Null
+    
+    # Copy default collection if it exists
+    if (Test-Path "data\collections\default.json") {
+        Copy-Item "data\collections\default.json" -Destination "$dataDir\collections\default.json"
+    }
+    
+    # Create README
+    $readmeContent = @"
+# Decksmith v$Version
+
+## Installation
+1. Extract all files to a folder of your choice
+2. Navigate to the 'Decksmith v$Version' folder  
+3. Run 'Decksmith v$Version.exe' to start the application
+
+## Data Storage
+- Your decks will be saved in the 'data/decks' folder
+- Collections are stored in the 'data/collections' folder
+- Cache files are stored in the 'data/cache' folder
+
+## Support
+For issues or questions, visit: https://github.com/shorres/Magic-Tool
+"@
+    $readmeContent | Out-File -FilePath "$releasePackageDir\README.txt" -Encoding UTF8
+    
+    # Create the ZIP package with complete directory structure
     Compress-Archive -Path "$releasePackageDir\*" -DestinationPath "$releaseDir\$packageName" -Force
     
     # Clean up temporary package directory
     Remove-Item $releasePackageDir -Recurse -Force
 
-    Write-Host "Minimal build completed successfully!" -ForegroundColor $Green
-    Write-Host "Executable: $exePath" -ForegroundColor $Green  
-    Write-Host "Minimal Package: $releaseDir\$packageName" -ForegroundColor $Green
-    Write-Host "Package contains: Decksmith v$Version.exe only" -ForegroundColor $Green
+    Write-Host "Directory-based build completed successfully!" -ForegroundColor $Green
+    Write-Host "Application Directory: $appDir" -ForegroundColor $Green  
+    Write-Host "Complete Package: $releaseDir\$packageName" -ForegroundColor $Green
+    Write-Host "Package contains: Application folder + data directories + README" -ForegroundColor $Green
     
-    # Test the executable
+    # Test the executable in the directory
     Write-Host "Testing executable..." -ForegroundColor $Yellow
-    $testResult = Test-Path $exePath
+    $testExePath = "$appDir\Decksmith v$Version.exe"
+    $testResult = Test-Path $testExePath
     if ($testResult) {
-        $fileSize = (Get-Item $exePath).Length / 1MB
+        Write-Host "✓ Executable exists and is ready!" -ForegroundColor $Green
+        # Get file size of the actual executable in the directory  
+        $fileSize = (Get-Item $testExePath).Length / 1MB
         Write-Host "Executable size: $([math]::Round($fileSize, 2)) MB" -ForegroundColor $Green
+    } else {
+        Write-Host "✗ Executable not found in application directory!" -ForegroundColor $Red
     }
 } else {
-    Write-Host "Build failed - executable not found!" -ForegroundColor $Red
+    Write-Host "Build failed - application directory not found!" -ForegroundColor $Red
+    Write-Host "Expected directory: $appDir" -ForegroundColor $Red
+    Write-Host "Available files in release directory:" -ForegroundColor $Yellow
+    Get-ChildItem $releaseDir | ForEach-Object { Write-Host "  $_" }
     exit 1
 }
 
@@ -196,8 +235,8 @@ Write-Host "- Package: $packageName" -ForegroundColor White
 if ($CreateBranch) {
     Write-Host "`nNext steps for release:" -ForegroundColor $Yellow
     Write-Host "1. Test the executable thoroughly" -ForegroundColor White
-    Write-Host "2. Commit version changes: git add . && git commit -m 'Release v$Version'" -ForegroundColor White
-    Write-Host "3. Merge to main: git checkout main && git merge release/$Version" -ForegroundColor White
+    Write-Host "2. Commit version changes: git add . ; git commit -m `"Release v$Version`"" -ForegroundColor White
+    Write-Host "3. Merge to main: git checkout main ; git merge release/$Version" -ForegroundColor White
     Write-Host "4. Create GitHub release with the ZIP package" -ForegroundColor White
-    Write-Host "5. Tag the release: git tag v$Version && git push origin v$Version" -ForegroundColor White
+    Write-Host "5. Tag the release: git tag v$Version ; git push origin v$Version" -ForegroundColor White
 }
