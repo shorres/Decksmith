@@ -52,7 +52,7 @@ Counterspell,3
 ## Project Structure
 
 ```
-Magic Tool/
+Decksmith/
 ├── main.py                 # Application entry point
 ├── src/
 │   ├── gui/                # User interface

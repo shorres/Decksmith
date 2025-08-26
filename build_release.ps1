@@ -1,4 +1,4 @@
-# Release Build Script for Magic Tool
+# Release Build Script for Decksmith
 # This script creates a release build with proper versioning
 
 param(
@@ -53,7 +53,7 @@ if ($CreateBranch) {
 Write-Host "Updating version information..." -ForegroundColor $Yellow
 $versionContent = @"
 __version__ = "$Version"
-__app_name__ = "Magic Tool"
+__app_name__ = "Decksmith"
 __description__ = "Magic: The Gathering Arena Deck Manager"
 "@
 $versionContent | Out-File -FilePath "src\__version__.py" -Encoding UTF8

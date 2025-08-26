@@ -12,7 +12,7 @@ try:
     from src.__version__ import __version__, __app_name__
 except ImportError:
     __version__ = "1.0.0"
-    __app_name__ = "Magic Tool"
+    __app_name__ = "Decksmith"
 
 def setup_paths():
     """Setup Python paths for both development and packaged environments"""

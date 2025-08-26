@@ -24,7 +24,7 @@ git tag v1.0.4; git push origin v1.0.4
 git add .; git commit -m "Release v1.0.3"
 git checkout main; git merge release/1.0.3; git push
 git tag v1.0.3; git push origin v1.0.3
-# Then upload ZIP at: https://github.com/shorres/Magic-Tool/releases
+# Then upload ZIP at: https://github.com/shorres/Decksmith/releases
 ```
 
 ---
@@ -85,7 +85,7 @@ Get-Item "release\1.0.3\Decksmith v1.0.3.exe" | Select-Object @{Name="Size(MB)";
 #### Step 1: Build Release
 ```powershell
 # Navigate to project directory
-cd "D:\Repos\Magic Tool"
+cd "D:\Repos\Decksmith"
 
 # Build with version and branch creation
 .\build_release.ps1 -Version "1.0.3" -CreateBranch
@@ -100,10 +100,10 @@ cd "D:\Repos\Magic Tool"
 #### Step 2: Test the Build
 ```powershell
 # Test the executable
-& ".\release\1.0.3\Magic Tool v1.0.3.exe"
+& ".\release\1.0.3\Decksmith v1.0.3.exe"
 
 # Verify package contents
-Expand-Archive -Path ".\release\1.0.3\Magic-Tool-v1.0.3-Windows.zip" -DestinationPath "test" -Force
+Expand-Archive -Path ".\release\1.0.3\Decksmith-v1.0.3-Windows.zip" -DestinationPath "test" -Force
 ls test
 ```
 
@@ -128,12 +128,12 @@ git push origin v1.0.3
 ```
 
 #### Step 6: Create GitHub Release
-1. Go to https://github.com/shorres/Magic-Tool/releases
+1. Go to https://github.com/shorres/Decksmith/releases
 2. Click **"Create a new release"**
 3. Choose tag: `v1.0.3`
-4. Release title: `Magic Tool v1.0.3`
+4. Release title: `Decksmith v1.0.3`
 5. Description: Let GitHub generate release notes or write custom
-6. Upload file: `release\1.0.3\Magic-Tool-v1.0.3-Windows.zip`
+6. Upload file: `release\1.0.3\Decksmith-v1.0.3-Windows.zip`
 7. Click **"Publish release"**
 
 ### 🤖 Method 2: Automated Release Process
@@ -156,7 +156,7 @@ git push origin v1.0.3
 - Generate release notes
 
 #### Manual Trigger (Alternative)
-1. Go to https://github.com/shorres/Magic-Tool/actions
+1. Go to https://github.com/shorres/Decksmith/actions
 2. Click "Build and Release" workflow
 3. Click "Run workflow"
 4. Enter version: `1.0.3`
@@ -168,8 +168,8 @@ git push origin v1.0.3
 
 Your users will get:
 ```
-Magic-Tool-v1.0.3-Windows.zip
-├── Magic Tool v1.0.3.exe  (13.9 MB - everything included)
+Decksmith-v1.0.3-Windows.zip
+├── Decksmith v1.0.3.exe  (13.9 MB - everything included)
 ```
 
 GitHub automatically provides:
@@ -269,10 +269,10 @@ git tag v1.0.3
 git push origin v1.0.3
 
 # Check build size
-Get-Item "release\1.0.3\Magic Tool v1.0.3.exe" | Select-Object Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}}
+Get-Item "release\1.0.3\Decksmith v1.0.3.exe" | Select-Object Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}}
 
 # Test ZIP contents
-Expand-Archive "release\1.0.3\Magic-Tool-v1.0.3-Windows.zip" -DestinationPath "test-extract" -Force; ls test-extract
+Expand-Archive "release\1.0.3\Decksmith-v1.0.3-Windows.zip" -DestinationPath "test-extract" -Force; ls test-extract
 ```
 
 ---

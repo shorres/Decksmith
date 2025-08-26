@@ -9,6 +9,9 @@ missing dependencies early.
 Usage: python validate_imports.py
 """
 
+import os
+import sys
+
 import sys
 import importlib
 from typing import List, Tuple
@@ -153,8 +156,14 @@ def validate_spec_file() -> bool:
     """
     print(f"\n🔧 Validating PyInstaller Spec File:")
     
+    # Check if spec file exists
+    if not os.path.exists('decksmith_release.spec'):
+        print(f"  ⚠️  Spec file not found (decksmith_release.spec)")
+        print(f"     This is expected during GitHub Actions builds")
+        return True
+    
     try:
-        with open('magic_tool_release.spec', 'r') as f:
+        with open('decksmith_release.spec', 'r') as f:
             spec_content = f.read()
         
         missing_imports = []

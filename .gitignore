@@ -97,10 +97,13 @@ build.sh
 setup_cx_freeze.py
 requirements-build.txt
 magic_tool.spec
+decksmith.spec
 Magic\ Tool.spec
+Decksmith.spec
 manifest.xml
 version_info.txt
 magic_tool.ico
+decksmith.ico
 
 # Release builds (keep the script, ignore the output)
 release/
@@ -109,7 +112,7 @@ build/
 
 # Keep release build script
 !build_release.ps1
-!magic_tool_release.spec
+!decksmith_release.spec
 
 # Test files
 test_*.py
