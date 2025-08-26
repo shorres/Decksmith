@@ -134,45 +134,28 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Create release package
-Write-Host "Creating release package..." -ForegroundColor $Yellow
+Write-Host "Creating minimal release package..." -ForegroundColor $Yellow
 $packageName = "Magic-Tool-v$Version-Windows.zip"
 $exePath = "$releaseDir\Magic Tool v$Version.exe"
 
 if (Test-Path $exePath) {
-    # Create README for release
-    $releaseReadme = @"
-# Magic Tool v$Version - Windows Release
+    # Create minimal release directory structure
+    $releasePackageDir = "$releaseDir\package"
+    New-Item -ItemType Directory -Path $releasePackageDir -Force | Out-Null
+    
+    # Copy only the executable (no README or other files)
+    Copy-Item $exePath -Destination "$releasePackageDir\Magic Tool v$Version.exe"
+    
+    # Create the minimal ZIP package with just the executable
+    Compress-Archive -Path "$releasePackageDir\*" -DestinationPath "$releaseDir\$packageName" -Force
+    
+    # Clean up temporary package directory
+    Remove-Item $releasePackageDir -Recurse -Force
 
-## Installation
-1. Download and extract this ZIP file
-2. Run "Magic Tool v$Version.exe"
-3. No installation required - it's a portable executable
-
-## System Requirements
-- Windows 10/11 or later
-- No additional software required
-
-## Features
-- Collection Management
-- Deck Builder with AI Recommendations  
-- Scryfall Integration with Auto-Enrichment
-- Import/Export (CSV, Arena formats, Clipboard)
-- Advanced Analysis and Statistics
-
-## Support
-Visit: https://github.com/shorres/Magic-Tool
-
-Built on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-"@
-    $releaseReadme | Out-File -FilePath "$releaseDir\README.txt" -Encoding UTF8
-
-    # Create the ZIP package
-    Compress-Archive -Path "$releaseDir\Magic Tool v$Version.exe", "$releaseDir\README.txt" -DestinationPath "$releaseDir\$packageName" -Force
-
-    Write-Host "Build completed successfully!" -ForegroundColor $Green
+    Write-Host "Minimal build completed successfully!" -ForegroundColor $Green
     Write-Host "Executable: $exePath" -ForegroundColor $Green  
-    Write-Host "Package: $releaseDir\$packageName" -ForegroundColor $Green
-    Write-Host "Release directory: $releaseDir" -ForegroundColor $Green
+    Write-Host "Minimal Package: $releaseDir\$packageName" -ForegroundColor $Green
+    Write-Host "Package contains: Magic Tool v$Version.exe only" -ForegroundColor $Green
     
     # Test the executable
     Write-Host "Testing executable..." -ForegroundColor $Yellow

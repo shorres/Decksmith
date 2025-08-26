@@ -92,42 +92,25 @@ jobs:
         # Build with PyInstaller
         pyinstaller --onefile --windowed --name "Magic Tool v$version" --distpath "$releaseDir" --workpath "$releaseDir\build" --version-file="$releaseDir\version_info.txt" --add-data "src;src" --add-data "data;data" --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox main.py
     
-    - name: Create release package
+    - name: Create minimal release package
       run: |
         $version = "${{ steps.get_version.outputs.VERSION }}"
         $releaseDir = "release\$version" 
         $exePath = "$releaseDir\Magic Tool v$version.exe"
         
-        # Create release README
-        $readme = @"
-        # Magic Tool v$version - Windows Release
-
-        ## Installation
-        1. Download and extract this ZIP file
-        2. Run "Magic Tool v$version.exe"
-        3. No installation required - it's a portable executable
-
-        ## System Requirements
-        - Windows 10/11 or later
-        - No additional software required
-
-        ## Features
-        - Collection Management
-        - Deck Builder with AI Recommendations  
-        - Scryfall Integration with Auto-Enrichment
-        - Import/Export (CSV, Arena formats, Clipboard)
-        - Advanced Analysis and Statistics
-
-        ## Support
-        Visit: https://github.com/shorres/Magic-Tool
-
-        Built on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-        "@
-        $readme | Out-File -FilePath "$releaseDir\README.txt" -Encoding UTF8
+        # Create minimal package directory
+        $packageDir = "$releaseDir\package"
+        New-Item -ItemType Directory -Path $packageDir -Force
         
-        # Create ZIP package
+        # Copy only the executable
+        Copy-Item $exePath -Destination "$packageDir\Magic Tool v$version.exe"
+        
+        # Create minimal ZIP package
         $packageName = "Magic-Tool-v$version-Windows.zip"
-        Compress-Archive -Path "$exePath", "$releaseDir\README.txt" -DestinationPath "$releaseDir\$packageName" -Force
+        Compress-Archive -Path "$packageDir\*" -DestinationPath "$releaseDir\$packageName" -Force
+        
+        # Clean up temporary directory
+        Remove-Item $packageDir -Recurse -Force
         
         echo "PACKAGE_PATH=$releaseDir\$packageName" >> $env:GITHUB_OUTPUT
         echo "PACKAGE_NAME=$packageName" >> $env:GITHUB_OUTPUT
