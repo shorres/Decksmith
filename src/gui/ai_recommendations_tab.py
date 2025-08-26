@@ -796,9 +796,9 @@ class AIRecommendationsTab:
         self.rec_tree.tag_configure('craftable', foreground="dark slate gray")
         
         # Configure confidence level row colors
-        self.rec_tree.tag_configure('high_confidence', background="green3")
-        self.rec_tree.tag_configure('medium_confidence', background="green2")
-        self.rec_tree.tag_configure('low_confidence', background="green1")
+        self.rec_tree.tag_configure('high_confidence', background="#a7df81")
+        self.rec_tree.tag_configure('medium_confidence', background="#E0DF8F")
+        self.rec_tree.tag_configure('low_confidence', background="#FF3232")
     
     def update_column_headers(self):
         """Update column headers with sort indicators"""
