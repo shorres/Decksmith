@@ -356,6 +356,21 @@ class DeckTab:
             return display_name.split(" (")[0]
         return display_name
     
+    def _sanitize_filename(self, name: str) -> str:
+        """Sanitize a string to be safe for use as a filename"""
+        import re
+        # Replace spaces with underscores
+        name = name.replace(' ', '_')
+        # Remove or replace problematic characters
+        name = re.sub(r'[<>:"/\\|?*]', '_', name)  # Windows forbidden chars
+        name = re.sub(r'[()\'",;]', '_', name)  # Additional problematic chars
+        name = re.sub(r'_+', '_', name)  # Collapse multiple underscores
+        name = name.strip('_')  # Remove leading/trailing underscores
+        # Ensure it's not empty
+        if not name:
+            name = "unnamed_deck"
+        return name
+    
     def refresh_autocomplete_suggestions(self):
         """Refresh autocomplete suggestions for all card entry widgets"""
         for entry in self.autocomplete_entries:
@@ -846,6 +861,7 @@ class DeckTab:
         if not os.path.exists(decks_dir):
             return
         
+        loaded_count = 0
         for filename in os.listdir(decks_dir):
             if filename.endswith('.json'):
                 filepath = os.path.join(decks_dir, filename)
@@ -854,8 +870,16 @@ class DeckTab:
                         data = json.load(f)
                     deck = Deck.from_dict(data)
                     self.decks.append(deck)
+                    loaded_count += 1
                 except Exception as e:
                     print(f"Failed to load deck {filename}: {e}")
+            else:
+                # Warn about files that don't have .json extension
+                if filename.startswith('deck_'):
+                    print(f"Warning: Found deck file without .json extension: {filename}")
+        
+        if loaded_count > 0:
+            print(f"Successfully loaded {loaded_count} decks")
     
     def save_decks(self):
         """Save all decks to files"""
@@ -869,7 +893,17 @@ class DeckTab:
         
         # Save current decks
         for i, deck in enumerate(self.decks):
-            filename = f"deck_{i:03d}_{deck.name.replace(' ', '_')}.json"
+            # Sanitize deck name for filename
+            safe_name = self._sanitize_filename(deck.name)
+            filename = f"deck_{i:03d}_{safe_name}.json"
+            
+            # Ensure filename isn't too long (Windows has 260 char limit)
+            if len(filename) > 200:  # Leave room for path
+                # Truncate the deck name part but keep the structure
+                max_name_length = 200 - len(f"deck_{i:03d}_.json")
+                truncated_name = safe_name[:max_name_length]
+                filename = f"deck_{i:03d}_{truncated_name}.json"
+            
             filepath = os.path.join(decks_dir, filename)
             try:
                 with open(filepath, 'w', encoding='utf-8') as f:

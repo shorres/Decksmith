@@ -73,13 +73,19 @@ exe = EXE(
     name='Magic Tool',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
+    strip=True,  # Strip debug symbols to reduce size and suspicious patterns
+    upx=False,   # Disable UPX compression (often triggers AV)
     console=False,  # Disable console for clean GUI launch
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    # Add version information to look more legitimate
+    version='version_info.txt',
+    # Add manifest for Windows compatibility
+    manifest='manifest.xml',
+    # Add icon
+    icon='magic_tool.ico' if os.path.exists(os.path.join(current_dir, 'magic_tool.ico')) else None,
 )
 
 coll = COLLECT(
