@@ -106,14 +106,25 @@ $versionInfoContent | Out-File -FilePath "$releaseDir\version_info.txt" -Encodin
 
 # Run PyInstaller
 Write-Host "Building executable with PyInstaller..." -ForegroundColor $Yellow
-$buildCommand = "pyinstaller --onefile --windowed --name `"Magic Tool v$Version`" --distpath `"$releaseDir`" --workpath `"$releaseDir\build`" --specpath `"$releaseDir`" main.py"
+
+# Use absolute paths for add-data
+$srcPath = Join-Path $PWD "src"
+$dataPath = Join-Path $PWD "data" 
+$mainPath = Join-Path $PWD "main.py"
+$versionPath = Join-Path $PWD "$releaseDir\version_info.txt"
+
+$buildCommand = "pyinstaller --onefile --windowed --name `"Magic Tool v$Version`" --distpath `"$releaseDir`" --workpath `"$releaseDir\build`" --specpath `"$releaseDir`" `"$mainPath`""
 
 # Add version info if on Windows
-$buildCommand += " --version-file=`"$releaseDir\version_info.txt`""
+$buildCommand += " --version-file=`"$versionPath`""
 
-# Add additional options
-$buildCommand += " --add-data `"src;src`" --add-data `"data;data`""
-$buildCommand += " --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox"
+# Add additional options with absolute paths
+$buildCommand += " --add-data `"$srcPath;src`" --add-data `"$dataPath;data`""
+$buildCommand += " --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.simpledialog"
+$buildCommand += " --hidden-import=requests --hidden-import=urllib3 --hidden-import=certifi --hidden-import=charset_normalizer"
+$buildCommand += " --hidden-import=json --hidden-import=threading --hidden-import=queue --hidden-import=csv --hidden-import=re"
+$buildCommand += " --hidden-import=pyperclip --hidden-import=datetime --hidden-import=os --hidden-import=time --hidden-import=math"
+$buildCommand += " --hidden-import=collections --hidden-import=dataclasses --hidden-import=typing"
 
 Invoke-Expression $buildCommand
 
@@ -176,16 +187,16 @@ Built on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 }
 
 Write-Host "`nBuild Summary:" -ForegroundColor $Blue
-Write-Host "- Version: $Version" -ForegroundColor $White
-Write-Host "- Release directory: $releaseDir" -ForegroundColor $White  
-Write-Host "- Executable: Magic Tool v$Version.exe" -ForegroundColor $White
-Write-Host "- Package: $packageName" -ForegroundColor $White
+Write-Host "- Version: $Version" -ForegroundColor White
+Write-Host "- Release directory: $releaseDir" -ForegroundColor White  
+Write-Host "- Executable: Magic Tool v$Version.exe" -ForegroundColor White
+Write-Host "- Package: $packageName" -ForegroundColor White
 
 if ($CreateBranch) {
     Write-Host "`nNext steps for release:" -ForegroundColor $Yellow
-    Write-Host "1. Test the executable thoroughly" -ForegroundColor $White
-    Write-Host "2. Commit version changes: git add . && git commit -m 'Release v$Version'" -ForegroundColor $White
-    Write-Host "3. Merge to main: git checkout main && git merge release/$Version" -ForegroundColor $White
-    Write-Host "4. Create GitHub release with the ZIP package" -ForegroundColor $White
-    Write-Host "5. Tag the release: git tag v$Version && git push origin v$Version" -ForegroundColor $White
+    Write-Host "1. Test the executable thoroughly" -ForegroundColor White
+    Write-Host "2. Commit version changes: git add . && git commit -m 'Release v$Version'" -ForegroundColor White
+    Write-Host "3. Merge to main: git checkout main && git merge release/$Version" -ForegroundColor White
+    Write-Host "4. Create GitHub release with the ZIP package" -ForegroundColor White
+    Write-Host "5. Tag the release: git tag v$Version && git push origin v$Version" -ForegroundColor White
 }
