@@ -41,16 +41,16 @@ class CardDetailsModal:
         """Create the modal dialog"""
         self.dialog = tk.Toplevel(self.parent)
         self.dialog.title(f"Card Details - {self.card.name}")
-        self.dialog.geometry("600x500")
+        self.dialog.geometry("650x600")
         self.dialog.resizable(True, True)
         self.dialog.transient(self.parent)
         self.dialog.grab_set()
         
         # Center the dialog
         self.dialog.update_idletasks()
-        x = (self.dialog.winfo_screenwidth() // 2) - (300)
-        y = (self.dialog.winfo_screenheight() // 2) - (250)
-        self.dialog.geometry(f"600x500+{x}+{y}")
+        x = (self.dialog.winfo_screenwidth() // 2) - (325)
+        y = (self.dialog.winfo_screenheight() // 2) - (300)
+        self.dialog.geometry(f"650x600+{x}+{y}")
         
         # Create main layout
         self.create_layout()
@@ -184,55 +184,52 @@ class CardDetailsModal:
         self.details_text.delete(1.0, tk.END)
         
         # Enhanced card info from Scryfall
-        details = f"Mana Cost: {getattr(self.scryfall_card, 'mana_cost', 'N/A')}\n"
-        details += f"Converted Mana Cost: {getattr(self.scryfall_card, 'cmc', 0)}\n"
-        details += f"Type Line: {getattr(self.scryfall_card, 'type_line', 'N/A')}\n"
-        details += f"Rarity: {getattr(self.scryfall_card, 'rarity', 'Unknown').title()}\n"
-        details += f"Colors: {', '.join(getattr(self.scryfall_card, 'colors', []))}\n"
+        details = f"Mana Cost: {self.scryfall_card.mana_cost or 'N/A'}\n"
+        details += f"Converted Mana Cost: {self.scryfall_card.cmc}\n"
+        details += f"Type Line: {self.scryfall_card.type_line or 'N/A'}\n"
+        details += f"Rarity: {self.scryfall_card.rarity or 'Unknown'}\n"
+        details += f"Colors: {', '.join(self.scryfall_card.colors) if self.scryfall_card.colors else 'Colorless'}\n"
         
-        if hasattr(self.scryfall_card, 'power') and hasattr(self.scryfall_card, 'toughness'):
-            if self.scryfall_card.power and self.scryfall_card.toughness:
-                details += f"Power/Toughness: {self.scryfall_card.power}/{self.scryfall_card.toughness}\n"
+        if self.scryfall_card.power and self.scryfall_card.toughness:
+            details += f"Power/Toughness: {self.scryfall_card.power}/{self.scryfall_card.toughness}\n"
         
-        details += f"Set: {getattr(self.scryfall_card, 'set_name', 'Unknown')} ({getattr(self.scryfall_card, 'set_code', '').upper()})\n"
+        details += f"Set: {self.scryfall_card.set_name or 'Unknown'} ({self.scryfall_card.set_code or 'N/A'})\n"
         
-        if hasattr(self.scryfall_card, 'collector_number'):
+        if self.scryfall_card.collector_number:
             details += f"Collector Number: {self.scryfall_card.collector_number}\n"
         
-        if hasattr(self.scryfall_card, 'artist'):
+        if self.scryfall_card.artist:
             details += f"Artist: {self.scryfall_card.artist}\n"
         
-        if hasattr(self.scryfall_card, 'released_at'):
+        if self.scryfall_card.released_at:
             details += f"Release Date: {self.scryfall_card.released_at}\n"
         
         details += "\n"
         
-        oracle_text = getattr(self.scryfall_card, 'oracle_text', '')
-        if oracle_text:
-            details += f"Oracle Text:\n{oracle_text}\n\n"
+        if self.scryfall_card.oracle_text:
+            details += f"Oracle Text:\n{self.scryfall_card.oracle_text}\n\n"
         
-        flavor_text = getattr(self.scryfall_card, 'flavor_text', '')
-        if flavor_text:
-            details += f"Flavor Text:\n{flavor_text}\n\n"
+        if self.scryfall_card.flavor_text:
+            details += f"Flavor Text:\n{self.scryfall_card.flavor_text}\n\n"
         
         # Legality information
-        if hasattr(self.scryfall_card, 'legalities'):
+        if hasattr(self.scryfall_card, 'legalities') and self.scryfall_card.legalities:
             details += "Format Legality:\n"
             legalities = self.scryfall_card.legalities
             for format_name in ['standard', 'pioneer', 'modern', 'legacy', 'vintage', 'commander']:
-                if hasattr(legalities, format_name):
-                    status = getattr(legalities, format_name, 'unknown')
+                if format_name in legalities:
+                    status = legalities[format_name]
                     details += f"  {format_name.title()}: {status.title()}\n"
             details += "\n"
         
         # Pricing info if available
-        if hasattr(self.scryfall_card, 'prices') and self.scryfall_card.prices:
+        if self.scryfall_card.prices:
             details += "Pricing (USD):\n"
             prices = self.scryfall_card.prices
-            if hasattr(prices, 'usd') and prices.usd:
-                details += f"  Regular: ${prices.usd}\n"
-            if hasattr(prices, 'usd_foil') and prices.usd_foil:
-                details += f"  Foil: ${prices.usd_foil}\n"
+            if prices.get('usd'):
+                details += f"  Regular: ${prices['usd']}\n"
+            if prices.get('usd_foil'):
+                details += f"  Foil: ${prices['usd_foil']}\n"
         
         self.details_text.insert(1.0, details)
         self.details_text.configure(state=tk.DISABLED)
@@ -301,7 +298,7 @@ class CardDetailsModal:
         """Open card page on Scryfall website"""
         try:
             import webbrowser
-            if self.scryfall_card and hasattr(self.scryfall_card, 'scryfall_uri'):
+            if self.scryfall_card and self.scryfall_card.scryfall_uri:
                 webbrowser.open(self.scryfall_card.scryfall_uri)
             else:
                 # Fallback to search

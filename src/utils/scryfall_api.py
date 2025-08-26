@@ -35,6 +35,11 @@ class ScryfallCard:
     image_uris: Optional[Dict[str, str]]  # Add image_uris for multiple sizes
     scryfall_id: str
     legalities: Dict[str, str]  # Format legality information
+    scryfall_uri: Optional[str] = None  # Link to Scryfall page
+    artist: Optional[str] = None
+    flavor_text: Optional[str] = None
+    released_at: Optional[str] = None
+    prices: Optional[Dict[str, Optional[str]]] = None
 
 class ScryfallAPI:
     """Scryfall API client for card data and autocomplete"""
@@ -254,7 +259,12 @@ class ScryfallAPI:
                 image_uri=image_uri,
                 image_uris=image_uris,
                 scryfall_id=data.get('id', ''),
-                legalities=data.get('legalities', {})
+                legalities=data.get('legalities', {}),
+                scryfall_uri=data.get('scryfall_uri'),
+                artist=data.get('artist'),
+                flavor_text=data.get('flavor_text'),
+                released_at=data.get('released_at'),
+                prices=data.get('prices')
             )
         except Exception as e:
             print(f"Error parsing Scryfall card data: {e}")

@@ -1113,7 +1113,7 @@ class EnhancedRecommendationEngine:
         if 'choose' in oracle_text or 'either' in oracle_text:
             reasons.append("Versatile with multiple modes")
         
-        return reasons[:4]  # Limit to 4 most relevant reasons
+        return reasons[:10]  # Limit to 4 most relevant reasons
     
     def _get_curve_recommendations_scryfall(self, curve: Dict[int, int], colors: List[str], current_cards: Set[str], format_name: str, limit: int = 5) -> List[SmartRecommendation]:
         """Get mana curve improvement recommendations using Scryfall"""
