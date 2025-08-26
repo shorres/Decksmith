@@ -262,7 +262,7 @@ class AIRecommendationsTab:
         self.rec_tree.bind('<MouseWheel>', self.on_mousewheel)
         self.rec_tree.bind('<Button-4>', self.on_mousewheel)  # Linux scroll up
         self.rec_tree.bind('<Button-5>', self.on_mousewheel)  # Linux scroll down
-        
+
         # Recommendation controls - moved below the table for better visibility
         rec_controls = ttk.Frame(parent)  # Changed from rec_frame to parent
         rec_controls.pack(fill=tk.X, padx=5, pady=5)
@@ -295,18 +295,22 @@ class AIRecommendationsTab:
         type_combo['values'] = ('All', 'Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land')
         type_combo.pack(side=tk.LEFT, padx=5)
         type_combo.bind('<<ComboboxSelected>>', lambda e: self.filter_recommendations())
-        
-        # Total recommendations count
-        self.total_count_label = ttk.Label(rec_controls, text="Total: 0 recommendations", 
-                                         font=('TkDefaultFont', 9, 'bold'), foreground='black')
-        self.total_count_label.pack(side=tk.RIGHT, padx=5)
-        
+
         # Load More button (for manual loading)
         self.load_more_button = ttk.Button(rec_controls, text="Load More", 
                                          command=self.load_more_batch, 
                                          state='disabled')
         self.load_more_button.pack(side=tk.RIGHT, padx=5)
         
+        # Total count display - separate from controls to prevent cut-off
+        count_frame = ttk.Frame(parent)
+        count_frame.pack(fill=tk.X, padx=5, pady=(0, 2))
+        
+        # Total recommendations count - positioned clearly without crowding
+        self.total_count_label = ttk.Label(count_frame, text="Total: 0 recommendations", 
+                                         font=('TkDefaultFont', 9, 'bold'), foreground='black')
+        self.total_count_label.pack(side=tk.RIGHT, padx=5)
+
         # Update confidence label
         def update_confidence_label(*args):
             self.confidence_label.config(text=f"{int(self.min_confidence_var.get() * 100)}%")
