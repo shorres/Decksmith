@@ -156,32 +156,33 @@ jobs:
         "@
         $versionInfo | Out-File -FilePath "$releaseDir\version_info.txt" -Encoding UTF8
         
-        # Build with PyInstaller with all hidden imports (add icon if available)
+        # Build with PyInstaller in directory mode (more reliable for complex dependencies)
         $iconArg = ""
         if (Test-Path "assets\decksmith_icon.ico") {
           $iconArg = "--icon=assets\decksmith_icon.ico"
           Write-Host "Using icon: assets\decksmith_icon.ico"
         }
         
-        pyinstaller --onefile --windowed --name "Decksmith v$version" $iconArg --distpath "$releaseDir" --workpath "$releaseDir\build" --version-file="$releaseDir\version_info.txt" --add-data "src;src" --add-data "data;data" --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.simpledialog --hidden-import=requests --hidden-import=requests.adapters --hidden-import=requests.auth --hidden-import=requests.cookies --hidden-import=requests.models --hidden-import=requests.sessions --hidden-import=urllib3 --hidden-import=urllib3.connection --hidden-import=urllib3.connectionpool --hidden-import=urllib3.poolmanager --hidden-import=urllib3.util --hidden-import=urllib3.util.retry --hidden-import=certifi --hidden-import=charset_normalizer --hidden-import=json --hidden-import=threading --hidden-import=queue --hidden-import=csv --hidden-import=re --hidden-import=pyperclip --hidden-import=datetime --hidden-import=os --hidden-import=time --hidden-import=math --hidden-import=collections --hidden-import=dataclasses --hidden-import=typing --hidden-import=PIL --hidden-import=PIL.Image --hidden-import=PIL.ImageTk --hidden-import=io --hidden-import=sys --hidden-import=pathlib --hidden-import=logging main.py
+        # Use --onedir instead of --onefile for better dependency handling
+        pyinstaller --onedir --windowed --name "Decksmith v$version" $iconArg --distpath "$releaseDir" --workpath "$releaseDir\build" --version-file="$releaseDir\version_info.txt" --add-data "src;src" --add-data "data;data" --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.simpledialog --hidden-import=requests --hidden-import=requests.adapters --hidden-import=requests.auth --hidden-import=requests.cookies --hidden-import=requests.models --hidden-import=requests.sessions --hidden-import=urllib3 --hidden-import=urllib3.connection --hidden-import=urllib3.connectionpool --hidden-import=urllib3.poolmanager --hidden-import=urllib3.util --hidden-import=urllib3.util.retry --hidden-import=certifi --hidden-import=charset_normalizer --hidden-import=json --hidden-import=threading --hidden-import=queue --hidden-import=csv --hidden-import=re --hidden-import=pyperclip --hidden-import=datetime --hidden-import=os --hidden-import=time --hidden-import=math --hidden-import=collections --hidden-import=dataclasses --hidden-import=typing --hidden-import=PIL --hidden-import=PIL.Image --hidden-import=PIL.ImageTk --hidden-import=io --hidden-import=sys --hidden-import=pathlib --hidden-import=logging main.py
 
-    - name: Create enhanced release package
+    - name: Create directory-based release package
       run: |
         $version = "${{ steps.get_version.outputs.VERSION }}"
         $releaseDir = "release\$version" 
-        $exePath = "$releaseDir\Decksmith v$version.exe"
+        $appDir = "$releaseDir\Decksmith v$version"
         
-        # Verify executable exists
-        if (-not (Test-Path $exePath)) {
-          throw "Executable not found at: $exePath"
+        # Verify directory exists (PyInstaller creates a directory with --onedir)
+        if (-not (Test-Path $appDir)) {
+          throw "Application directory not found at: $appDir"
         }
         
         # Create comprehensive release package directory
         $packageDir = "$releaseDir\package"
         New-Item -ItemType Directory -Path $packageDir -Force
         
-        # Copy executable
-        Copy-Item $exePath -Destination "$packageDir\Decksmith v$version.exe"
+        # Copy the entire application directory
+        Copy-Item $appDir -Destination "$packageDir\Decksmith v$version" -Recurse
         
         # Create data directory structure (for user data persistence)
         $dataDir = "$packageDir\data"
@@ -196,7 +197,7 @@ jobs:
         }
         
         # Create README for users
-        $readmeContent = "# Decksmith v$version`n`n## Installation`n1. Extract all files to a folder of your choice`n2. Run 'Decksmith v$version.exe' to start the application`n`n## Data Storage`n- Your decks will be saved in the 'data/decks' folder`n- Collections are stored in the 'data/collections' folder`n- Cache files are stored in the 'data/cache' folder`n`n## Support`nFor issues or questions, visit: https://github.com/shorres/Magic-Tool"
+        $readmeContent = "# Decksmith v$version`n`n## Installation`n1. Extract all files to a folder of your choice`n2. Navigate to the 'Decksmith v$version' folder`n3. Run 'Decksmith v$version.exe' to start the application`n`n## Data Storage`n- Your decks will be saved in the 'data/decks' folder`n- Collections are stored in the 'data/collections' folder`n- Cache files are stored in the 'data/cache' folder`n`n## Support`nFor issues or questions, visit: https://github.com/shorres/Magic-Tool"
         $readmeContent | Out-File -FilePath "$packageDir\README.txt" -Encoding UTF8
         
         # Create enhanced ZIP package
