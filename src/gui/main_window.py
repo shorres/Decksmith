@@ -143,7 +143,6 @@ class MainWindow:
         deck_menu.add_command(label="Import from CSV", command=self.import_deck_csv)
         deck_menu.add_command(label="Import from Arena", command=self.import_deck_arena)
         deck_menu.add_command(label="Export to CSV", command=self.export_deck_csv)
-        deck_menu.add_command(label="Export to Arena", command=self.export_deck_arena)
         
         # View menu
         view_menu = tk.Menu(menubar, tearoff=0)
@@ -190,11 +189,6 @@ class MainWindow:
         """Export deck to CSV"""
         self.deck_tab.export_deck_csv()
         self.update_status("Deck export to CSV completed")
-    
-    def export_deck_arena(self):
-        """Export deck to Arena format"""
-        self.deck_tab.export_deck_arena()
-        self.update_status("Deck export to Arena completed")
     
     def show_ai_help(self):
         """Show AI features help dialog"""
