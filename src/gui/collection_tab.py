@@ -664,50 +664,54 @@ class AddCardDialog:
         main_frame = ttk.Frame(self.dialog)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Card name with Scryfall autocomplete
-        ttk.Label(main_frame, text="Card Name:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        # Title
+        title_label = ttk.Label(main_frame, text="Card Details", font=('TkDefaultFont', 12, 'bold'))
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 15))
+        
+        # Card name with Scryfall autocomplete - moved down to be inline
+        ttk.Label(main_frame, text="Card Name:").grid(row=1, column=0, sticky=tk.W, pady=2)
         
         self.card_autocomplete = ScryfallAutocompleteEntry(
             main_frame, 
             width=30,
             on_card_selected=self.on_card_selected
         )
-        self.card_autocomplete.grid(row=0, column=1, sticky="ew", pady=2)
+        self.card_autocomplete.grid(row=1, column=1, sticky="ew", pady=2)
         
         # Auto-fill button
-        ttk.Button(main_frame, text="Auto-Fill", command=self.auto_fill_card_data).grid(row=0, column=2, padx=5)
+        ttk.Button(main_frame, text="Auto-Fill", command=self.auto_fill_card_data).grid(row=1, column=2, padx=5)
         
         # Mana cost
-        ttk.Label(main_frame, text="Mana Cost:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        ttk.Label(main_frame, text="Mana Cost:").grid(row=2, column=0, sticky=tk.W, pady=2)
         self.mana_cost_var = tk.StringVar()
-        ttk.Entry(main_frame, textvariable=self.mana_cost_var).grid(row=1, column=1, sticky="ew", pady=2)
+        ttk.Entry(main_frame, textvariable=self.mana_cost_var).grid(row=2, column=1, sticky="ew", pady=2)
         
         # CMC
-        ttk.Label(main_frame, text="CMC:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        ttk.Label(main_frame, text="CMC:").grid(row=3, column=0, sticky=tk.W, pady=2)
         self.cmc_var = tk.IntVar()
-        ttk.Entry(main_frame, textvariable=self.cmc_var).grid(row=2, column=1, sticky="ew", pady=2)
+        ttk.Entry(main_frame, textvariable=self.cmc_var).grid(row=3, column=1, sticky="ew", pady=2)
         
         # Card type
-        ttk.Label(main_frame, text="Card Type:").grid(row=3, column=0, sticky=tk.W, pady=2)
+        ttk.Label(main_frame, text="Card Type:").grid(row=4, column=0, sticky=tk.W, pady=2)
         self.type_var = tk.StringVar()
-        ttk.Entry(main_frame, textvariable=self.type_var).grid(row=3, column=1, sticky="ew", pady=2)
+        ttk.Entry(main_frame, textvariable=self.type_var).grid(row=4, column=1, sticky="ew", pady=2)
         
         # Creature type
-        ttk.Label(main_frame, text="Creature Type:").grid(row=4, column=0, sticky=tk.W, pady=2)
+        ttk.Label(main_frame, text="Creature Type:").grid(row=5, column=0, sticky=tk.W, pady=2)
         self.creature_type_var = tk.StringVar()
-        ttk.Entry(main_frame, textvariable=self.creature_type_var).grid(row=4, column=1, sticky="ew", pady=2)
+        ttk.Entry(main_frame, textvariable=self.creature_type_var).grid(row=5, column=1, sticky="ew", pady=2)
         
         # Rarity
-        ttk.Label(main_frame, text="Rarity:").grid(row=5, column=0, sticky=tk.W, pady=2)
+        ttk.Label(main_frame, text="Rarity:").grid(row=6, column=0, sticky=tk.W, pady=2)
         self.rarity_var = tk.StringVar(value="Common")
         rarity_combo = ttk.Combobox(main_frame, textvariable=self.rarity_var)
         rarity_combo['values'] = ('Common', 'Uncommon', 'Rare', 'Mythic')
-        rarity_combo.grid(row=5, column=1, sticky="ew", pady=2)
+        rarity_combo.grid(row=6, column=1, sticky="ew", pady=2)
         
         # Colors
-        ttk.Label(main_frame, text="Colors:").grid(row=6, column=0, sticky=tk.W, pady=2)
+        ttk.Label(main_frame, text="Colors:").grid(row=7, column=0, sticky=tk.W, pady=2)
         colors_frame = ttk.Frame(main_frame)
-        colors_frame.grid(row=6, column=1, sticky="ew", pady=2)
+        colors_frame.grid(row=7, column=1, sticky="ew", pady=2)
         
         self.color_vars = {}
         colors = [("W", "White"), ("U", "Blue"), ("B", "Black"), ("R", "Red"), ("G", "Green")]
@@ -717,20 +721,24 @@ class AddCardDialog:
             ttk.Checkbutton(colors_frame, text=code, variable=var).grid(row=0, column=i)
         
         # Quantity
-        ttk.Label(main_frame, text="Quantity:").grid(row=7, column=0, sticky=tk.W, pady=2)
+        ttk.Label(main_frame, text="Quantity:").grid(row=8, column=0, sticky=tk.W, pady=2)
         self.quantity_var = tk.IntVar(value=1)
-        ttk.Entry(main_frame, textvariable=self.quantity_var).grid(row=7, column=1, sticky="ew", pady=2)
+        ttk.Entry(main_frame, textvariable=self.quantity_var).grid(row=8, column=1, sticky="ew", pady=2)
         
         # Foil
         self.foil_var = tk.BooleanVar()
-        ttk.Checkbutton(main_frame, text="Foil", variable=self.foil_var).grid(row=8, column=1, sticky=tk.W, pady=2)
+        ttk.Checkbutton(main_frame, text="Foil", variable=self.foil_var).grid(row=9, column=1, sticky=tk.W, pady=2)
         
-        # Buttons
+        # Buttons - properly centered
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=9, column=0, columnspan=2, pady=20)
+        button_frame.grid(row=10, column=0, columnspan=3, pady=20)
         
-        ttk.Button(button_frame, text="Add", command=self.ok_clicked).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT, padx=5)
+        # Create inner frame to center the buttons
+        button_inner = ttk.Frame(button_frame)
+        button_inner.pack(expand=True)
+        
+        ttk.Button(button_inner, text="Add", command=self.ok_clicked).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_inner, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT, padx=5)
         
         # Configure column weights
         main_frame.columnconfigure(1, weight=1)
