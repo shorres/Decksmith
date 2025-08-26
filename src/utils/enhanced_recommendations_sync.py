@@ -332,6 +332,10 @@ class EnhancedRecommendationEngine:
                 if card_name.lower() in current_cards:
                     continue
                 
+                # Skip Un-set cards (silver-bordered/joke cards)
+                if self._is_un_set_card(card):
+                    continue
+                
                 # Skip cards that don't fit colors
                 if not self._is_color_compatible_scryfall_card(card, colors, format_name):
                     continue
@@ -446,6 +450,10 @@ class EnhancedRecommendationEngine:
                 if card_name.lower() in current_cards:
                     continue
                 
+                # Skip Un-set cards (silver-bordered/joke cards)
+                if self._is_un_set_card(card):
+                    continue
+                
                 # Calculate advanced archetype fit with full deck analysis
                 temp_analysis = {
                     "colors": colors,
@@ -535,6 +543,11 @@ class EnhancedRecommendationEngine:
                     card_name = card.name
                     
                     if card_name.lower() in current_cards:
+                        continue
+                    
+                    # Skip Un-set cards (silver-bordered/joke cards)
+                    if self._is_un_set_card(card):
+                        continue
                         continue
                     
                     # Calculate advanced synergy score
@@ -700,7 +713,7 @@ class EnhancedRecommendationEngine:
             return 0.6 if not card_colors else 0.4  # Neutral for colorless in colorless deck
         
         if not card_colors:
-            return 0.75 if is_singleton else 0.7  # Colorless cards slightly better in singleton
+            return 0.7  # Standard colorless card synergy score
         
         # Perfect color identity match
         if card_colors <= deck_colors:  # Card colors are subset of deck colors
@@ -1160,6 +1173,10 @@ class EnhancedRecommendationEngine:
                     if card_name.lower() in current_cards:
                         continue
                     
+                    # Skip Un-set cards (silver-bordered/joke cards)
+                    if self._is_un_set_card(card):
+                        continue
+                    
                     # Calculate advanced curve-filling scores
                     temp_analysis = {
                         "colors": colors,
@@ -1318,6 +1335,25 @@ class EnhancedRecommendationEngine:
                 keywords.append(keyword)
         
         return keywords
+    
+    def _is_un_set_card(self, card) -> bool:
+        """Check if a card is from an Un-set (silver-bordered/joke cards)"""
+        if not hasattr(card, 'set_code') or not card.set_code:
+            return False
+        
+        # List of Un-set codes that should be filtered out
+        un_set_codes = {
+            'UGL',  # Unglued
+            'UNH',  # Unhinged
+            'UST',  # Unstable
+            'UND',  # Unsanctioned
+            'UFR',  # Unfinity
+            'SUNF', # Unfinity tokens/extras
+            'UNF',  # Unfinity (alternative code)
+        }
+        
+        set_code = card.set_code.upper() if card.set_code else ''
+        return set_code in un_set_codes
     
     def _is_color_compatible_scryfall_card(self, card, deck_colors: List[str], format_name: str = "standard") -> bool:
         """Check color compatibility using Scryfall card with format-specific rules"""

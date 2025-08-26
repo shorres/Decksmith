@@ -408,6 +408,27 @@ class IntelligentRecommendationEngine:
         
         return recommendations
     
+    def _is_un_set_card(self, card_name: str, set_code: Optional[str] = None) -> bool:
+        """Check if a card is from an Un-set (silver-bordered/joke cards)"""
+        if not set_code:
+            # If we don't have set information, we can't filter
+            # In practice, our card database likely doesn't include Un-set cards anyway
+            return False
+        
+        # List of Un-set codes that should be filtered out
+        un_set_codes = {
+            'UGL',  # Unglued
+            'UNH',  # Unhinged
+            'UST',  # Unstable
+            'UND',  # Unsanctioned
+            'UFR',  # Unfinity
+            'SUNF', # Unfinity tokens/extras
+            'UNF',  # Unfinity (alternative code)
+        }
+        
+        set_code_upper = set_code.upper() if set_code else ''
+        return set_code_upper in un_set_codes
+    
     def _find_card_data(self, card_name: str) -> Optional[Dict]:
         """Find card data across all format databases"""
         for format_cards in self.format_staples.values():
