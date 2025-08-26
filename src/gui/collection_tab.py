@@ -393,6 +393,7 @@ class CollectionTab:
             self.collection.add_card(card, quantity, foil)
             self.apply_filters()
             self.refresh_display()
+            self.save_collection()  # Save after adding card
     
     def edit_quantity(self):
         """Edit the quantity of selected card"""
@@ -418,6 +419,7 @@ class CollectionTab:
                 
                 self.apply_filters()
                 self.refresh_display()
+                self.save_collection()  # Save after editing quantity
     
     def remove_card(self):
         """Remove selected card from collection"""
@@ -433,6 +435,7 @@ class CollectionTab:
                 del self.collection.cards[card_name]
                 self.apply_filters()
                 self.refresh_display()
+                self.save_collection()  # Save after removing card
     
     def view_card_details(self):
         """View detailed information about selected card"""
@@ -466,9 +469,11 @@ class CollectionTab:
                 with open(collection_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 self.collection = Collection.from_dict(data)
-                self.apply_filters()
             except Exception as e:
                 print(f"Failed to load collection: {e}")
+        
+        # Always apply filters after loading (or when no file exists)
+        self.apply_filters()
     
     def save_collection(self):
         """Save collection to file"""
