@@ -112,11 +112,20 @@ $srcPath = Join-Path $PWD "src"
 $dataPath = Join-Path $PWD "data" 
 $mainPath = Join-Path $PWD "main.py"
 $versionPath = Join-Path $PWD "$releaseDir\version_info.txt"
+$iconPath = Join-Path $PWD "assets\decksmith_icon.ico"
 
 $buildCommand = "pyinstaller --onefile --windowed --name `"Decksmith v$Version`" --distpath `"$releaseDir`" --workpath `"$releaseDir\build`" --specpath `"$releaseDir`" `"$mainPath`""
 
 # Add version info if on Windows
 $buildCommand += " --version-file=`"$versionPath`""
+
+# Add icon if it exists
+if (Test-Path $iconPath) {
+    $buildCommand += " --icon=`"$iconPath`""
+    Write-Host "Using icon: $iconPath" -ForegroundColor Green
+} else {
+    Write-Host "Icon not found: $iconPath" -ForegroundColor Yellow
+}
 
 # Add additional options with absolute paths
 $buildCommand += " --add-data `"$srcPath;src`" --add-data `"$dataPath;data`""

@@ -93,8 +93,14 @@ jobs:
         "@
         $versionInfo | Out-File -FilePath "$releaseDir\version_info.txt" -Encoding UTF8
         
-        # Build with PyInstaller with all hidden imports
-        pyinstaller --onefile --windowed --name "Decksmith v$version" --distpath "$releaseDir" --workpath "$releaseDir\build" --version-file="$releaseDir\version_info.txt" --add-data "src;src" --add-data "data;data" --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.simpledialog --hidden-import=requests --hidden-import=urllib3 --hidden-import=certifi --hidden-import=charset_normalizer --hidden-import=json --hidden-import=threading --hidden-import=queue --hidden-import=csv --hidden-import=re --hidden-import=pyperclip --hidden-import=datetime --hidden-import=os --hidden-import=time --hidden-import=math --hidden-import=collections --hidden-import=dataclasses --hidden-import=typing main.py
+        # Build with PyInstaller with all hidden imports (add icon if available)
+        $iconArg = ""
+        if (Test-Path "assets\decksmith_icon.ico") {
+          $iconArg = "--icon=assets\decksmith_icon.ico"
+          Write-Host "Using icon: assets\decksmith_icon.ico"
+        }
+        
+        pyinstaller --onefile --windowed --name "Decksmith v$version" $iconArg --distpath "$releaseDir" --workpath "$releaseDir\build" --version-file="$releaseDir\version_info.txt" --add-data "src;src" --add-data "data;data" --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.simpledialog --hidden-import=requests --hidden-import=urllib3 --hidden-import=certifi --hidden-import=charset_normalizer --hidden-import=json --hidden-import=threading --hidden-import=queue --hidden-import=csv --hidden-import=re --hidden-import=pyperclip --hidden-import=datetime --hidden-import=os --hidden-import=time --hidden-import=math --hidden-import=collections --hidden-import=dataclasses --hidden-import=typing main.py
     
     - name: Create minimal release package
       run: |
