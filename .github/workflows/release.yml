@@ -1,0 +1,151 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Get version
+      id: get_version
+      run: |
+        if ("${{ github.event.inputs.version }}" -ne "") {
+          $VERSION = "${{ github.event.inputs.version }}"
+        } else {
+          $VERSION = "${{ github.ref_name }}" -replace '^v', ''
+        }
+        echo "VERSION=$VERSION" >> $env:GITHUB_OUTPUT
+        echo "Building version: $VERSION"
+    
+    - name: Update version file
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        $content = @"
+        __version__ = "$version"
+        __app_name__ = "Magic Tool"  
+        __description__ = "Magic: The Gathering Arena Deck Manager"
+        "@
+        $content | Out-File -FilePath "src\__version__.py" -Encoding UTF8
+    
+    - name: Build executable
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        $releaseDir = "release\$version"
+        New-Item -ItemType Directory -Path $releaseDir -Force
+        
+        # Create version info
+        $versionInfo = @"
+        VSVersionInfo(
+          ffi=FixedFileInfo(
+            filevers=(1,0,0,0),
+            prodvers=(1,0,0,0),
+            mask=0x3f,
+            flags=0x0,
+            OS=0x40004,
+            fileType=0x1,
+            subtype=0x0,
+            date=(0, 0)
+            ),
+          kids=[
+            StringFileInfo(
+              [
+              StringTable(
+                u'040904B0',
+                [StringStruct(u'CompanyName', u''),
+                StringStruct(u'FileDescription', u'Magic: The Gathering Arena Deck Manager'),
+                StringStruct(u'FileVersion', u'$version'),
+                StringStruct(u'InternalName', u'MagicTool'),
+                StringStruct(u'LegalCopyright', u''),
+                StringStruct(u'OriginalFilename', u'Magic Tool v$version.exe'),
+                StringStruct(u'ProductName', u'Magic Tool'),
+                StringStruct(u'ProductVersion', u'$version')])
+              ]),
+            VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+          ]
+        )
+        "@
+        $versionInfo | Out-File -FilePath "$releaseDir\version_info.txt" -Encoding UTF8
+        
+        # Build with PyInstaller
+        pyinstaller --onefile --windowed --name "Magic Tool v$version" --distpath "$releaseDir" --workpath "$releaseDir\build" --version-file="$releaseDir\version_info.txt" --add-data "src;src" --add-data "data;data" --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox main.py
+    
+    - name: Create release package
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        $releaseDir = "release\$version" 
+        $exePath = "$releaseDir\Magic Tool v$version.exe"
+        
+        # Create release README
+        $readme = @"
+        # Magic Tool v$version - Windows Release
+
+        ## Installation
+        1. Download and extract this ZIP file
+        2. Run "Magic Tool v$version.exe"
+        3. No installation required - it's a portable executable
+
+        ## System Requirements
+        - Windows 10/11 or later
+        - No additional software required
+
+        ## Features
+        - Collection Management
+        - Deck Builder with AI Recommendations  
+        - Scryfall Integration with Auto-Enrichment
+        - Import/Export (CSV, Arena formats, Clipboard)
+        - Advanced Analysis and Statistics
+
+        ## Support
+        Visit: https://github.com/shorres/Magic-Tool
+
+        Built on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+        "@
+        $readme | Out-File -FilePath "$releaseDir\README.txt" -Encoding UTF8
+        
+        # Create ZIP package
+        $packageName = "Magic-Tool-v$version-Windows.zip"
+        Compress-Archive -Path "$exePath", "$releaseDir\README.txt" -DestinationPath "$releaseDir\$packageName" -Force
+        
+        echo "PACKAGE_PATH=$releaseDir\$packageName" >> $env:GITHUB_OUTPUT
+        echo "PACKAGE_NAME=$packageName" >> $env:GITHUB_OUTPUT
+      id: package
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ steps.package.outputs.PACKAGE_NAME }}
+        path: ${{ steps.package.outputs.PACKAGE_PATH }}
+    
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ${{ steps.package.outputs.PACKAGE_PATH }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

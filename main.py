@@ -7,6 +7,13 @@ A comprehensive tool for managing MTG Arena collections and decks
 import sys
 import os
 
+# Import version info
+try:
+    from src.__version__ import __version__, __app_name__
+except ImportError:
+    __version__ = "1.0.0"
+    __app_name__ = "Magic Tool"
+
 def setup_paths():
     """Setup Python paths for both development and packaged environments"""
     # Fix potential stdin/stdout issues in GUI mode

@@ -1,0 +1,191 @@
+# Release Build Script for Magic Tool
+# This script creates a release build with proper versioning
+
+param(
+    [string]$Version = "",
+    [switch]$CreateBranch = $false
+)
+
+# Colors for output
+$Red = "Red"
+$Green = "Green" 
+$Yellow = "Yellow"
+$Blue = "Blue"
+
+Write-Host "Magic Tool Release Builder" -ForegroundColor $Blue
+Write-Host "===========================" -ForegroundColor $Blue
+
+# Check if virtual environment is activated
+if (-not $env:VIRTUAL_ENV) {
+    Write-Host "Activating virtual environment..." -ForegroundColor $Yellow
+    & ".\.venv\Scripts\Activate.ps1"
+}
+
+# Get version from version file or prompt
+if (-not $Version) {
+    if (Test-Path "src\__version__.py") {
+        $content = Get-Content "src\__version__.py" | Where-Object { $_ -match '__version__' }
+        if ($content -match '"([^"]+)"') {
+            $CurrentVersion = $matches[1]
+            Write-Host "Current version: $CurrentVersion" -ForegroundColor $Yellow
+            $Version = Read-Host "Enter new version (or press Enter to use $CurrentVersion)"
+            if (-not $Version) { $Version = $CurrentVersion }
+        }
+    }
+    if (-not $Version) {
+        $Version = Read-Host "Enter version number (e.g., 1.0.0)"
+    }
+}
+
+Write-Host "Building version: $Version" -ForegroundColor $Green
+
+# Create release branch if requested
+if ($CreateBranch) {
+    Write-Host "Creating release branch: release/$Version" -ForegroundColor $Yellow
+    git checkout -b "release/$Version"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Failed to create release branch" -ForegroundColor $Red
+        exit 1
+    }
+}
+
+# Update version file
+Write-Host "Updating version information..." -ForegroundColor $Yellow
+$versionContent = @"
+__version__ = "$Version"
+__app_name__ = "Magic Tool"
+__description__ = "Magic: The Gathering Arena Deck Manager"
+"@
+$versionContent | Out-File -FilePath "src\__version__.py" -Encoding UTF8
+
+# Create release directory
+$releaseDir = "release\$Version"
+if (Test-Path $releaseDir) {
+    Write-Host "Removing existing release directory..." -ForegroundColor $Yellow
+    Remove-Item $releaseDir -Recurse -Force
+}
+New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
+
+# Install/update build dependencies
+Write-Host "Installing build dependencies..." -ForegroundColor $Yellow
+pip install --upgrade pyinstaller
+
+# Create version info for Windows executable
+$versionInfoContent = @"
+# UTF-8
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1,0,0,0),
+    prodvers=(1,0,0,0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+    ),
+  kids=[
+    StringFileInfo(
+      [
+      StringTable(
+        u'040904B0',
+        [StringStruct(u'CompanyName', u''),
+        StringStruct(u'FileDescription', u'Magic: The Gathering Arena Deck Manager'),
+        StringStruct(u'FileVersion', u'$Version'),
+        StringStruct(u'InternalName', u'MagicTool'),
+        StringStruct(u'LegalCopyright', u''),
+        StringStruct(u'OriginalFilename', u'Magic Tool v$Version.exe'),
+        StringStruct(u'ProductName', u'Magic Tool'),
+        StringStruct(u'ProductVersion', u'$Version')])
+      ]),
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+  ]
+)
+"@
+$versionInfoContent | Out-File -FilePath "$releaseDir\version_info.txt" -Encoding UTF8
+
+# Run PyInstaller
+Write-Host "Building executable with PyInstaller..." -ForegroundColor $Yellow
+$buildCommand = "pyinstaller --onefile --windowed --name `"Magic Tool v$Version`" --distpath `"$releaseDir`" --workpath `"$releaseDir\build`" --specpath `"$releaseDir`" main.py"
+
+# Add version info if on Windows
+$buildCommand += " --version-file=`"$releaseDir\version_info.txt`""
+
+# Add additional options
+$buildCommand += " --add-data `"src;src`" --add-data `"data;data`""
+$buildCommand += " --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox"
+
+Invoke-Expression $buildCommand
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Build failed!" -ForegroundColor $Red
+    exit 1
+}
+
+# Create release package
+Write-Host "Creating release package..." -ForegroundColor $Yellow
+$packageName = "Magic-Tool-v$Version-Windows.zip"
+$exePath = "$releaseDir\Magic Tool v$Version.exe"
+
+if (Test-Path $exePath) {
+    # Create README for release
+    $releaseReadme = @"
+# Magic Tool v$Version - Windows Release
+
+## Installation
+1. Download and extract this ZIP file
+2. Run "Magic Tool v$Version.exe"
+3. No installation required - it's a portable executable
+
+## System Requirements
+- Windows 10/11 or later
+- No additional software required
+
+## Features
+- Collection Management
+- Deck Builder with AI Recommendations  
+- Scryfall Integration with Auto-Enrichment
+- Import/Export (CSV, Arena formats, Clipboard)
+- Advanced Analysis and Statistics
+
+## Support
+Visit: https://github.com/shorres/Magic-Tool
+
+Built on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+"@
+    $releaseReadme | Out-File -FilePath "$releaseDir\README.txt" -Encoding UTF8
+
+    # Create the ZIP package
+    Compress-Archive -Path "$releaseDir\Magic Tool v$Version.exe", "$releaseDir\README.txt" -DestinationPath "$releaseDir\$packageName" -Force
+
+    Write-Host "Build completed successfully!" -ForegroundColor $Green
+    Write-Host "Executable: $exePath" -ForegroundColor $Green  
+    Write-Host "Package: $releaseDir\$packageName" -ForegroundColor $Green
+    Write-Host "Release directory: $releaseDir" -ForegroundColor $Green
+    
+    # Test the executable
+    Write-Host "Testing executable..." -ForegroundColor $Yellow
+    $testResult = Test-Path $exePath
+    if ($testResult) {
+        $fileSize = (Get-Item $exePath).Length / 1MB
+        Write-Host "Executable size: $([math]::Round($fileSize, 2)) MB" -ForegroundColor $Green
+    }
+} else {
+    Write-Host "Build failed - executable not found!" -ForegroundColor $Red
+    exit 1
+}
+
+Write-Host "`nBuild Summary:" -ForegroundColor $Blue
+Write-Host "- Version: $Version" -ForegroundColor $White
+Write-Host "- Release directory: $releaseDir" -ForegroundColor $White  
+Write-Host "- Executable: Magic Tool v$Version.exe" -ForegroundColor $White
+Write-Host "- Package: $packageName" -ForegroundColor $White
+
+if ($CreateBranch) {
+    Write-Host "`nNext steps for release:" -ForegroundColor $Yellow
+    Write-Host "1. Test the executable thoroughly" -ForegroundColor $White
+    Write-Host "2. Commit version changes: git add . && git commit -m 'Release v$Version'" -ForegroundColor $White
+    Write-Host "3. Merge to main: git checkout main && git merge release/$Version" -ForegroundColor $White
+    Write-Host "4. Create GitHub release with the ZIP package" -ForegroundColor $White
+    Write-Host "5. Tag the release: git tag v$Version && git push origin v$Version" -ForegroundColor $White
+}

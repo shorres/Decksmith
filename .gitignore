@@ -102,6 +102,15 @@ manifest.xml
 version_info.txt
 magic_tool.ico
 
+# Release builds (keep the script, ignore the output)
+release/
+dist/
+build/
+
+# Keep release build script
+!build_release.ps1
+!magic_tool_release.spec
+
 # Test files
 test_*.py
 test_*.txt
