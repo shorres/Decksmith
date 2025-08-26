@@ -19,6 +19,47 @@ class MainWindow:
         
         self.setup_window()
         self.create_widgets()
+        self.setup_exit_handlers()
+    
+    def setup_exit_handlers(self):
+        """Setup proper exit handling to ensure data is saved"""
+        # Handle window close button (X)
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        # Handle Ctrl+C and other termination signals in console
+        import signal
+        import sys
+        
+        def signal_handler(sig, frame):
+            self.on_closing()
+        
+        # Only set signal handlers if not in PyInstaller bundle (avoids issues)
+        if not getattr(sys, 'frozen', False):
+            try:
+                signal.signal(signal.SIGINT, signal_handler)
+                signal.signal(signal.SIGTERM, signal_handler)
+            except (ValueError, OSError):
+                # Signal handling not available on this platform
+                pass
+    
+    def on_closing(self):
+        """Handle application closing - save all data before exit"""
+        try:
+            # Ensure collection is saved
+            if hasattr(self, 'collection_tab') and self.collection_tab:
+                self.collection_tab.save_collection()
+                print("Collection saved on exit")
+            
+            # Ensure decks are saved
+            if hasattr(self, 'deck_tab') and self.deck_tab:
+                self.deck_tab.save_decks()
+                print("Decks saved on exit")
+                
+        except Exception as e:
+            print(f"Error saving data on exit: {e}")
+        finally:
+            # Close the application
+            self.root.destroy()
     
     
     def setup_window(self):
@@ -87,7 +128,7 @@ class MainWindow:
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.root.quit)
+        file_menu.add_command(label="Exit", command=self.on_closing)
         
         # Collection menu
         collection_menu = tk.Menu(menubar, tearoff=0)

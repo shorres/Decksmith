@@ -480,10 +480,18 @@ class CollectionTab:
         os.makedirs(os.path.join("data", "collections"), exist_ok=True)
         collection_file = os.path.join("data", "collections", "default.json")
         try:
+            # Add debug logging
+            card_count = len(self.collection.cards) if self.collection.cards else 0
+            print(f"Saving collection with {card_count} cards to {collection_file}")
+            
             with open(collection_file, 'w', encoding='utf-8') as f:
                 json.dump(self.collection.to_dict(), f, indent=2)
+                
+            print(f"Successfully saved collection")
         except Exception as e:
             print(f"Failed to save collection: {e}")
+            import traceback
+            traceback.print_exc()
 
     def on_card_double_click(self, event):
         """Handle double-click on a card to show details modal"""
