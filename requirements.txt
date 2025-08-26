@@ -2,5 +2,8 @@ tkinter
 pandas
 openpyxl
 requests
+urllib3
+certifi
+charset-normalizer
 Pillow
 pyperclip
