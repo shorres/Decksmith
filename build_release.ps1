@@ -104,6 +104,15 @@ VSVersionInfo(
 "@
 $versionInfoContent | Out-File -FilePath "$releaseDir\version_info.txt" -Encoding UTF8
 
+# Validate imports before building
+Write-Host "Validating imports before building..." -ForegroundColor $Yellow
+& python validate_imports.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Import validation failed! Please fix missing dependencies before building." -ForegroundColor Red
+    exit 1
+}
+Write-Host "Import validation passed!" -ForegroundColor Green
+
 # Run PyInstaller
 Write-Host "Building executable with PyInstaller..." -ForegroundColor $Yellow
 
