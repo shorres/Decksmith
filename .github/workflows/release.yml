@@ -127,12 +127,20 @@ jobs:
         # Clean up temporary directory
         Remove-Item $packageDir -Recurse -Force
         
+        # Convert paths to use forward slashes for GitHub Actions compatibility
+        $packagePathForGitHub = $packagePath -replace '\\', '/'
+        
         # Set outputs with proper paths
-        echo "PACKAGE_PATH=$packagePath" >> $env:GITHUB_OUTPUT
+        echo "PACKAGE_PATH=$packagePathForGitHub" >> $env:GITHUB_OUTPUT
         echo "PACKAGE_NAME=$packageName" >> $env:GITHUB_OUTPUT
         
         Write-Host "Package created: $packagePath"
+        Write-Host "Package path for GitHub: $packagePathForGitHub"
         Write-Host "Package size: $((Get-Item $packagePath).Length / 1MB) MB"
+        
+        # List files to verify
+        Write-Host "Files in release directory:"
+        Get-ChildItem $releaseDir
       id: package
     
     - name: Upload artifact
