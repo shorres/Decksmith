@@ -290,6 +290,14 @@ class AIRecommendationsTab:
         self.confidence_label = ttk.Label(filter_frame, text="0%")
         self.confidence_label.pack(side=tk.LEFT, padx=5)
         
+        # Card type filter
+        ttk.Label(filter_frame, text="Card Type:").pack(side=tk.LEFT, padx=(15, 5))
+        self.card_type_var = tk.StringVar(value="All")
+        type_combo = ttk.Combobox(filter_frame, textvariable=self.card_type_var, width=12, state="readonly")
+        type_combo['values'] = ('All', 'Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land')
+        type_combo.pack(side=tk.LEFT, padx=5)
+        type_combo.bind('<<ComboboxSelected>>', lambda e: self.filter_recommendations())
+        
         # Total recommendations count
         self.total_count_label = ttk.Label(rec_controls, text="Total: 0 recommendations", 
                                          font=('TkDefaultFont', 9, 'bold'), foreground='black')
@@ -680,6 +688,11 @@ class AIRecommendationsTab:
             # Filter out lands (cards with "Land" in their card_type)
             filtered_recs = [r for r in filtered_recs if "Land" not in r.card_type]
         
+        # Filter by card type if not "All"
+        selected_type = self.card_type_var.get()
+        if selected_type != "All":
+            filtered_recs = [r for r in filtered_recs if self._matches_card_type(r.card_type, selected_type)]
+        
         # Clear existing items before updating
         for item in self.rec_tree.get_children():
             self.rec_tree.delete(item)
@@ -806,7 +819,7 @@ class AIRecommendationsTab:
             self.rec_tree.heading(col, text=text)
     
     def filter_recommendations(self, *args):
-        """Filter recommendations by minimum confidence and land visibility"""
+        """Filter recommendations by minimum confidence, land visibility, and card type"""
         self.refresh_display()
         
     def update_total_count(self, total_recommendations, filtered_recommendations):
@@ -816,13 +829,55 @@ class AIRecommendationsTab:
         else:
             count_text = f"Total: {filtered_recommendations} of {total_recommendations} recommendations"
         
+        # Add filter info if any filters are active
+        filter_info = []
+        
         # Add land filter info if lands are hidden
         if not self.show_lands_var.get():
             land_count = sum(1 for r in self.current_smart_recommendations if "Land" in r.card_type)
-            count_text += f" (hiding {land_count} lands)"
+            filter_info.append(f"hiding {land_count} lands")
+        
+        # Add card type filter info if not "All"
+        selected_type = getattr(self, 'card_type_var', None)
+        if selected_type and selected_type.get() != "All":
+            type_name = selected_type.get()
+            type_count = sum(1 for r in self.current_smart_recommendations 
+                           if not self._matches_card_type(r.card_type, type_name))
+            filter_info.append(f"showing only {type_name}s")
+        
+        # Add filter info to count text
+        if filter_info:
+            count_text += f" ({', '.join(filter_info)})"
         
         if hasattr(self, 'total_count_label'):
             self.total_count_label.config(text=count_text)
+    
+    def _matches_card_type(self, card_type_line: str, filter_type: str) -> bool:
+        """Check if a card matches the selected type filter"""
+        if not card_type_line:
+            return False
+        
+        # Convert to lowercase for case-insensitive matching
+        type_line = card_type_line.lower()
+        filter_type_lower = filter_type.lower()
+        
+        # Handle specific type matching
+        if filter_type_lower == "creature":
+            return "creature" in type_line
+        elif filter_type_lower == "instant":
+            return "instant" in type_line and "sorcery" not in type_line  # Exclude instant sorceries
+        elif filter_type_lower == "sorcery":
+            return "sorcery" in type_line
+        elif filter_type_lower == "enchantment":
+            return "enchantment" in type_line
+        elif filter_type_lower == "artifact":
+            return "artifact" in type_line and "creature" not in type_line  # Exclude artifact creatures from artifact filter
+        elif filter_type_lower == "planeswalker":
+            return "planeswalker" in type_line
+        elif filter_type_lower == "land":
+            return "land" in type_line
+        
+        return False
     
     def toggle_land_visibility(self):
         """Toggle the visibility of land recommendations"""
