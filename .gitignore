@@ -1,0 +1,113 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Application Data
+data/cache/
+*.log
+
+# Development Documentation (context files for AI development)
+*_COMPLETE.md
+*_SUMMARY.md
+*_ANALYSIS.md
+*_ENHANCEMENT.md
+*_OPTIMIZATIONS.md
+*_INSTRUCTIONS.md
+*_FIX.md
+*_FIXES.md
+*_GUIDE.md
+ANTIVIRUS_FALSE_POSITIVE_GUIDE.md
+BUILD_INSTRUCTIONS.md
+CLIPBOARD_IMPORT_ENHANCEMENT.md
+CODE_CLEANUP_SUMMARY.md
+COLLECTION_DATA_LOSS_FIX.md
+COLOR_IDENTITY_ENHANCEMENT.md
+CONFIDENCE_SCORING_FIX.md
+ENHANCED_DECK_ANALYSIS.md
+ENHANCED_DECK_STATISTICS.md
+ERROR_FIXES_COMPLETE.md
+FEATURES_COMPLETED.md
+ISSUE_RESOLUTION_FINAL.md
+LAYOUT_OPTIMIZATION_SUMMARY.md
+LAYOUT_REFINEMENTS_APPLIED.md
+MANA_CURVE_INTEGRATION.md
+PACKAGING_GUIDE.md
+PERFECT_LAYOUT_BALANCE.md
+PERFORMANCE_CLEANUP_COMPLETE.md
+PERFORMANCE_OPTIMIZATIONS.md
+PERFORMANCE_OPTIMIZATIONS_COMPLETE.md
+RECOMMENDATIONS_LABEL_FIX.md
+STREAMLINED_BUTTONS.md
+TEXT_FORMATTING_FIXES.md
+THEME_PERFORMANCE_ANALYSIS.md
+UNICODE_CURVE_SOLUTION.md
+
+# Build files
+*.spec
+build_enhanced.bat
+build_enhanced.ps1
+build.bat
+build.sh
+setup_cx_freeze.py
+requirements-build.txt
+magic_tool.spec
+Magic\ Tool.spec
+manifest.xml
+version_info.txt
+magic_tool.ico
+
+# Test files
+test_*.py
+test_*.txt
+test_*.csv
+sample_*.txt
+
+# Recovery and utility scripts
+recovery_utility.py
+cache_manager.py
