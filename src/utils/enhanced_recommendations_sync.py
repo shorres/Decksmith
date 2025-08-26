@@ -348,6 +348,27 @@ class EnhancedRecommendationEngine:
                     f"High play rate in {format_name} decks"
                 ]
                 
+                # Add specific reasons based on card characteristics
+                cmc = card.cmc
+                if cmc <= 2:
+                    reasons.append("Efficient early game play")
+                elif cmc >= 5:
+                    reasons.append("Powerful late game threat")
+                else:
+                    reasons.append("Solid midrange option")
+                
+                # Calculate dynamic synergy and deck fit scores
+                temp_analysis = {
+                    "colors": colors,  # Use the colors parameter passed to this method
+                    "archetype": "midrange",
+                    "curve": {},
+                    "keywords": {}
+                }
+                
+                synergy_score = self._calculate_color_synergy(card, temp_analysis)
+                deck_fit_score = self._calculate_deck_fit_score(card, temp_analysis)
+                meta_score = self._calculate_meta_score(card, "midrange")
+                
                 # Extract keywords
                 keywords = self._extract_keywords_from_text(card.oracle_text)
                 
@@ -357,12 +378,12 @@ class EnhancedRecommendationEngine:
                     card_type=card.type_line,
                     rarity=card.rarity,
                     confidence=confidence,
-                    synergy_score=0.6,
-                    meta_score=0.8,  # High meta score for staples
-                    deck_fit=0.7,
+                    synergy_score=synergy_score,
+                    meta_score=meta_score,
+                    deck_fit=deck_fit_score,
                     cost_consideration="unknown",
                     reasons=reasons,
-                    cmc=card.cmc,  # Add CMC field
+                    cmc=card.cmc,
                     legality=card.legalities,
                     oracle_text=card.oracle_text,
                     power_toughness=self._get_power_toughness_from_card(card),
@@ -425,19 +446,30 @@ class EnhancedRecommendationEngine:
                 if card_name.lower() in current_cards:
                     continue
                 
-                # Calculate archetype fit
-                archetype_score = self._calculate_archetype_fit_card(card, pattern)
+                # Calculate advanced archetype fit with full deck analysis
+                temp_analysis = {
+                    "colors": colors,
+                    "archetype": archetype,
+                    "curve": {},
+                    "keywords": {}
+                }
+                
+                archetype_score = self._calculate_archetype_synergy(card, temp_analysis)
+                synergy_score = self._calculate_color_synergy(card, temp_analysis)
+                deck_fit_score = self._calculate_deck_fit_score(card, temp_analysis)
                 
                 if archetype_score < 0.4:
                     continue
                 
-                confidence = 0.6 + archetype_score * 0.3
+                # Advanced confidence calculation
+                confidence = self._calculate_advanced_confidence_score(
+                    card, temp_analysis, (archetype_score + synergy_score) / 2
+                )
                 
-                reasons = [
-                    f"Perfect fit for {archetype} strategy",
-                    f"Matches {archetype} patterns",
-                    "Strong archetype synergy"
-                ]
+                # Generate detailed reasons
+                reasons = self._generate_synergy_reasons(
+                    card, temp_analysis, f"archetype_{archetype}", archetype_score
+                )
                 
                 keywords = self._extract_keywords_from_text(card.oracle_text)
                 
@@ -447,9 +479,9 @@ class EnhancedRecommendationEngine:
                     card_type=card.type_line,
                     rarity=card.rarity,
                     confidence=confidence,
-                    synergy_score=archetype_score,
-                    meta_score=0.7,
-                    deck_fit=0.9,
+                    synergy_score=synergy_score,
+                    meta_score=self._calculate_meta_score(card, archetype),
+                    deck_fit=deck_fit_score,
                     cost_consideration="unknown",
                     reasons=reasons,
                     cmc=card.cmc,  # Add CMC field
@@ -470,66 +502,77 @@ class EnhancedRecommendationEngine:
         return recommendations
     
     def _get_synergy_recommendations_scryfall(self, deck: Deck, deck_analysis: Dict, current_cards: Set[str], limit: int = 6) -> List[SmartRecommendation]:
-        """Get synergy-based recommendations using Scryfall (simplified)"""
+        """Get synergy-based recommendations using advanced scoring"""
         recommendations = []
         
         # Get deck analysis info
         colors = deck_analysis["colors"]
         keywords = deck_analysis["keywords"]
+        archetype = deck_analysis["archetype"]
+        curve = deck_analysis["curve"]
         
-        # Simple synergy approach - recommend cards for the deck's primary colors
+        # Advanced synergy approach - recommend cards based on multiple factors
         if not colors:
             return recommendations
         
         try:
-            # Build a simple synergy query based on deck colors
-            primary_color = colors[0] if colors else "c"  # Colorless if no colors
+            # Build sophisticated synergy queries based on deck characteristics
+            queries = self._build_synergy_queries(colors, keywords, archetype, curve)
             
-            query = f"legal:standard c:{primary_color.lower()} -t:basic cmc<=3"
-            
-            print(f"Synergy query: {query}")  # Debug
-            cards_data = self.scryfall.search_cards(query, limit=200, max_pages=2)  # Use pagination for more synergy results
-            
-            if not cards_data:
-                return recommendations
-            
-            # Process results with increased limit
-            for card in cards_data[:limit * 5]:  # Much more generous limit for synergy cards
-                card_name = card.name
+            for query_data in queries:
+                query = query_data["query"]
+                weight = query_data["weight"]
+                synergy_type = query_data["type"]
                 
-                if card_name.lower() in current_cards:
+                print(f"Synergy query ({synergy_type}): {query}")  # Debug
+                cards_data = self.scryfall.search_cards(query, limit=100, max_pages=2)
+                
+                if not cards_data:
                     continue
                 
-                synergy_score = 0.6  # Base synergy score
-                confidence = 0.7
+                # Process results with advanced scoring
+                for card in cards_data[:limit * 3]:
+                    card_name = card.name
+                    
+                    if card_name.lower() in current_cards:
+                        continue
+                    
+                    # Calculate advanced synergy score
+                    synergy_score = self._calculate_advanced_synergy_score(
+                        card, deck_analysis, synergy_type, weight
+                    )
+                    
+                    # Calculate advanced confidence score
+                    confidence = self._calculate_advanced_confidence_score(
+                        card, deck_analysis, synergy_score
+                    )
+                    
+                    # Generate detailed reasons
+                    reasons = self._generate_synergy_reasons(
+                        card, deck_analysis, synergy_type, synergy_score
+                    )
+                    
+                    keywords_extracted = self._extract_keywords_from_text(card.oracle_text)
+                    
+                    rec = SmartRecommendation(
+                        card_name=card_name,
+                        mana_cost=card.mana_cost,
+                        card_type=card.type_line,
+                        rarity=card.rarity,
+                        confidence=confidence,
+                        synergy_score=synergy_score,
+                        meta_score=self._calculate_meta_score(card, archetype),
+                        deck_fit=self._calculate_deck_fit_score(card, deck_analysis),
+                        cost_consideration="unknown",
+                        reasons=reasons,
+                        cmc=card.cmc,
+                        legality=card.legalities,
+                        oracle_text=card.oracle_text,
+                        power_toughness=self._get_power_toughness_from_card(card),
+                        keywords=keywords_extracted
+                    )
                 
-                reasons = [
-                    f"Color synergy with {primary_color}",
-                    f"Good fit for {primary_color} deck",
-                    "Efficient mana cost"
-                ]
-                
-                keywords_extracted = self._extract_keywords_from_text(card.oracle_text)
-                
-                rec = SmartRecommendation(
-                    card_name=card_name,
-                    mana_cost=card.mana_cost,
-                    card_type=card.type_line,
-                    rarity=card.rarity,
-                    confidence=confidence,
-                    synergy_score=synergy_score,
-                    meta_score=0.6,
-                    deck_fit=0.8,
-                    cost_consideration="unknown",
-                    reasons=reasons,
-                    cmc=card.cmc,  # Add CMC field
-                    legality=card.legalities,
-                    oracle_text=card.oracle_text,
-                    power_toughness=self._get_power_toughness_from_card(card),
-                    keywords=keywords_extracted
-                )
-                
-                recommendations.append(rec)
+                    recommendations.append(rec)
                 
                 if len(recommendations) >= limit:
                     break
@@ -538,6 +581,485 @@ class EnhancedRecommendationEngine:
             print(f"Error fetching synergy recommendations: {e}")
         
         return recommendations
+    
+    def _build_synergy_queries(self, colors: List[str], keywords: Dict, archetype: str, curve: Dict) -> List[Dict]:
+        """Build sophisticated synergy queries based on deck characteristics"""
+        queries = []
+        
+        # Color-based synergy
+        if colors:
+            color_str = "".join(sorted(colors)).lower()
+            queries.append({
+                "query": f"legal:standard ci<={color_str} -t:basic",
+                "weight": 1.0,
+                "type": "color_synergy"
+            })
+        
+        # Archetype-specific synergy
+        archetype_keywords = self._get_archetype_search_terms(archetype)
+        if archetype_keywords:
+            for keyword in archetype_keywords[:2]:  # Top 2 keywords
+                queries.append({
+                    "query": f"legal:standard o:\"{keyword}\" -t:basic",
+                    "weight": 0.8,
+                    "type": f"archetype_{keyword}"
+                })
+        
+        # Curve-based synergy (fill gaps)
+        curve_gaps = self._identify_curve_gaps(curve)
+        for cmc in curve_gaps[:2]:  # Top 2 gaps
+            queries.append({
+                "query": f"legal:standard cmc:{cmc} (r:c OR r:u) -t:basic",
+                "weight": 0.6,
+                "type": f"curve_cmc{cmc}"
+            })
+        
+        # Keyword synergy
+        top_keywords = sorted(keywords.items(), key=lambda x: x[1], reverse=True)[:3]
+        for keyword, count in top_keywords:
+            if count >= 2:  # Only if we have multiple instances
+                queries.append({
+                    "query": f"legal:standard o:\"{keyword}\" -t:basic",
+                    "weight": 0.7,
+                    "type": f"keyword_{keyword}"
+                })
+        
+        return queries
+    
+    def _get_archetype_search_terms(self, archetype: str) -> List[str]:
+        """Get search terms for specific archetypes"""
+        archetype_terms = {
+            "aggro": ["haste", "prowess", "first strike", "menace"],
+            "control": ["counter", "draw", "exile", "destroy"],
+            "midrange": ["enters", "whenever", "tap:", "untap"],
+            "combo": ["search", "tutor", "sacrifice", "graveyard"],
+            "ramp": ["mana", "land", "search", "ramp"],
+            "burn": ["damage", "target", "player", "burn"],
+            "tribal": ["elf", "goblin", "zombie", "human"],
+            "artifacts": ["artifact", "tap:", "enters"]
+        }
+        return archetype_terms.get(archetype.lower(), [])
+    
+    def _identify_curve_gaps(self, curve: Dict) -> List[int]:
+        """Identify the biggest gaps in mana curve"""
+        total_cards = sum(curve.values())
+        if total_cards == 0:
+            return [1, 2, 3]  # Default curve positions
+        
+        ideal_percentages = {1: 0.20, 2: 0.30, 3: 0.25, 4: 0.15, 5: 0.10}
+        gaps = []
+        
+        for cmc, ideal_pct in ideal_percentages.items():
+            current_pct = curve.get(cmc, 0) / total_cards
+            if current_pct < ideal_pct * 0.6:  # 40% below ideal
+                gap_size = ideal_pct - current_pct
+                gaps.append((cmc, gap_size))
+        
+        # Sort by gap size and return CMCs
+        gaps.sort(key=lambda x: x[1], reverse=True)
+        return [cmc for cmc, _ in gaps]
+    
+    def _calculate_advanced_synergy_score(self, card, deck_analysis: Dict, synergy_type: str, weight: float) -> float:
+        """Calculate advanced synergy score based on multiple factors"""
+        base_score = 0.0
+        
+        # Type-specific synergy calculation
+        if synergy_type == "color_synergy":
+            base_score = self._calculate_color_synergy(card, deck_analysis)
+        elif synergy_type.startswith("archetype_"):
+            base_score = self._calculate_archetype_synergy(card, deck_analysis)
+        elif synergy_type.startswith("curve_"):
+            base_score = self._calculate_curve_synergy(card, deck_analysis)
+        elif synergy_type.startswith("keyword_"):
+            base_score = self._calculate_keyword_synergy(card, deck_analysis, synergy_type)
+        
+        # Apply weight and additional factors
+        synergy_score = base_score * weight
+        
+        # Bonus for efficient cards
+        if hasattr(card, 'cmc') and card.cmc <= 3:
+            synergy_score += 0.05
+        
+        # Bonus for versatile cards
+        oracle_text = getattr(card, 'oracle_text', '').lower()
+        if any(word in oracle_text for word in ['choose', 'either', 'or']):
+            synergy_score += 0.1
+        
+        return min(synergy_score, 1.0)
+    
+    def _calculate_color_synergy(self, card, deck_analysis: Dict) -> float:
+        """Calculate color-based synergy score with balanced distribution"""
+        deck_colors = set(deck_analysis.get("colors", []))
+        card_colors = set(getattr(card, 'colors', []))
+        
+        if not deck_colors:
+            return 0.6 if not card_colors else 0.4  # Neutral for colorless in colorless deck
+        
+        if not card_colors:
+            return 0.7  # Colorless cards are generally playable
+        
+        # Perfect match gets good but not perfect score
+        if card_colors <= deck_colors:  # Card colors are subset of deck colors
+            color_overlap = len(card_colors.intersection(deck_colors))
+            deck_size = len(deck_colors)
+            
+            # Scale based on deck's color commitment
+            if deck_size == 1:  # Mono-colored deck
+                return 0.75 + (color_overlap * 0.05)  # Max 0.8
+            elif deck_size == 2:  # Two-color deck
+                return 0.65 + (color_overlap * 0.08)  # Max 0.81
+            else:  # Three+ color deck
+                return 0.55 + (color_overlap * 0.1)   # Max 0.85
+        
+        # Partial match gets lower score
+        overlap = len(card_colors.intersection(deck_colors))
+        if overlap > 0:
+            overlap_ratio = overlap / len(card_colors)
+            return 0.3 + (overlap_ratio * 0.25)  # Max 0.55
+        
+        # No overlap - very low synergy
+        return 0.15
+    
+    def _calculate_archetype_synergy(self, card, deck_analysis: Dict) -> float:
+        """Calculate archetype-specific synergy with realistic scoring"""
+        archetype = deck_analysis.get("archetype", "midrange").lower()
+        oracle_text = getattr(card, 'oracle_text', '').lower()
+        type_line = getattr(card, 'type_line', '').lower()
+        cmc = getattr(card, 'cmc', 0)
+        
+        archetype_patterns = {
+            "aggro": {
+                "keywords": ["haste", "prowess", "first strike", "menace", "trample"],
+                "cmc_sweet_spot": (1, 3),
+                "creature_bonus": 0.15,
+                "preferred_stats": ["power", "aggressive"]
+            },
+            "control": {
+                "keywords": ["counter", "draw", "exile", "destroy", "flash"],
+                "cmc_sweet_spot": (2, 6),
+                "instant_sorcery_bonus": 0.2,
+                "preferred_effects": ["removal", "card_advantage"]
+            },
+            "midrange": {
+                "keywords": ["enters", "whenever", "tap", "untap", "value"],
+                "cmc_sweet_spot": (2, 5),
+                "versatility_bonus": 0.1,
+                "preferred_effects": ["incremental_advantage"]
+            },
+            "combo": {
+                "keywords": ["search", "tutor", "sacrifice", "graveyard", "storm"],
+                "cmc_sweet_spot": (1, 4),
+                "synergy_bonus": 0.25,
+                "preferred_effects": ["engine", "enabler"]
+            }
+        }
+        
+        pattern = archetype_patterns.get(archetype, archetype_patterns["midrange"])
+        score = 0.4  # Base archetype compatibility
+        
+        # Keyword matching (max +0.25)
+        keyword_matches = sum(1 for kw in pattern["keywords"] if kw in oracle_text)
+        keyword_bonus = min(keyword_matches * 0.08, 0.25)
+        score += keyword_bonus
+        
+        # CMC curve fit (max +0.2)
+        min_cmc, max_cmc = pattern["cmc_sweet_spot"]
+        if min_cmc <= cmc <= max_cmc:
+            if cmc == min_cmc + 1:  # Sweet spot
+                score += 0.2
+            else:
+                score += 0.1
+        elif cmc < min_cmc:
+            score += 0.05  # Slightly early but okay
+        else:
+            score -= 0.05  # Too expensive for archetype
+        
+        # Type-specific bonuses (max +0.2)
+        if archetype == "aggro" and "creature" in type_line:
+            score += pattern.get("creature_bonus", 0)
+        elif archetype == "control" and ("instant" in type_line or "sorcery" in type_line):
+            score += pattern.get("instant_sorcery_bonus", 0)
+        elif archetype == "combo" and any(word in oracle_text for word in ["search", "tutor", "sacrifice"]):
+            score += pattern.get("synergy_bonus", 0)
+        elif archetype == "midrange":
+            # Midrange likes versatile cards
+            if any(word in oracle_text for word in ["choose", "either", "mode"]):
+                score += pattern.get("versatility_bonus", 0)
+        
+        # Cap the score at reasonable maximum (0.85)
+        return min(score, 0.85)
+    
+    def _calculate_curve_synergy(self, card, deck_analysis: Dict) -> float:
+        """Calculate curve-filling synergy with balanced scoring"""
+        curve = deck_analysis.get("curve", {})
+        cmc = getattr(card, 'cmc', 0)
+        
+        total_cards = sum(curve.values())
+        if total_cards == 0:
+            return 0.5  # Neutral if no curve data
+        
+        current_pct = curve.get(cmc, 0) / total_cards
+        
+        # Ideal percentages for different CMCs
+        ideal_percentages = {
+            1: 0.20, 2: 0.30, 3: 0.25, 4: 0.15, 5: 0.08, 6: 0.02, 7: 0.01
+        }
+        ideal_pct = ideal_percentages.get(cmc, 0.005)  # Very low for 8+ CMC
+        
+        # Calculate gap size
+        gap_size = ideal_pct - current_pct
+        
+        if gap_size > 0.15:  # Big gap (>15% below ideal)
+            return 0.75
+        elif gap_size > 0.10:  # Medium gap (>10% below ideal)
+            return 0.65
+        elif gap_size > 0.05:  # Small gap (>5% below ideal)
+            return 0.55
+        elif gap_size > -0.05:  # Near ideal
+            return 0.45
+        elif gap_size > -0.10:  # Slightly oversaturated
+            return 0.35
+        else:  # Very oversaturated
+            return 0.25
+    
+    def _calculate_keyword_synergy(self, card, deck_analysis: Dict, synergy_type: str) -> float:
+        """Calculate keyword-based synergy"""
+        keyword = synergy_type.split("_", 1)[1]  # Extract keyword from "keyword_X"
+        oracle_text = getattr(card, 'oracle_text', '').lower()
+        deck_keywords = deck_analysis.get("keywords", {})
+        
+        # Base score for having the keyword
+        score = 0.4 if keyword in oracle_text else 0.2
+        
+        # Bonus based on how prevalent the keyword is in the deck
+        keyword_count = deck_keywords.get(keyword, 0)
+        if keyword_count >= 3:
+            score += 0.3
+        elif keyword_count >= 2:
+            score += 0.2
+        elif keyword_count >= 1:
+            score += 0.1
+        
+        return min(score, 1.0)
+    
+    def _calculate_advanced_confidence_score(self, card, deck_analysis: Dict, synergy_score: float) -> float:
+        """Calculate advanced confidence score using weighted multiplication for better distribution"""
+        
+        # Start with a base multiplier instead of additive
+        confidence_multipliers = []
+        
+        # Synergy contribution (most important factor)
+        synergy_weight = 0.5 + (synergy_score * 0.4)  # Range: 0.5 to 0.9
+        confidence_multipliers.append(synergy_weight)
+        
+        # Rarity consideration (power correlation)
+        rarity = getattr(card, 'rarity', 'common').lower()
+        rarity_weights = {
+            "mythic": 0.95,   # Very high confidence multiplier
+            "rare": 0.85,     # High confidence multiplier  
+            "uncommon": 0.75, # Good confidence multiplier
+            "common": 0.65    # Moderate confidence multiplier
+        }
+        confidence_multipliers.append(rarity_weights.get(rarity, 0.65))
+        
+        # CMC efficiency factor
+        cmc = getattr(card, 'cmc', 0)
+        if cmc <= 1:
+            cmc_weight = 0.9   # Very efficient
+        elif cmc <= 2:
+            cmc_weight = 0.85  # Highly efficient  
+        elif cmc <= 3:
+            cmc_weight = 0.8   # Efficient
+        elif cmc <= 4:
+            cmc_weight = 0.75  # Reasonable
+        elif cmc <= 5:
+            cmc_weight = 0.7   # Acceptable
+        elif cmc <= 6:
+            cmc_weight = 0.6   # Expensive
+        else:
+            cmc_weight = 0.5   # Very expensive
+        
+        confidence_multipliers.append(cmc_weight)
+        
+        # Type relevance factor
+        type_line = getattr(card, 'type_line', '').lower()
+        archetype = deck_analysis.get("archetype", "midrange").lower()
+        
+        if archetype == "aggro" and "creature" in type_line:
+            type_weight = 0.9  # Perfect match
+        elif archetype == "control" and ("instant" in type_line or "sorcery" in type_line):
+            type_weight = 0.9  # Perfect match
+        elif archetype == "midrange" and "creature" in type_line:
+            type_weight = 0.85 # Good match
+        elif "planeswalker" in type_line:
+            type_weight = 0.88 # Usually powerful
+        elif "creature" in type_line:
+            type_weight = 0.75 # General creature
+        elif "instant" in type_line or "sorcery" in type_line:
+            type_weight = 0.7  # Spell
+        else:
+            type_weight = 0.65 # Other permanent
+        
+        confidence_multipliers.append(type_weight)
+        
+        # Card complexity/power indicator
+        oracle_text = getattr(card, 'oracle_text', '')
+        text_length = len(oracle_text)
+        
+        if text_length > 120:
+            complexity_weight = 0.9  # Very complex, likely powerful
+        elif text_length > 80:
+            complexity_weight = 0.85 # Moderately complex
+        elif text_length > 40:
+            complexity_weight = 0.8  # Some complexity
+        elif text_length > 15:
+            complexity_weight = 0.75 # Simple but functional
+        else:
+            complexity_weight = 0.65 # Very simple
+        
+        confidence_multipliers.append(complexity_weight)
+        
+        # Keyword density (abilities indicator)
+        keywords = self._extract_keywords_from_text(oracle_text)
+        keyword_count = len(keywords)
+        
+        if keyword_count >= 3:
+            keyword_weight = 0.9   # Many keywords, high power
+        elif keyword_count >= 2:
+            keyword_weight = 0.85  # Multiple keywords
+        elif keyword_count >= 1:
+            keyword_weight = 0.8   # Some keywords
+        else:
+            keyword_weight = 0.7   # No recognized keywords
+        
+        confidence_multipliers.append(keyword_weight)
+        
+        # Calculate final confidence using geometric mean for better distribution
+        # This prevents any single factor from dominating
+        product = 1.0
+        for multiplier in confidence_multipliers:
+            product *= multiplier
+        
+        # Take the nth root where n is number of factors
+        final_confidence = product ** (1.0 / len(confidence_multipliers))
+        
+        # Apply slight randomization for more natural distribution (±2%)
+        import random
+        randomization = random.uniform(-0.02, 0.02)
+        final_confidence += randomization
+        
+        # Ensure reasonable bounds (0.2 to 0.98 to avoid perfect scores)
+        return max(0.2, min(final_confidence, 0.98))
+    
+    def _calculate_meta_score(self, card, archetype: str) -> float:
+        """Calculate meta-game relevance score"""
+        base_score = 0.5
+        rarity = getattr(card, 'rarity', 'common').lower()
+        
+        # Rarity usually correlates with power level
+        rarity_multipliers = {"mythic": 1.3, "rare": 1.2, "uncommon": 1.1, "common": 1.0}
+        base_score *= rarity_multipliers.get(rarity, 1.0)
+        
+        # Archetype relevance
+        oracle_text = getattr(card, 'oracle_text', '').lower()
+        type_line = getattr(card, 'type_line', '').lower()
+        
+        archetype_relevance = {
+            "aggro": ["haste", "prowess", "damage", "attack", "creature"],
+            "control": ["counter", "draw", "destroy", "exile", "instant", "sorcery"],
+            "midrange": ["enters", "whenever", "creature", "versatile"],
+            "combo": ["search", "tutor", "sacrifice", "graveyard"]
+        }
+        
+        relevant_terms = archetype_relevance.get(archetype.lower(), [])
+        matches = sum(1 for term in relevant_terms if term in oracle_text or term in type_line)
+        base_score += matches * 0.05
+        
+        return min(base_score, 1.0)
+    
+    def _calculate_deck_fit_score(self, card, deck_analysis: Dict) -> float:
+        """Calculate how well card fits the deck's strategy"""
+        score = 0.4
+        
+        # Color fit (25%)
+        color_score = self._calculate_color_synergy(card, deck_analysis)
+        score += color_score * 0.25
+        
+        # Curve fit (25%)
+        curve_score = self._calculate_curve_synergy(card, deck_analysis)
+        score += curve_score * 0.25
+        
+        # Archetype fit (30%)
+        archetype_score = self._calculate_archetype_synergy(card, deck_analysis)
+        score += archetype_score * 0.30
+        
+        # Versatility bonus (20%)
+        oracle_text = getattr(card, 'oracle_text', '').lower()
+        if any(word in oracle_text for word in ['choose', 'either', 'or', 'mode', 'additional cost']):
+            score += 0.15
+        
+        # Multi-use bonus
+        if any(word in oracle_text for word in ['tap:', 'activated ability', 'enters']):
+            score += 0.05
+        
+        return min(score, 1.0)
+    
+    def _generate_synergy_reasons(self, card, deck_analysis: Dict, synergy_type: str, synergy_score: float) -> List[str]:
+        """Generate detailed reasons for the recommendation"""
+        reasons = []
+        
+        # Primary synergy reason
+        if synergy_type == "color_synergy":
+            colors = deck_analysis.get("colors", [])
+            card_colors = getattr(card, 'colors', [])
+            if set(card_colors) <= set(colors):
+                reasons.append(f"Perfect color match ({'/'.join(card_colors) if card_colors else 'Colorless'})")
+            else:
+                overlap = set(card_colors) & set(colors)
+                reasons.append(f"Color overlap with {'/'.join(overlap)}")
+        
+        elif synergy_type.startswith("archetype_"):
+            archetype_keyword = synergy_type.split("_", 1)[1]
+            reasons.append(f"Strong {archetype_keyword} synergy")
+            
+        elif synergy_type.startswith("curve_"):
+            cmc = synergy_type.split("cmc")[1]
+            reasons.append(f"Fills {cmc}-mana curve gap")
+            
+        elif synergy_type.startswith("keyword_"):
+            keyword = synergy_type.split("_", 1)[1]
+            reasons.append(f"Synergizes with existing {keyword} cards")
+        
+        # Quality indicators
+        if synergy_score > 0.8:
+            reasons.append("Excellent synergy potential")
+        elif synergy_score > 0.6:
+            reasons.append("Good synergy with current cards")
+        elif synergy_score > 0.4:
+            reasons.append("Reasonable fit for deck")
+        
+        # Efficiency notes
+        cmc = getattr(card, 'cmc', 0)
+        if cmc <= 1:
+            reasons.append("Highly efficient (low CMC)")
+        elif cmc <= 3:
+            reasons.append("Efficient mana cost")
+        
+        # Rarity consideration
+        rarity = getattr(card, 'rarity', 'common').lower()
+        if rarity in ["rare", "mythic"]:
+            reasons.append(f"Powerful {rarity} with strong effects")
+        elif rarity == "uncommon":
+            reasons.append("Solid uncommon with good value")
+        else:
+            reasons.append("Accessible common with consistent effects")
+        
+        # Versatility
+        oracle_text = getattr(card, 'oracle_text', '').lower()
+        if 'choose' in oracle_text or 'either' in oracle_text:
+            reasons.append("Versatile with multiple modes")
+        
+        return reasons[:4]  # Limit to 4 most relevant reasons
     
     def _get_curve_recommendations_scryfall(self, curve: Dict[int, int], colors: List[str], current_cards: Set[str], format_name: str, limit: int = 5) -> List[SmartRecommendation]:
         """Get mana curve improvement recommendations using Scryfall"""
@@ -584,13 +1106,35 @@ class EnhancedRecommendationEngine:
                     if card_name.lower() in current_cards:
                         continue
                     
-                    confidence = 0.6 + gap_size
+                    # Calculate advanced curve-filling scores
+                    temp_analysis = {
+                        "colors": colors,
+                        "archetype": "midrange",
+                        "curve": curve,
+                        "keywords": {}
+                    }
+                    
+                    curve_synergy = self._calculate_curve_synergy(card, temp_analysis)
+                    confidence = self._calculate_advanced_confidence_score(
+                        card, temp_analysis, curve_synergy
+                    )
+                    
+                    # Boost confidence for filling big gaps
+                    confidence = min(confidence + gap_size * 0.3, 1.0)
                     
                     reasons = [
-                        f"Fills {cmc}-mana curve gap",
+                        f"Fills critical {cmc}-mana gap ({gap_size:.1%} below ideal)",
                         f"Improves mana curve balance",
-                        f"Good {cmc}-drop option"
+                        f"Efficient {cmc}-drop for curve"
                     ]
+                    
+                    # Add efficiency note
+                    if cmc <= 3:
+                        reasons.append("Strong early-to-mid game presence")
+                    
+                    synergy_score = self._calculate_color_synergy(card, temp_analysis)
+                    deck_fit_score = self._calculate_deck_fit_score(card, temp_analysis)
+                    meta_score = self._calculate_meta_score(card, "midrange")
                     
                     keywords = self._extract_keywords_from_text(card.oracle_text)
                     
@@ -599,10 +1143,10 @@ class EnhancedRecommendationEngine:
                         mana_cost=card.mana_cost,
                         card_type=card.type_line,
                         rarity=card.rarity,
-                        confidence=min(confidence, 1.0),
-                        synergy_score=0.5,
-                        meta_score=0.6,
-                        deck_fit=0.8,
+                        confidence=confidence,
+                        synergy_score=synergy_score,
+                        meta_score=meta_score,
+                        deck_fit=deck_fit_score,
                         cost_consideration="unknown",
                         reasons=reasons,
                         cmc=card.cmc,  # Add CMC field
@@ -736,22 +1280,91 @@ class EnhancedRecommendationEngine:
         return all(color in deck_colors for color in card_colors)
     
     def _calculate_staple_confidence(self, card, format_name: str) -> float:
-        """Calculate confidence score for format staples"""
-        base_confidence = 0.6
+        """Calculate confidence score for format staples with balanced distribution"""
         
-        # Boost for competitive formats
+        # Use multiplicative factors instead of additive for better distribution
+        confidence_factors = []
+        
+        # Format legality factor
         legality = card.legalities
         if legality.get(format_name.lower()) == "legal":
-            base_confidence += 0.2
+            legality_factor = 0.9  # High confidence for legal cards
+        else:
+            legality_factor = 0.6  # Lower confidence for non-legal
+        confidence_factors.append(legality_factor)
         
-        # Boost for rare/mythic (usually more powerful)
-        rarity = card.rarity
-        if rarity in ["rare", "mythic"]:
-            base_confidence += 0.1
-        elif rarity == "uncommon":
-            base_confidence += 0.05
+        # Rarity power correlation factor
+        rarity = card.rarity.lower() if hasattr(card, 'rarity') else 'common'
+        rarity_factors = {
+            "mythic": 0.95,   # Mythics are usually format defining
+            "rare": 0.88,     # Rares are often powerful  
+            "uncommon": 0.78, # Uncommons can be very good
+            "common": 0.68    # Commons are accessible but lower power
+        }
+        confidence_factors.append(rarity_factors.get(rarity, 0.68))
         
-        return min(base_confidence, 1.0)
+        # CMC efficiency factor
+        cmc = getattr(card, 'cmc', 0)
+        if cmc <= 1:
+            cmc_factor = 0.95  # Very efficient
+        elif cmc == 2:
+            cmc_factor = 0.9   # Highly efficient
+        elif cmc == 3:
+            cmc_factor = 0.85  # Efficient
+        elif cmc == 4:
+            cmc_factor = 0.8   # Reasonable
+        elif cmc == 5:
+            cmc_factor = 0.75  # Acceptable
+        elif cmc == 6:
+            cmc_factor = 0.65  # Expensive
+        else:
+            cmc_factor = 0.55  # Very expensive
+        confidence_factors.append(cmc_factor)
+        
+        # Text complexity factor (indicator of power/versatility)
+        oracle_text = getattr(card, 'oracle_text', '')
+        text_length = len(oracle_text)
+        
+        if text_length > 100:
+            text_factor = 0.9   # Very complex, likely powerful
+        elif text_length > 60:
+            text_factor = 0.85  # Moderately complex
+        elif text_length > 30:
+            text_factor = 0.8   # Some complexity
+        elif text_length > 10:
+            text_factor = 0.75  # Basic effects
+        else:
+            text_factor = 0.65  # Very simple
+        confidence_factors.append(text_factor)
+        
+        # Type relevance factor
+        type_line = getattr(card, 'type_line', '').lower()
+        if "planeswalker" in type_line:
+            type_factor = 0.92  # Planeswalkers are usually impactful
+        elif "instant" in type_line or "sorcery" in type_line:
+            type_factor = 0.85  # Spells often define formats
+        elif "creature" in type_line:
+            type_factor = 0.82  # Creatures are format staples
+        elif "artifact" in type_line or "enchantment" in type_line:
+            type_factor = 0.78  # Permanents provide value
+        else:
+            type_factor = 0.7   # Other types
+        confidence_factors.append(type_factor)
+        
+        # Calculate geometric mean for balanced distribution
+        product = 1.0
+        for factor in confidence_factors:
+            product *= factor
+            
+        confidence = product ** (1.0 / len(confidence_factors))
+        
+        # Add slight variance for natural distribution
+        import random
+        variance = random.uniform(-0.03, 0.03)
+        confidence += variance
+        
+        # Ensure bounds (0.35 to 0.95 for staples)
+        return max(0.35, min(confidence, 0.95))
     
     def _calculate_archetype_fit_card(self, card, archetype_pattern: Dict) -> float:
         """Calculate how well a card fits an archetype"""
