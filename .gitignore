@@ -52,6 +52,40 @@ Thumbs.db
 data/cache/
 *.log
 
+# Node.js / Electron
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.pnpm-debug.log
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Electron specific
+electron/node_modules/
+electron/dist/
+electron/release/
+electron/build/
+electron/.webpack/
+electron/out/
+*.exe
+*.dmg
+*.AppImage
+*.snap
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Development and build artifacts
+.nyc_output
+coverage/
+.cache/
+.parcel-cache/
+.eslintcache
+
 # Development Documentation (context files for AI development)
 *_COMPLETE.md
 *_SUMMARY.md
@@ -62,31 +96,6 @@ data/cache/
 *_FIX.md
 *_FIXES.md
 *_GUIDE.md
-ANTIVIRUS_FALSE_POSITIVE_GUIDE.md
-BUILD_INSTRUCTIONS.md
-CLIPBOARD_IMPORT_ENHANCEMENT.md
-CODE_CLEANUP_SUMMARY.md
-COLLECTION_DATA_LOSS_FIX.md
-COLOR_IDENTITY_ENHANCEMENT.md
-CONFIDENCE_SCORING_FIX.md
-ENHANCED_DECK_ANALYSIS.md
-ENHANCED_DECK_STATISTICS.md
-ERROR_FIXES_COMPLETE.md
-FEATURES_COMPLETED.md
-ISSUE_RESOLUTION_FINAL.md
-LAYOUT_OPTIMIZATION_SUMMARY.md
-LAYOUT_REFINEMENTS_APPLIED.md
-MANA_CURVE_INTEGRATION.md
-PACKAGING_GUIDE.md
-PERFECT_LAYOUT_BALANCE.md
-PERFORMANCE_CLEANUP_COMPLETE.md
-PERFORMANCE_OPTIMIZATIONS.md
-PERFORMANCE_OPTIMIZATIONS_COMPLETE.md
-RECOMMENDATIONS_LABEL_FIX.md
-STREAMLINED_BUTTONS.md
-TEXT_FORMATTING_FIXES.md
-THEME_PERFORMANCE_ANALYSIS.md
-UNICODE_CURVE_SOLUTION.md
 
 # Build files
 *.spec
