@@ -1,11 +1,10 @@
 // Main application TypeScript file
-import './styles.css';
 import { CollectionTab } from './components/CollectionTab';
 import { DecksTab } from './components/DecksTab';
 import { AIRecommendationsTab } from './components/AIRecommendationsTab';
 import type { Card, Deck, Collection } from './types';
 
-class DecksmithApp {
+class DeckMasterApp {
   private currentTab = 'collection';
   private collection: Collection = { cards: [], lastModified: new Date().toISOString() };
   private decks: Deck[] = [];
@@ -27,14 +26,11 @@ class DecksmithApp {
   }
 
   private initializeComponents(): void {
-    console.log('Initializing components...');
-    
     this.collectionTab = new CollectionTab();
     this.decksTab = new DecksTab();
     this.aiTab = new AIRecommendationsTab();
     
     // Initialize components
-    console.log('Calling initialize on components...');
     this.collectionTab.initialize();
     this.decksTab.initialize();
     this.aiTab.initialize();
@@ -43,11 +39,6 @@ class DecksmithApp {
     this.collectionTab.setCollection(this.collection);
     this.decksTab.setDecks(this.decks);
     this.aiTab.setDecks(this.decks);
-    
-    // Render the active tab content
-    console.log('Rendering collection tab...');
-    this.collectionTab.render();
-    console.log('Components initialized and rendered');
   }
 
   private async setupEventListeners(): Promise<void> {
@@ -102,8 +93,6 @@ class DecksmithApp {
   }
 
   private switchTab(tabName: string): void {
-    console.log(`Switching to tab: ${tabName}`);
-    
     // Update active tab button
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.classList.remove('active');
@@ -115,20 +104,6 @@ class DecksmithApp {
       panel.classList.remove('active');
     });
     document.getElementById(`${tabName}-tab`)?.classList.add('active');
-
-    // Render the appropriate component
-    console.log(`Rendering component for tab: ${tabName}`);
-    switch (tabName) {
-      case 'collection':
-        this.collectionTab?.render();
-        break;
-      case 'decks':
-        this.decksTab?.render();
-        break;
-      case 'ai-recommendations':
-        this.aiTab?.render();
-        break;
-    }
 
     this.currentTab = tabName;
     this.updateStatus(`Switched to ${tabName} tab`);
@@ -331,5 +306,5 @@ class DecksmithApp {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  new DecksmithApp();
+  new DeckMasterApp();
 });

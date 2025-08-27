@@ -23,10 +23,12 @@ export interface Card {
 export interface Deck {
   id: string;
   name: string;
-  format: string;
-  cards: DeckCard[];
-  created: string;
-  modified: string;
+  format?: string;
+  mainboard: DeckCard[];
+  sideboard: DeckCard[];
+  created?: string;
+  modified?: string;
+  lastModified: string;
 }
 
 export interface DeckCard extends Card {

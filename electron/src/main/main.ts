@@ -5,7 +5,7 @@ import Store from 'electron-store';
 // Initialize electron store for persistent data
 const store = new Store();
 
-class DeckMasterApp {
+class DecksmithApp {
   private mainWindow: BrowserWindow | null = null;
   private isDev = process.env.NODE_ENV === 'development';
 
@@ -177,7 +177,7 @@ class DeckMasterApp {
         label: 'Help',
         submenu: [
           {
-            label: 'About Deckmaster',
+            label: 'About Decksmith',
             click: () => this.sendToRenderer('menu:about')
           },
           {
@@ -257,4 +257,4 @@ class DeckMasterApp {
 }
 
 // Create the app instance
-new DeckMasterApp();
+new DecksmithApp();

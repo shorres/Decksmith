@@ -207,8 +207,9 @@ class CSVHandler {
   }
 
   static exportDeckToArenaFormat(deck: Deck): string {
-    const mainboard = deck.cards.filter(card => !card.typeLine?.toLowerCase().includes('basic land'));
-    const lands = deck.cards.filter(card => card.typeLine?.toLowerCase().includes('basic land'));
+    const allCards = [...deck.mainboard, ...deck.sideboard];
+    const mainboard = allCards.filter(card => !card.typeLine?.toLowerCase().includes('basic land'));
+    const lands = allCards.filter(card => card.typeLine?.toLowerCase().includes('basic land'));
     
     let arenaFormat = `Deck\n`;
     
@@ -221,6 +222,14 @@ class CSVHandler {
     if (lands.length > 0) {
       arenaFormat += `\n`;
       for (const card of lands) {
+        arenaFormat += `${card.quantity} ${card.name}${card.setCode ? ` (${card.setCode.toUpperCase()})` : ''} ${card.collectorNumber || ''}\n`;
+      }
+    }
+    
+    // Add sideboard if any
+    if (deck.sideboard.length > 0) {
+      arenaFormat += `\nSideboard\n`;
+      for (const card of deck.sideboard) {
         arenaFormat += `${card.quantity} ${card.name}${card.setCode ? ` (${card.setCode.toUpperCase()})` : ''} ${card.collectorNumber || ''}\n`;
       }
     }

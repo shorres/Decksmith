@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deckmaster - MTG Collection & Deck Manager</title>
+    <title>Decksmith - MTG Collection & Deck Manager</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
         <header class="app-header">
             <div class="header-content">
                 <div class="app-title">
-                    <h1>🃏 Deckmaster</h1>
+                    <h1>🃏 Decksmith</h1>
                     <span class="version">v2.0.0</span>
                 </div>
                 <div class="header-actions">
@@ -28,16 +28,20 @@
             <!-- Navigation Tabs -->
             <nav class="tab-nav">
                 <button class="tab-btn active" data-tab="collection">
-                    📚 Collection
+                    <span class="tab-icon">📚</span>
+                    Collection
                 </button>
                 <button class="tab-btn" data-tab="decks">
-                    🏗️ Decks
+                    <span class="tab-icon">🏗️</span>
+                    Decks
                 </button>
                 <button class="tab-btn" data-tab="ai-recommendations">
-                    🤖 AI Recommendations
+                    <span class="tab-icon">🤖</span>
+                    AI Recommendations
                 </button>
                 <button class="tab-btn" data-tab="statistics">
-                    📊 Statistics
+                    <span class="tab-icon">📊</span>
+                    Statistics
                 </button>
             </nav>
 
@@ -45,114 +49,17 @@
             <div class="tab-content">
                 <!-- Collection Tab -->
                 <div id="collection-tab" class="tab-panel active">
-                    <div class="panel-header">
-                        <h2>Your Collection</h2>
-                        <div class="panel-actions">
-                            <button id="import-collection-btn" class="btn btn-primary">
-                                📥 Import Collection
-                            </button>
-                            <button id="export-collection-btn" class="btn btn-secondary">
-                                📤 Export Collection
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Search and Filters -->
-                    <div class="search-section">
-                        <div class="search-bar">
-                            <input type="text" id="collection-search" placeholder="Search your collection..." />
-                            <button id="clear-search" class="btn-icon">×</button>
-                        </div>
-                        <div class="filters">
-                            <select id="color-filter">
-                                <option value="">All Colors</option>
-                                <option value="W">White</option>
-                                <option value="U">Blue</option>
-                                <option value="B">Black</option>
-                                <option value="R">Red</option>
-                                <option value="G">Green</option>
-                                <option value="C">Colorless</option>
-                            </select>
-                            <select id="rarity-filter">
-                                <option value="">All Rarities</option>
-                                <option value="common">Common</option>
-                                <option value="uncommon">Uncommon</option>
-                                <option value="rare">Rare</option>
-                                <option value="mythic">Mythic</option>
-                            </select>
-                            <select id="type-filter">
-                                <option value="">All Types</option>
-                                <option value="creature">Creature</option>
-                                <option value="instant">Instant</option>
-                                <option value="sorcery">Sorcery</option>
-                                <option value="enchantment">Enchantment</option>
-                                <option value="artifact">Artifact</option>
-                                <option value="planeswalker">Planeswalker</option>
-                                <option value="land">Land</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Collection Grid -->
-                    <div id="collection-grid" class="card-grid">
-                        <div class="loading-state">
-                            <div class="spinner"></div>
-                            <p>Loading your collection...</p>
-                        </div>
-                    </div>
+                    <!-- Content will be rendered by CollectionTab component -->
                 </div>
 
                 <!-- Decks Tab -->
                 <div id="decks-tab" class="tab-panel">
-                    <div class="panel-header">
-                        <h2>Your Decks</h2>
-                        <div class="panel-actions">
-                            <button id="new-deck-btn" class="btn btn-primary">
-                                ➕ New Deck
-                            </button>
-                            <button id="import-deck-btn" class="btn btn-secondary">
-                                📥 Import Deck
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="deck-manager">
-                        <!-- Deck List -->
-                        <div class="deck-list-panel">
-                            <div id="deck-list" class="deck-list">
-                                <div class="empty-state">
-                                    <p>No decks yet. Create your first deck!</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Deck Editor -->
-                        <div class="deck-editor-panel">
-                            <div id="deck-editor" class="deck-editor">
-                                <div class="empty-state">
-                                    <p>Select a deck to edit</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Content will be rendered by DecksTab component -->
                 </div>
 
                 <!-- AI Recommendations Tab -->
                 <div id="ai-recommendations-tab" class="tab-panel">
-                    <div class="panel-header">
-                        <h2>AI Recommendations</h2>
-                        <div class="panel-actions">
-                            <button id="get-recommendations-btn" class="btn btn-primary">
-                                🤖 Get Recommendations
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="recommendations-content" class="recommendations-content">
-                        <div class="empty-state">
-                            <p>Select a deck and get AI-powered card recommendations</p>
-                        </div>
-                    </div>
+                    <!-- Content will be rendered by AIRecommendationsTab component -->
                 </div>
 
                 <!-- Statistics Tab -->
@@ -178,15 +85,6 @@
                             <div class="stat-card">
                                 <h3>Collection Value</h3>
                                 <div class="stat-value" id="collection-value">$0.00</div>
-                            </div>
-                        </div>
-                        
-                        <div class="charts-section">
-                            <div class="chart-container">
-                                <canvas id="color-distribution-chart"></canvas>
-                            </div>
-                            <div class="chart-container">
-                                <canvas id="rarity-distribution-chart"></canvas>
                             </div>
                         </div>
                     </div>
