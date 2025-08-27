@@ -4,6 +4,7 @@ import type { Card, Collection } from '../types';
 export class CollectionTab extends BaseComponent {
   private collection: Collection = { cards: [], lastModified: new Date().toISOString() };
   private filteredCards: Card[] = [];
+  private searchTimeout: number = 0;
 
   constructor() {
     super('#collection-tab');
@@ -166,10 +167,11 @@ export class CollectionTab extends BaseComponent {
   private setupEventListeners(): void {
     console.log('Setting up CollectionTab event listeners...');
     
-    // Search
+    // Search functionality
     this.bindEvent('#collection-search', 'input', () => {
       clearTimeout(this.searchTimeout);
       this.searchTimeout = window.setTimeout(() => {
+        console.log('Applying search filter');
         this.applyFilters();
       }, 300);
     });
@@ -183,73 +185,47 @@ export class CollectionTab extends BaseComponent {
       }
     });
 
-    // Color checkboxes
-    this.element.querySelectorAll('.color-checkbox input').forEach(checkbox => {
-      checkbox.addEventListener('change', () => {
-        this.applyFilters();
-      });
+    // Color checkboxes - use more reliable event binding
+    this.setupColorFilters();
+
+    // Filter selects - ensure they're bound after render
+    this.bindEvent('#type-filter', 'change', () => {
+      console.log('Type filter changed');
+      this.applyFilters();
+    });
+    
+    this.bindEvent('#rarity-filter', 'change', () => {
+      console.log('Rarity filter changed');
+      this.applyFilters();
     });
 
-    // Filter selects
-    this.bindEvent('#type-filter', 'change', () => this.applyFilters());
-    this.bindEvent('#rarity-filter', 'change', () => this.applyFilters());
-
-    // Clear filters
+    // Clear filters button
     this.bindEvent('#clear-filters', 'click', () => {
-      console.log('Clear filters clicked');
+      console.log('Clear all filters clicked');
       this.clearAllFilters();
     });
 
-    // Action buttons
-    this.bindEvent('#import-csv-btn', 'click', (e) => {
-      console.log('Import CSV clicked');
-      e.preventDefault();
-      try {
-        this.importCSV();
-      } catch (error) {
-        console.error('Error in importCSV:', error);
-      }
-    });
-    this.bindEvent('#import-clipboard-btn', 'click', (e) => {
-      console.log('Import Clipboard clicked');
-      e.preventDefault();
-      try {
-        this.importClipboard();
-      } catch (error) {
-        console.error('Error in importClipboard:', error);
-      }
-    });
-    this.bindEvent('#export-csv-btn', 'click', (e) => {
-      console.log('Export CSV clicked');
-      e.preventDefault();
-      try {
-        this.exportCSV();
-      } catch (error) {
-        console.error('Error in exportCSV:', error);
-      }
-    });
-    this.bindEvent('#add-card-btn', 'click', (e) => {
-      console.log('Add Card clicked');
-      e.preventDefault();
-      try {
-        this.addCard();
-      } catch (error) {
-        console.error('Error in addCard:', error);
-      }
-    });
-    
+    // Action buttons - using onclick handlers for reliability
     console.log('CollectionTab event listeners setup complete');
   }
 
-  private searchTimeout: number = 0;
-
-  setCollection(collection: Collection): void {
-    this.collection = collection;
-    this.filteredCards = [...collection.cards];
-    this.applyFilters();
+  private setupColorFilters(): void {
+    // Set up color checkbox filters with proper event delegation
+    const colorCheckboxes = this.element.querySelectorAll('.color-checkbox input[type="checkbox"]');
+    colorCheckboxes.forEach(checkbox => {
+      const input = checkbox as HTMLInputElement;
+      input.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        console.log(`Color filter ${target.value} ${target.checked ? 'enabled' : 'disabled'}`);
+        this.applyFilters();
+      });
+    });
   }
 
+  // Enhanced filter method with better color matching
   private applyFilters(): void {
+    console.log('Applying filters...');
+    
     const searchTerm = (this.element.querySelector('#collection-search') as HTMLInputElement)?.value.toLowerCase() || '';
     const rarityFilter = (this.element.querySelector('#rarity-filter') as HTMLSelectElement)?.value || '';
     const typeFilter = (this.element.querySelector('#type-filter') as HTMLSelectElement)?.value || '';
@@ -260,18 +236,51 @@ export class CollectionTab extends BaseComponent {
       selectedColors.push((checkbox as HTMLInputElement).value);
     });
 
-    this.filteredCards = this.collection.cards.filter(card => {
-      const matchesSearch = !searchTerm || card.name.toLowerCase().includes(searchTerm);
-      const matchesRarity = !rarityFilter || card.rarity === rarityFilter;
-      const matchesType = !typeFilter || card.typeLine?.toLowerCase().includes(typeFilter);
-      const matchesColor = selectedColors.length === 0 || 
-        (card.colors && card.colors.some(color => selectedColors.includes(color)));
+    console.log('Filter criteria:', { searchTerm, selectedColors, rarityFilter, typeFilter });
 
-      return matchesSearch && matchesColor && matchesRarity && matchesType;
+    this.filteredCards = this.collection.cards.filter(card => {
+      // Search filter - check name and type
+      const matchesSearch = !searchTerm || 
+        card.name.toLowerCase().includes(searchTerm) ||
+        (card.typeLine && card.typeLine.toLowerCase().includes(searchTerm));
+
+      // Rarity filter
+      const matchesRarity = !rarityFilter || card.rarity === rarityFilter;
+
+      // Type filter - more flexible matching
+      const matchesType = !typeFilter || 
+        (card.typeLine && card.typeLine.toLowerCase().includes(typeFilter.toLowerCase()));
+
+      // Color filter - improved logic
+      const matchesColor = selectedColors.length === 0 || this.cardMatchesColors(card, selectedColors);
+
+      const matches = matchesSearch && matchesColor && matchesRarity && matchesType;
+      return matches;
     });
+
+    console.log(`Filtered ${this.filteredCards.length} cards from ${this.collection.cards.length} total`);
 
     this.renderCards();
     this.updateStats();
+  }
+
+  // Forward-thinking color matching method that could be reused by other tabs
+  private cardMatchesColors(card: Card, selectedColors: string[]): boolean {
+    if (!card.colors || card.colors.length === 0) {
+      // Colorless cards - could add a specific colorless filter later
+      return selectedColors.length === 0;
+    }
+
+    // Check if card contains any of the selected colors
+    // This allows for flexible color filtering
+    return card.colors.some(color => selectedColors.includes(color));
+  }
+
+  // Public method to set collection data (can be called from other components)
+  setCollection(collection: Collection): void {
+    this.collection = collection;
+    this.filteredCards = [...collection.cards];
+    this.applyFilters();
   }
 
   private renderCards(): void {
@@ -282,24 +291,87 @@ export class CollectionTab extends BaseComponent {
       grid.innerHTML = `
         <div class="empty-state">
           <p>No cards match your current filters</p>
-          <button class="btn btn-secondary" id="clear-filters-btn">Clear Filters</button>
+          <button class="btn btn-secondary" id="clear-filters-btn" onclick="window.decksmithApp?.components?.collection?.clearAllFilters?.();">Clear Filters</button>
         </div>
       `;
     } else {
-      grid.innerHTML = this.filteredCards.map(card => `
-        <div class="card-item" data-card-id="${card.id}">
-          <div class="card-image-placeholder"></div>
-          <div class="card-info">
-            <div class="card-name">${card.name}</div>
-            <div class="card-type">${card.typeLine || ''}</div>
-            <div class="card-meta">
-              <span class="card-rarity ${card.rarity}">${card.rarity || 'common'}</span>
-              <span class="card-quantity">×${card.quantity || 1}</span>
+      grid.innerHTML = this.filteredCards.map(card => {
+        const imageUrl = this.getCardImageUrl(card.name);
+        return `
+          <div class="card-item" data-card-id="${card.id}" onclick="window.decksmithApp?.components?.collection?.showCardDetails?.('${card.id}');">
+            <div class="card-image-container">
+              ${imageUrl ? 
+                `<img class="card-image" src="${imageUrl}" alt="${card.name}" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                 <div class="card-image-placeholder" style="display: none;">
+                   <div class="placeholder-content">
+                     <span class="placeholder-icon">🃏</span>
+                     <span class="placeholder-text">${card.name}</span>
+                   </div>
+                 </div>` : 
+                `<div class="card-image-placeholder">
+                   <div class="placeholder-content">
+                     <span class="placeholder-icon">🃏</span>
+                     <span class="placeholder-text">${card.name}</span>
+                   </div>
+                 </div>`}
+            </div>
+            <div class="card-info">
+              <div class="card-name" title="${card.name}">${card.name}</div>
+              <div class="card-type" title="${card.typeLine || ''}">${card.typeLine || 'Unknown'}</div>
+              <div class="card-meta">
+                <span class="card-rarity ${card.rarity || 'common'}">${this.formatRarity(card.rarity || 'common')}</span>
+                <span class="card-quantity">×${card.quantity || 1}</span>
+                ${card.manaCost ? `<span class="mana-cost" title="Mana Cost">${card.manaCost}</span>` : ''}
+              </div>
+              ${card.colors && card.colors.length > 0 ? 
+                `<div class="card-colors">
+                   ${card.colors.map(color => `<span class="color-pip color-${color.toLowerCase()}">${color}</span>`).join('')}
+                 </div>` : ''}
             </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
+
+    // Re-bind any additional event listeners needed for the rendered cards
+    this.bindCardEvents();
+  }
+
+  private getCardImageUrl(cardName: string): string | null {
+    if (!cardName) return null;
+    
+    // Use Scryfall's image API - this will get the small image for performance
+    // Format: https://api.scryfall.com/cards/named?exact={name}&format=image&version=small
+    const encodedName = encodeURIComponent(cardName);
+    return `https://api.scryfall.com/cards/named?exact=${encodedName}&format=image&version=small`;
+  }
+
+  private formatRarity(rarity: string): string {
+    switch (rarity.toLowerCase()) {
+      case 'common': return 'C';
+      case 'uncommon': return 'U';
+      case 'rare': return 'R';  
+      case 'mythic': return 'M';
+      default: return 'C';
+    }
+  }
+
+  private bindCardEvents(): void {
+    // Add any additional event listeners for rendered cards if needed
+    // This method can be extended for card-specific interactions
+  }
+
+  // Forward-thinking method for card details modal (for future tabs)
+  showCardDetails(cardId: string): void {
+    const card = this.collection.cards.find(c => c.id === cardId);
+    if (!card) return;
+
+    console.log('Showing card details for:', card.name);
+    
+    // This will be enhanced later - for now just log
+    // In the future, this could open a detailed modal or sidebar
+    // that could be useful for deck building and AI recommendations
   }
 
   private updateStats(): void {
@@ -350,6 +422,8 @@ export class CollectionTab extends BaseComponent {
   }
 
   private clearAllFilters(): void {
+    console.log('Clearing all filters');
+    
     const searchInput = this.element.querySelector('#collection-search') as HTMLInputElement;
     if (searchInput) searchInput.value = '';
 
@@ -364,6 +438,88 @@ export class CollectionTab extends BaseComponent {
     });
 
     this.applyFilters();
+  }
+
+  // Forward-thinking methods for integration with other tabs
+  
+  // Get all cards (useful for deck building)
+  getAllCards(): Card[] {
+    return [...this.collection.cards];
+  }
+
+  // Get filtered cards (useful for exporting or other operations)  
+  getFilteredCards(): Card[] {
+    return [...this.filteredCards];
+  }
+
+  // Get card by ID (useful for card details, deck building)
+  getCardById(cardId: string): Card | undefined {
+    return this.collection.cards.find(card => card.id === cardId);
+  }
+
+  // Get cards by name (useful for deck building - handling different printings)
+  getCardsByName(cardName: string): Card[] {
+    return this.collection.cards.filter(card => 
+      card.name.toLowerCase() === cardName.toLowerCase()
+    );
+  }
+
+  // Check if card exists in collection (useful for deck building validation)
+  hasCard(cardName: string, quantity: number = 1): boolean {
+    const cards = this.getCardsByName(cardName);
+    const totalQuantity = cards.reduce((sum, card) => sum + (card.quantity || 1), 0);
+    return totalQuantity >= quantity;
+  }
+
+  // Get collection statistics (useful for AI recommendations and analytics)
+  getCollectionStats() {
+    const stats = {
+      totalCards: this.collection.cards.reduce((sum, card) => sum + (card.quantity || 1), 0),
+      uniqueCards: this.collection.cards.length,
+      cardsByRarity: {
+        common: this.collection.cards.filter(card => card.rarity === 'common').length,
+        uncommon: this.collection.cards.filter(card => card.rarity === 'uncommon').length,
+        rare: this.collection.cards.filter(card => card.rarity === 'rare').length,
+        mythic: this.collection.cards.filter(card => card.rarity === 'mythic').length,
+      },
+      cardsByColor: {
+        white: this.collection.cards.filter(card => card.colors?.includes('W')).length,
+        blue: this.collection.cards.filter(card => card.colors?.includes('U')).length,
+        black: this.collection.cards.filter(card => card.colors?.includes('B')).length,
+        red: this.collection.cards.filter(card => card.colors?.includes('R')).length,
+        green: this.collection.cards.filter(card => card.colors?.includes('G')).length,
+        colorless: this.collection.cards.filter(card => !card.colors || card.colors.length === 0).length,
+      },
+      cardsByType: this.getCardTypeDistribution()
+    };
+    
+    return stats;
+  }
+
+  private getCardTypeDistribution(): Record<string, number> {
+    const typeDistribution: Record<string, number> = {};
+    
+    this.collection.cards.forEach(card => {
+      if (card.typeLine) {
+        // Extract primary type (e.g., "Legendary Creature — Dragon" -> "Creature")
+        const primaryType = this.extractPrimaryType(card.typeLine);
+        typeDistribution[primaryType] = (typeDistribution[primaryType] || 0) + 1;
+      }
+    });
+    
+    return typeDistribution;
+  }
+
+  private extractPrimaryType(typeLine: string): string {
+    const types = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Battle'];
+    
+    for (const type of types) {
+      if (typeLine.includes(type)) {
+        return type;
+      }
+    }
+    
+    return 'Other';
   }
 
   private async importCSV(): Promise<void> {
@@ -803,11 +959,142 @@ export class CollectionTab extends BaseComponent {
     }
   }
 
+  // Enhanced loading method with better UX
+  async loadCollectionData(): Promise<void> {
+    try {
+      console.log('Loading collection data...');
+      
+      // Show loading state
+      const grid = this.element.querySelector('#collection-grid');
+      if (grid) {
+        grid.innerHTML = `
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading your collection...</p>
+          </div>
+        `;
+      }
+
+      // Load from storage
+      const savedCollection = await window.electronAPI?.store.get('collection');
+      
+      if (savedCollection && savedCollection.cards) {
+        console.log(`Loaded ${savedCollection.cards.length} cards from storage`);
+        this.setCollection(savedCollection);
+      } else {
+        console.log('No existing collection found, creating sample data for testing');
+        const sampleCollection = this.createSampleCollection();
+        this.setCollection(sampleCollection);
+        // Save the sample data
+        await this.saveCollection();
+      }
+      
+    } catch (error) {
+      console.error('Error loading collection data:', error);
+      
+      // Show error state
+      const grid = this.element.querySelector('#collection-grid');
+      if (grid) {
+        grid.innerHTML = `
+          <div class="error-state">
+            <p>⚠️ Error loading collection</p>
+            <button class="btn btn-secondary" onclick="window.decksmithApp?.components?.collection?.loadCollectionData?.();">
+              Retry
+            </button>
+          </div>
+        `;
+      }
+    }
+  }
+
   private async saveCollection(): Promise<void> {
     try {
+      this.collection.lastModified = new Date().toISOString();
       await window.electronAPI?.store.set('collection', this.collection);
+      console.log('Collection saved successfully');
     } catch (error) {
       console.error('Error saving collection:', error);
     }
+  }
+
+  // Create sample collection for testing/demonstration
+  private createSampleCollection(): Collection {
+    return {
+      cards: [
+        {
+          id: 'sample-1',
+          name: 'Lightning Bolt',
+          typeLine: 'Instant',
+          manaCost: '{R}',
+          colors: ['R'],
+          rarity: 'common',
+          quantity: 4
+        },
+        {
+          id: 'sample-2',
+          name: 'Counterspell',
+          typeLine: 'Instant',
+          manaCost: '{U}{U}',
+          colors: ['U'],
+          rarity: 'common',
+          quantity: 3
+        },
+        {
+          id: 'sample-3',
+          name: 'Black Lotus',
+          typeLine: 'Artifact',
+          manaCost: '{0}',
+          colors: [],
+          rarity: 'mythic',
+          quantity: 1
+        },
+        {
+          id: 'sample-4',
+          name: 'Serra Angel',
+          typeLine: 'Creature — Angel',
+          manaCost: '{3}{W}{W}',
+          colors: ['W'],
+          rarity: 'uncommon',
+          quantity: 2
+        },
+        {
+          id: 'sample-5',
+          name: 'Forest',
+          typeLine: 'Basic Land — Forest',
+          manaCost: '',
+          colors: [],
+          rarity: 'common',
+          quantity: 10
+        },
+        {
+          id: 'sample-6',
+          name: 'Jace, the Mind Sculptor',
+          typeLine: 'Legendary Planeswalker — Jace',
+          manaCost: '{2}{U}{U}',
+          colors: ['U'],
+          rarity: 'mythic',
+          quantity: 1
+        },
+        {
+          id: 'sample-7',
+          name: 'Sol Ring',
+          typeLine: 'Artifact',
+          manaCost: '{1}',
+          colors: [],
+          rarity: 'uncommon',
+          quantity: 1
+        },
+        {
+          id: 'sample-8',
+          name: 'Llanowar Elves',
+          typeLine: 'Creature — Elf Druid',
+          manaCost: '{G}',
+          colors: ['G'],
+          rarity: 'common',
+          quantity: 4
+        }
+      ],
+      lastModified: new Date().toISOString()
+    };
   }
 }

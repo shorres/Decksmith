@@ -48,15 +48,14 @@ class DecksmithApp {
     this.decksTab.initialize();
     this.aiTab.initialize();
     
-    // Pass data to components
-    this.collectionTab.setCollection(this.collection);
+    // Load collection data asynchronously
+    this.collectionTab.loadCollectionData();
+    
+    // Pass data to other components
     this.decksTab.setDecks(this.decks);
     this.aiTab.setDecks(this.decks);
     
-    // Render the active tab content
-    console.log('Rendering collection tab...');
-    this.collectionTab.render();
-    console.log('Components initialized and rendered');
+    console.log('Components initialized');
   }
 
   private async setupEventListeners(): Promise<void> {
