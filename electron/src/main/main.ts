@@ -233,6 +233,11 @@ class DecksmithApp {
       return app.getName();
     });
 
+    // Shell operations
+    ipcMain.handle('shell:openExternal', async (event, url) => {
+      await shell.openExternal(url);
+    });
+
   }
 
   private sendToRenderer(channel: string, ...args: any[]): void {

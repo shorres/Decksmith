@@ -1,13 +1,16 @@
 import { BaseComponent } from './BaseComponent';
+import { CardDetailsModal } from './CardDetailsModal';
 import type { Card, Collection } from '../types';
 
 export class CollectionTab extends BaseComponent {
   private collection: Collection = { cards: [], lastModified: new Date().toISOString() };
   private filteredCards: Card[] = [];
   private searchTimeout: number = 0;
+  private cardModal: CardDetailsModal;
 
   constructor() {
     super('#collection-tab');
+    this.cardModal = new CardDetailsModal();
   }
 
   initialize(): void {
@@ -369,9 +372,8 @@ export class CollectionTab extends BaseComponent {
 
     console.log('Showing card details for:', card.name);
     
-    // This will be enhanced later - for now just log
-    // In the future, this could open a detailed modal or sidebar
-    // that could be useful for deck building and AI recommendations
+    // Open the card details modal
+    this.cardModal.show(card.name);
   }
 
   private updateStats(): void {

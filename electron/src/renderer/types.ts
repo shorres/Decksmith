@@ -17,6 +17,9 @@ export interface Card {
   collectorNumber?: string;
   imageUri?: string;
   scryfallId?: string;
+  scryfallUri?: string;
+  legalities?: { [format: string]: string };
+  prices?: { [type: string]: string };
   quantity?: number;
 }
 

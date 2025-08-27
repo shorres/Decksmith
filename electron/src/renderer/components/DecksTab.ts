@@ -1,13 +1,16 @@
 import { BaseComponent } from './BaseComponent';
+import { CardDetailsModal } from './CardDetailsModal';
 import type { Deck, DeckCard, Card, Collection } from '../types';
 
 export class DecksTab extends BaseComponent {
   private decks: Deck[] = [];
   private selectedDeck: Deck | null = null;
   private collection: Collection = { cards: [], lastModified: new Date().toISOString() };
+  private cardModal: CardDetailsModal;
 
   constructor() {
     super('#decks-tab');
+    this.cardModal = new CardDetailsModal();
   }
 
   initialize(): void {
@@ -230,7 +233,7 @@ export class DecksTab extends BaseComponent {
     }
   }
 
-  addCardToMainboard(): void {
+  async addCardToMainboard(): Promise<void> {
     const input = this.element.querySelector('#add-card-input') as HTMLInputElement;
     const qtyInput = this.element.querySelector('#add-card-qty') as HTMLInputElement;
     
@@ -241,12 +244,12 @@ export class DecksTab extends BaseComponent {
     
     if (!cardName) return;
     
-    this.addCardToDeck(cardName, quantity, false);
+    await this.addCardToDeck(cardName, quantity, false);
     input.value = '';
     qtyInput.value = '1';
   }
 
-  addCardToSideboard(): void {
+  async addCardToSideboard(): Promise<void> {
     const input = this.element.querySelector('#add-card-input-sb') as HTMLInputElement;
     const qtyInput = this.element.querySelector('#add-card-qty-sb') as HTMLInputElement;
     
@@ -257,7 +260,7 @@ export class DecksTab extends BaseComponent {
     
     if (!cardName) return;
     
-    this.addCardToDeck(cardName, quantity, true);
+    await this.addCardToDeck(cardName, quantity, true);
     input.value = '';
     qtyInput.value = '1';
   }
@@ -301,9 +304,7 @@ export class DecksTab extends BaseComponent {
   }
 
   showCardDetails(cardName: string): void {
-    // Open card details modal (similar to CollectionTab)
-    console.log(`Show details for ${cardName}`);
-    // TODO: Implement card details modal
+    this.cardModal.show(cardName);
   }
 
   clearDeckSelection(): void {
@@ -616,7 +617,7 @@ export class DecksTab extends BaseComponent {
     }
   }
 
-  private addCardToDeck(cardName: string, quantity: number, isSideboard: boolean): void {
+  private async addCardToDeck(cardName: string, quantity: number, isSideboard: boolean): Promise<void> {
     if (!this.selectedDeck) return;
     
     const section = isSideboard ? this.selectedDeck.sideboard : this.selectedDeck.mainboard;
@@ -625,20 +626,93 @@ export class DecksTab extends BaseComponent {
     if (existingCard) {
       existingCard.quantity += quantity;
     } else {
-      const newCard: DeckCard = {
-        id: `${cardName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
-        name: cardName,
-        quantity: quantity,
-        typeLine: 'Unknown',
-        manaCost: '',
-        colors: []
-      };
-      section.push(newCard);
+      // Fetch real card data from Scryfall
+      try {
+        const cardData = await this.fetchCardData(cardName);
+        if (cardData) {
+          const newCard: DeckCard = {
+            id: cardData.id,
+            name: cardData.name,
+            quantity: quantity,
+            typeLine: cardData.typeLine || 'Unknown',
+            manaCost: cardData.manaCost || '',
+            colors: cardData.colors || [],
+            cmc: cardData.cmc || 0,
+            rarity: cardData.rarity || 'common',
+            power: cardData.power,
+            toughness: cardData.toughness,
+            imageUri: cardData.imageUri,
+            scryfallId: cardData.scryfallId
+          };
+          section.push(newCard);
+        } else {
+          // Fallback if card not found
+          const newCard: DeckCard = {
+            id: `${cardName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
+            name: cardName,
+            quantity: quantity,
+            typeLine: 'Unknown',
+            manaCost: '',
+            colors: []
+          };
+          section.push(newCard);
+        }
+      } catch (error) {
+        console.error('Error fetching card data:', error);
+        // Fallback card
+        const newCard: DeckCard = {
+          id: `${cardName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
+          name: cardName,
+          quantity: quantity,
+          typeLine: 'Unknown',
+          manaCost: '',
+          colors: []
+        };
+        section.push(newCard);
+      }
     }
     
     this.selectedDeck.lastModified = new Date().toISOString();
     this.renderDeckEditor();
     this.saveDecks();
+  }
+
+  private async fetchCardData(cardName: string): Promise<Card | null> {
+    try {
+      const encodedName = encodeURIComponent(cardName);
+      const response = await fetch(`https://api.scryfall.com/cards/named?exact=${encodedName}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      return {
+        id: data.id,
+        name: data.name,
+        manaCost: data.mana_cost || '',
+        cmc: data.cmc || 0,
+        typeLine: data.type_line || '',
+        oracleText: data.oracle_text || '',
+        colors: data.colors || [],
+        colorIdentity: data.color_identity || [],
+        power: data.power || '',
+        toughness: data.toughness || '',
+        rarity: data.rarity || '',
+        setCode: data.set || '',
+        setName: data.set_name || '',
+        collectorNumber: data.collector_number || '',
+        imageUri: data.image_uris?.normal || data.image_uris?.large || '',
+        scryfallId: data.id,
+        scryfallUri: data.scryfall_uri || '',
+        legalities: data.legalities || {},
+        prices: data.prices || {}
+      };
+    } catch (error) {
+      console.error('Error fetching from Scryfall:', error);
+      return null;
+    }
   }
 
   private showImportDialog(fromClipboard: boolean = false): void {

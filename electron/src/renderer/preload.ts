@@ -18,6 +18,11 @@ const electronAPI = {
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   getAppName: () => ipcRenderer.invoke('app:getName'),
 
+  // Shell operations
+  shell: {
+    openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
+  },
+
   // Menu events (from main process)
   onMenuAction: (callback: (action: string) => void) => {
     const handler = (event: any, action: string) => callback(action);
