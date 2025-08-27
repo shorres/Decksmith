@@ -3,10 +3,14 @@ export abstract class BaseComponent {
   protected isInitialized = false;
 
   constructor(protected selector: string) {
+    console.log(`BaseComponent: Looking for element with selector: ${selector}`);
     const element = document.querySelector(selector);
     if (!element) {
+      console.error(`BaseComponent: Element with selector "${selector}" not found`);
+      console.log('Available elements:', document.querySelectorAll('*[id]'));
       throw new Error(`Element with selector "${selector}" not found`);
     }
+    console.log(`BaseComponent: Found element for ${selector}:`, element);
     this.element = element as HTMLElement;
   }
 

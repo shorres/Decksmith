@@ -47,9 +47,18 @@ class DecksmithApp {
 
   private async init(): Promise<void> {
     await this.loadData();
+    this.hideModalAtStartup(); // Ensure modal is hidden
     this.initializeComponents();
     this.setupEventListeners();
     this.updateUI();
+  }
+
+  private hideModalAtStartup(): void {
+    const modal = document.getElementById('modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      console.log('Modal hidden at startup');
+    }
   }
 
   private initializeComponents(): void {
@@ -114,7 +123,7 @@ class DecksmithApp {
       this.closeModal();
     });
 
-    document.getElementById('modal-overlay')?.addEventListener('click', (e) => {
+    document.getElementById('modal')?.addEventListener('click', (e) => {
       if (e.target === e.currentTarget) {
         this.closeModal();
       }
@@ -313,7 +322,7 @@ class DecksmithApp {
   }
 
   private closeModal(): void {
-    const modal = document.getElementById('modal-overlay');
+    const modal = document.getElementById('modal');
     if (modal) {
       modal.classList.add('hidden');
     }
@@ -372,7 +381,7 @@ class DecksmithApp {
   }
 
   private showAbout(): void {
-    const modal = document.getElementById('modal-overlay');
+    const modal = document.getElementById('modal');
     const title = document.getElementById('modal-title');
     const body = document.getElementById('modal-body');
 

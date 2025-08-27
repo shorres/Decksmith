@@ -15,7 +15,7 @@ export class DecksTab extends BaseComponent {
   }
 
   initialize(): void {
-    if (this.isInitialized) return;
+    if (this.initialized) return;
     
     this.render();
     this.setupEventListeners();

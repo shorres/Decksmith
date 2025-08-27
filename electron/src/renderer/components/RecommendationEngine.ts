@@ -221,7 +221,11 @@ export class RecommendationEngine {
     }
   }
 
-  private scryfallToRecommendation(scryfallCard: any, confidence: number = 75): SmartRecommendation {
+  private scryfallToRecommendation(
+    scryfallCard: any, 
+    confidence: number = 75, 
+    deckAnalysis?: DeckAnalysis
+  ): SmartRecommendation {
     const colors = scryfallCard.colors || [];
     const cmc = scryfallCard.cmc || 0;
     
@@ -231,11 +235,11 @@ export class RecommendationEngine {
       cardType: scryfallCard.type_line || 'Unknown',
       rarity: scryfallCard.rarity || 'common',
       confidence: confidence,
-      synergyScore: this.calculateSynergyScore(scryfallCard),
+      synergyScore: this.calculateSynergyScore(scryfallCard, deckAnalysis),
       metaScore: this.calculateMetaScore(scryfallCard),
-      deckFit: this.calculateDeckFit(scryfallCard),
+      deckFit: this.calculateDeckFit(scryfallCard, deckAnalysis),
       costConsideration: this.getCostConsideration(scryfallCard.rarity || 'common'),
-      reasons: this.generateReasons(scryfallCard),
+      reasons: this.generateReasons(scryfallCard, deckAnalysis),
       cmc: cmc,
       legality: scryfallCard.legalities || {},
       oracleText: scryfallCard.oracle_text || '',
@@ -245,19 +249,66 @@ export class RecommendationEngine {
     };
   }
 
-  private calculateSynergyScore(scryfallCard: any): number {
-    // Base synergy calculation - can be enhanced based on deck analysis
-    let score = 50;
+  private calculateSynergyScore(scryfallCard: any, deckAnalysis?: DeckAnalysis): number {
+    // Context-aware synergy calculation
+    let score = 40; // Lower base score, earn through synergies
     
-    if (scryfallCard.oracle_text) {
-      const text = scryfallCard.oracle_text.toLowerCase();
-      if (text.includes('draw')) score += 10;
-      if (text.includes('search')) score += 15;
-      if (text.includes('enters the battlefield')) score += 12;
-      if (text.includes('flying') || text.includes('trample')) score += 8;
+    if (!deckAnalysis) {
+      // Fallback to deterministic scoring without context
+      return this.getStableCardScore(scryfallCard, 'synergy');
     }
     
-    return Math.min(100, score);
+    const oracleText = scryfallCard.oracle_text?.toLowerCase() || '';
+    const cardName = scryfallCard.name?.toLowerCase() || '';
+    const typeLine = scryfallCard.type_line?.toLowerCase() || '';
+    
+    // Keyword synergies with deck
+    deckAnalysis.keywords.forEach(deckKeyword => {
+      if (oracleText.includes(deckKeyword.toLowerCase())) {
+        score += 20;
+      }
+    });
+    
+    // Theme synergies
+    deckAnalysis.themes.forEach(theme => {
+      const themeWords = theme.toLowerCase().split(' ');
+      themeWords.forEach(word => {
+        if (cardName.includes(word) || oracleText.includes(word) || typeLine.includes(word)) {
+          score += 15;
+        }
+      });
+    });
+    
+    // Archetype-specific synergies
+    if (deckAnalysis.archetype === 'aggro') {
+      if (oracleText.includes('haste')) score += 25;
+      if (oracleText.includes('double strike') || oracleText.includes('first strike')) score += 20;
+      if (oracleText.includes('trample') || oracleText.includes('menace')) score += 15;
+      if (scryfallCard.cmc <= 2 && typeLine.includes('creature')) score += 10;
+    } else if (deckAnalysis.archetype === 'control') {
+      if (oracleText.includes('counter target spell')) score += 30;
+      if (oracleText.includes('draw') && oracleText.includes('card')) score += 20;
+      if (oracleText.includes('destroy') || oracleText.includes('exile')) score += 15;
+      if (oracleText.includes('flash')) score += 10;
+    } else if (deckAnalysis.archetype === 'combo') {
+      if (oracleText.includes('search your library')) score += 25;
+      if (oracleText.includes('enters the battlefield')) score += 20;
+      if (oracleText.includes('sacrifice') || oracleText.includes('activate')) score += 15;
+    }
+    
+    // Color synergy
+    const cardColors = scryfallCard.colors || [];
+    const colorSynergy = cardColors.some((color: string) => 
+      deckAnalysis.primaryColors.includes(this.convertScryfallColor(color))
+    );
+    if (colorSynergy) score += 10;
+    
+    // General powerful effects
+    if (oracleText.includes('draw')) score += 8;
+    if (oracleText.includes('search')) score += 12;
+    if (oracleText.includes('enters the battlefield')) score += 8;
+    
+    return Math.min(100, Math.max(0, score));
   }
 
   private calculateMetaScore(scryfallCard: any): number {
@@ -272,33 +323,146 @@ export class RecommendationEngine {
     return Math.min(100, score);
   }
 
-  private calculateDeckFit(scryfallCard: any): number {
-    // Basic deck fit calculation - can be enhanced with deck analysis context
-    return 70 + Math.floor(Math.random() * 30);
-  }
-
-  private generateReasons(scryfallCard: any): string[] {
-    const reasons: string[] = [];
+  private calculateDeckFit(scryfallCard: any, deckAnalysis?: DeckAnalysis): number {
+    // Deterministic deck fit calculation based on card and deck characteristics
+    let score = 50; // Base score
     
-    if (scryfallCard.oracle_text) {
-      const text = scryfallCard.oracle_text.toLowerCase();
-      if (text.includes('draw')) reasons.push('Provides card advantage');
-      if (text.includes('search')) reasons.push('Tutoring effect for consistency');
-      if (text.includes('enters the battlefield')) reasons.push('Immediate board impact');
-      if (text.includes('flying')) reasons.push('Evasive threat');
-      if (text.includes('haste')) reasons.push('Immediate pressure');
+    if (!deckAnalysis) {
+      // Fallback scoring without deck context
+      return this.getStableCardScore(scryfallCard, 'deckFit');
     }
     
-    if (scryfallCard.cmc <= 2) reasons.push('Low mana cost for early game');
-    if (scryfallCard.rarity === 'mythic' || scryfallCard.rarity === 'rare') {
-      reasons.push('Powerful rare effect');
+    // Color compatibility (major factor)
+    const cardColors = scryfallCard.colors || [];
+    if (cardColors.length === 0) {
+      // Colorless cards are generally compatible
+      score += 15;
+    } else {
+      const colorMatch = cardColors.some((color: any) => 
+        deckAnalysis.primaryColors.includes(this.convertScryfallColor(color))
+      );
+      if (colorMatch) score += 25;
+      else score -= 20; // Significant penalty for off-colors
+    }
+    
+    // Mana curve fit
+    const cardCmc = scryfallCard.cmc || 0;
+    const deckCurveTotal = Object.values(deckAnalysis.curve).reduce((a, b) => a + b, 0);
+    if (deckCurveTotal > 0) {
+      const currentCmcPercent = (deckAnalysis.curve[cardCmc] || 0) / deckCurveTotal;
+      if (currentCmcPercent < 0.3) score += 15; // Fill gaps in curve
+      else if (currentCmcPercent > 0.4) score -= 10; // Don't over-saturate CMC slots
+    }
+    
+    // Archetype alignment
+    const cardType = scryfallCard.type_line?.toLowerCase() || '';
+    const oracleText = scryfallCard.oracle_text?.toLowerCase() || '';
+    
+    if (deckAnalysis.archetype === 'aggro') {
+      if (cardCmc <= 3) score += 20;
+      if (oracleText.includes('haste') || oracleText.includes('trample')) score += 15;
+      if (cardType.includes('creature') && cardCmc <= 2) score += 10;
+    } else if (deckAnalysis.archetype === 'control') {
+      if (cardCmc >= 4) score += 10;
+      if (oracleText.includes('counter') || oracleText.includes('destroy')) score += 20;
+      if (oracleText.includes('draw') || oracleText.includes('scry')) score += 15;
+    } else if (deckAnalysis.archetype === 'midrange') {
+      if (cardCmc >= 2 && cardCmc <= 5) score += 15;
+      if (cardType.includes('creature') && (scryfallCard.power >= 3 || scryfallCard.toughness >= 3)) score += 10;
+    }
+    
+    // Theme synergy
+    const cardName = scryfallCard.name?.toLowerCase() || '';
+    deckAnalysis.themes.forEach(theme => {
+      if (cardName.includes(theme.toLowerCase()) || oracleText.includes(theme.toLowerCase())) {
+        score += 15;
+      }
+    });
+    
+    return Math.min(100, Math.max(0, score));
+  }
+
+  private generateReasons(scryfallCard: any, deckAnalysis?: DeckAnalysis): string[] {
+    const reasons: string[] = [];
+    
+    if (!deckAnalysis) {
+      // Fallback generic reasons
+      if (scryfallCard.oracle_text) {
+        const text = scryfallCard.oracle_text.toLowerCase();
+        if (text.includes('draw')) reasons.push('Provides card advantage');
+        if (text.includes('search')) reasons.push('Tutoring effect for consistency');
+        if (text.includes('enters the battlefield')) reasons.push('Immediate board impact');
+      }
+      if (scryfallCard.cmc <= 2) reasons.push('Low mana cost for early game');
+      if (reasons.length === 0) reasons.push('Solid card for the format');
+      return reasons;
+    }
+    
+    const oracleText = scryfallCard.oracle_text?.toLowerCase() || '';
+    const cardName = scryfallCard.name?.toLowerCase() || '';
+    const typeLine = scryfallCard.type_line?.toLowerCase() || '';
+    const cmc = scryfallCard.cmc || 0;
+    
+    // Color compatibility reasons
+    const cardColors = scryfallCard.colors || [];
+    if (cardColors.length > 0) {
+      const colorMatch = cardColors.some((color: any) => 
+        deckAnalysis.primaryColors.includes(this.convertScryfallColor(color))
+      );
+      if (colorMatch) {
+        reasons.push(`Fits ${deckAnalysis.primaryColors.join('/')} color identity`);
+      }
+    } else {
+      reasons.push('Colorless - fits any deck');
+    }
+    
+    // Archetype-specific reasons
+    if (deckAnalysis.archetype === 'aggro') {
+      if (cmc <= 3) reasons.push('Low cost supports aggressive strategy');
+      if (oracleText.includes('haste')) reasons.push('Haste enables immediate pressure');
+      if (oracleText.includes('trample') || oracleText.includes('menace')) reasons.push('Evasion breaks through defenses');
+    } else if (deckAnalysis.archetype === 'control') {
+      if (oracleText.includes('counter')) reasons.push('Counterspell supports control plan');
+      if (oracleText.includes('draw')) reasons.push('Card advantage for late game');
+      if (oracleText.includes('destroy') || oracleText.includes('exile')) reasons.push('Removal maintains board control');
+    } else if (deckAnalysis.archetype === 'combo') {
+      if (oracleText.includes('search')) reasons.push('Tutoring supports combo consistency');
+      if (oracleText.includes('enters the battlefield')) reasons.push('ETB triggers enable combo lines');
+    }
+    
+    // Curve reasons
+    const totalCards = Object.values(deckAnalysis.curve).reduce((a, b) => a + b, 0);
+    if (totalCards > 0) {
+      const cmcPercent = (deckAnalysis.curve[cmc] || 0) / totalCards;
+      if (cmcPercent < 0.2) reasons.push(`Fills gap in ${cmc}-cost slot`);
+    }
+    
+    // Theme synergies
+    let themeMatches = 0;
+    deckAnalysis.themes.forEach(theme => {
+      if (cardName.includes(theme.toLowerCase()) || oracleText.includes(theme.toLowerCase())) {
+        reasons.push(`Synergizes with ${theme} theme`);
+        themeMatches++;
+      }
+    });
+    
+    // Keyword synergies
+    deckAnalysis.keywords.forEach(keyword => {
+      if (oracleText.includes(keyword.toLowerCase())) {
+        reasons.push(`Shares ${keyword} with deck cards`);
+      }
+    });
+    
+    // Generic powerful effects
+    if (oracleText.includes('draw') && !reasons.some(r => r.includes('advantage'))) {
+      reasons.push('Provides card advantage');
     }
     
     if (reasons.length === 0) {
-      reasons.push('Solid card for the format');
+      reasons.push(`Good fit for ${deckAnalysis.archetype} strategy`);
     }
     
-    return reasons;
+    return reasons.slice(0, 4); // Limit to 4 most relevant reasons
   }
 
   private extractKeywordsFromText(oracleText: string): string[] {
@@ -447,13 +611,13 @@ export class RecommendationEngine {
 
     // 1. Get format staples
     const stapleRecs = await this.getFormatStaplesRecommendations(
-      formatName, deckAnalysis.colors, currentCards, stapleCount
+      formatName, deckAnalysis.colors, currentCards, stapleCount, deckAnalysis
     );
     recommendations.push(...stapleRecs);
 
     // 2. Get archetype-specific cards
     const archetypeRecs = await this.getArchetypeRecommendations(
-      deckAnalysis.archetype, deckAnalysis.colors, currentCards, formatName, archetypeCount
+      deckAnalysis.archetype, deckAnalysis.colors, currentCards, formatName, archetypeCount, deckAnalysis
     );
     recommendations.push(...archetypeRecs);
 
@@ -465,7 +629,7 @@ export class RecommendationEngine {
 
     // 4. Fill mana curve gaps
     const curveRecs = await this.getCurveRecommendations(
-      deckAnalysis.curve, deckAnalysis.colors, currentCards, formatName, curveCount
+      deckAnalysis.curve, deckAnalysis.colors, currentCards, formatName, curveCount, deckAnalysis
     );
     recommendations.push(...curveRecs);
 
@@ -520,7 +684,7 @@ export class RecommendationEngine {
     });
 
     const stapleRecs = await this.getFormatStaplesRecommendations(
-      formatName, deckAnalysis.colors, currentCards, stapleCount
+      formatName, deckAnalysis.colors, currentCards, stapleCount, deckAnalysis
     );
     recommendations.push(...stapleRecs);
     
@@ -533,7 +697,7 @@ export class RecommendationEngine {
 
     // Phase 2: Archetype cards
     const archetypeRecs = await this.getArchetypeRecommendations(
-      deckAnalysis.archetype, deckAnalysis.colors, currentCards, formatName, archetypeCount
+      deckAnalysis.archetype, deckAnalysis.colors, currentCards, formatName, archetypeCount, deckAnalysis
     );
     recommendations.push(...archetypeRecs);
 
@@ -559,7 +723,7 @@ export class RecommendationEngine {
 
     // Phase 4: Curve fillers
     const curveRecs = await this.getCurveRecommendations(
-      deckAnalysis.curve, deckAnalysis.colors, currentCards, formatName, curveCount
+      deckAnalysis.curve, deckAnalysis.colors, currentCards, formatName, curveCount, deckAnalysis
     );
     recommendations.push(...curveRecs);
 
@@ -792,7 +956,8 @@ export class RecommendationEngine {
     formatName: string,
     colors: string[],
     currentCards: Set<string>,
-    limit: number
+    limit: number,
+    deckAnalysis?: DeckAnalysis
   ): Promise<SmartRecommendation[]> {
     const recommendations: SmartRecommendation[] = [];
     
@@ -818,7 +983,7 @@ export class RecommendationEngine {
         if (currentCards.has(card.name.toLowerCase())) continue;
         if (recommendations.length >= limit) break;
         
-        const recommendation = this.scryfallToRecommendation(card, 85);
+        const recommendation = this.scryfallToRecommendation(card, 85, deckAnalysis);
         recommendation.reasons = [
           `Popular ${formatName} staple`,
           'High play rate in competitive decks',
@@ -842,7 +1007,8 @@ export class RecommendationEngine {
     colors: string[],
     currentCards: Set<string>,
     formatName: string,
-    limit: number
+    limit: number,
+    deckAnalysis?: DeckAnalysis
   ): Promise<SmartRecommendation[]> {
     const recommendations: SmartRecommendation[] = [];
     
@@ -877,7 +1043,7 @@ export class RecommendationEngine {
           if (currentCards.has(card.name.toLowerCase())) continue;
           if (recommendations.length >= limit) break;
           
-          const recommendation = this.scryfallToRecommendation(card, 80);
+          const recommendation = this.scryfallToRecommendation(card, 80, deckAnalysis);
           recommendation.reasons = [
             `Perfect fit for ${archetype} strategy`,
             `Matches your deck's archetype pattern`,
@@ -962,7 +1128,7 @@ export class RecommendationEngine {
           if (currentCards.has(card.name.toLowerCase())) continue;
           if (recommendations.length >= limit) break;
           
-          const recommendation = this.scryfallToRecommendation(card, 75);
+          const recommendation = this.scryfallToRecommendation(card, 75, deckAnalysis);
           recommendation.reasons = [
             `Strong ${theme} synergy`,
             `Enhances your deck's theme`,
@@ -987,7 +1153,8 @@ export class RecommendationEngine {
     colors: string[],
     currentCards: Set<string>,
     formatName: string,
-    limit: number
+    limit: number,
+    deckAnalysis?: DeckAnalysis
   ): Promise<SmartRecommendation[]> {
     const recommendations: SmartRecommendation[] = [];
     
@@ -1032,13 +1199,12 @@ export class RecommendationEngine {
           if (currentCards.has(card.name.toLowerCase())) continue;
           if (recommendations.length >= limit) break;
           
-          const recommendation = this.scryfallToRecommendation(card, 70);
+          const recommendation = this.scryfallToRecommendation(card, 70, deckAnalysis);
           recommendation.reasons = [
             `Fills mana curve gap at ${gapCmc} CMC`,
             `Improves deck's tempo consistency`,
             ...recommendation.reasons.slice(0, 1)
           ];
-          recommendation.deckFit = 85;
           
           recommendations.push(recommendation);
         }
@@ -1081,6 +1247,41 @@ export class RecommendationEngine {
       case 'mythic': case 'mythic rare': return 'mythic_craft';
       default: return 'common_craft';
     }
+  }
+
+  /**
+   * Helper methods for deterministic scoring
+   */
+  private getStableCardScore(card: any, scoreType: string): number {
+    // Create a deterministic score based on card characteristics
+    const cardName = card.name || '';
+    const cmc = card.cmc || 0;
+    const colors = (card.colors || []).join('');
+    const rarity = card.rarity || 'common';
+    
+    // Create a simple hash from card characteristics
+    let hash = 0;
+    const str = `${cardName}${cmc}${colors}${rarity}${scoreType}`;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    // Convert hash to a score between 60-90
+    return 60 + Math.abs(hash % 31);
+  }
+
+  private convertScryfallColor(scryfallColor: string): string {
+    // Convert Scryfall color codes to our format
+    const colorMap: { [key: string]: string } = {
+      'W': 'white',
+      'U': 'blue', 
+      'B': 'black',
+      'R': 'red',
+      'G': 'green'
+    };
+    return colorMap[scryfallColor] || scryfallColor.toLowerCase();
   }
 
   private deduplicateAndRank(recommendations: SmartRecommendation[]): SmartRecommendation[] {
