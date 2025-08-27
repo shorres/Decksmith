@@ -11,11 +11,16 @@ export class AIRecommendationsTab extends BaseComponent {
   private recommendationEngine: RecommendationEngine;
   private collection: any = null; // Will be set by parent
   private availableDecks: Deck[] = []; // Store available decks
+  private cardDetailsModal: any = null; // Will be imported when needed
   
   // Pagination/infinite scroll properties
   private displayedCount = 20; // Start with 20 cards
   private readonly loadMoreIncrement = 20; // Load 20 more each time
   private isLoadingMore = false;
+  
+  // Display mode
+  private compactMode = true; // Start in compact mode
+  private expandedCards = new Set<string>(); // Track expanded cards
 
   constructor() {
     super('#ai-recommendations-tab');
@@ -108,6 +113,16 @@ export class AIRecommendationsTab extends BaseComponent {
                     <option value="instant">Instant</option>
                     <option value="sorcery">Sorcery</option>
                   </select>
+                  <div class="display-mode-controls">
+                    <label>
+                      <input type="radio" name="display-mode" value="compact" id="compact-mode" checked />
+                      Compact
+                    </label>
+                    <label>
+                      <input type="radio" name="display-mode" value="detailed" id="detailed-mode" />
+                      Detailed  
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -143,6 +158,18 @@ export class AIRecommendationsTab extends BaseComponent {
     // Filter controls
     this.bindEvent('#show-lands', 'change', () => this.filterRecommendations());
     this.bindEvent('#card-type-filter', 'change', () => this.filterRecommendations());
+    
+    // Display mode controls - use direct event listeners for radio buttons
+    const displayModeRadios = this.element.querySelectorAll('input[name="display-mode"]');
+    displayModeRadios.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        if (target.checked) {
+          this.compactMode = target.value === 'compact';
+          this.renderRecommendations();
+        }
+      });
+    });
     
     const confidenceSlider = this.element.querySelector('#confidence-slider') as HTMLInputElement;
     confidenceSlider?.addEventListener('input', () => {
@@ -574,40 +601,8 @@ export class AIRecommendationsTab extends BaseComponent {
         <p><strong>Showing: ${displayRecs.length} of ${this.filteredRecommendations.length} recommendations</strong></p>
         <p><small>${ownedCount} owned • ${landCount} lands • Prioritizing owned cards</small></p>
       </div>
-      <div class="recommendations-grid" id="recommendations-grid">
-        ${displayRecs.map(rec => `
-          <div class="recommendation-item ${rec.costConsideration === 'owned' ? 'owned' : ''}">
-            <div class="rec-header">
-              <div class="rec-confidence">
-                <span class="confidence-badge">${rec.confidence.toFixed(1)}%</span>
-                <span class="synergy-score">Synergy: ${rec.synergyScore.toFixed(1)}%</span>
-                <span class="cmc-badge">CMC: ${rec.cmc}</span>
-              </div>
-            </div>
-            <div class="rec-card-info">
-              <h4 class="card-name">${rec.cardName} ${rec.costConsideration === 'owned' ? '✅' : ''}</h4>
-              <p class="card-type">${rec.cardType}</p>
-              <p class="card-cost">${rec.manaCost} • ${rec.rarity}</p>
-              <p class="card-scores">Meta: ${rec.metaScore.toFixed(1)}% • Fit: ${rec.deckFit.toFixed(1)}%</p>
-            </div>
-            <div class="rec-reasons">
-              <h5>Reasons/Notes</h5>
-              <ul>
-                ${rec.reasons.slice(0, 3).map(reason => `<li>${reason}</li>`).join('')}
-                ${rec.reasons.length > 3 ? `<li class="more-reasons">+${rec.reasons.length - 3} more reasons...</li>` : ''}
-              </ul>
-            </div>
-            <div class="rec-actions">
-              <button class="btn btn-sm btn-secondary" onclick="this.closest('.recommendation-item').dispatchEvent(new CustomEvent('view-details', { bubbles: true, detail: { cardName: '${rec.cardName}' } }))">
-                View Details
-              </button>
-              ${rec.costConsideration === 'owned' ? 
-                '<button class="btn btn-sm btn-primary">Add to Deck</button>' : 
-                `<button class="btn btn-sm btn-outline" title="Craft ${rec.costConsideration.replace('_', ' ')}">${this.getCraftCost(rec.costConsideration)}</button>`
-              }
-            </div>
-          </div>
-        `).join('')}
+      <div class="recommendations-grid ${this.compactMode ? 'compact' : 'detailed'}" id="recommendations-grid">
+        ${displayRecs.map(rec => this.compactMode ? this.renderCompactCard(rec) : this.renderDetailedCard(rec)).join('')}
       </div>
       ${displayRecs.length < this.filteredRecommendations.length ? `
         <div class="load-more-section">
@@ -623,6 +618,159 @@ export class AIRecommendationsTab extends BaseComponent {
     if (displayRecs.length < this.filteredRecommendations.length) {
       this.setupInfiniteScroll();
     }
+    
+    // Setup event listeners (both modes need view details handling)
+    this.setupCompactModeListeners();
+  }
+
+  private renderCompactCard(rec: SmartRecommendation): string {
+    const isExpanded = this.expandedCards.has(rec.cardName);
+    const standardLegal = this.isStandardLegal(rec);
+    
+    return `
+      <div class="recommendation-item-compact ${rec.costConsideration === 'owned' ? 'owned' : ''}" 
+           data-card-name="${rec.cardName}">
+        <div class="rec-compact-header">
+          <div class="rec-compact-main">
+            <div class="card-name-compact">
+              ${rec.cardName} 
+              ${rec.costConsideration === 'owned' ? '✅' : ''}
+              ${standardLegal ? '<span class="standard-legal" title="Standard Legal">⚖️</span>' : ''}
+            </div>
+            <div class="card-type-compact">${rec.cardType}</div>
+          </div>
+          <div class="rec-compact-scores">
+            <span class="confidence-badge-compact">${rec.confidence.toFixed(0)}%</span>
+            <span class="synergy-score-compact">S:${rec.synergyScore.toFixed(0)}%</span>
+            <span class="cmc-badge-compact">${rec.manaCost || rec.cmc}</span>
+          </div>
+          <div class="expand-indicator ${isExpanded ? 'expanded' : ''}">${isExpanded ? '▼' : '▶'}</div>
+        </div>
+        
+        ${isExpanded ? `
+          <div class="rec-compact-details">
+            <div class="rec-details-scores">
+              <span class="score-detail">Meta: ${rec.metaScore.toFixed(1)}%</span>
+              <span class="score-detail">Fit: ${rec.deckFit.toFixed(1)}%</span>
+              <span class="score-detail">${rec.rarity}</span>
+            </div>
+            <div class="rec-details-reasons">
+              <h5>Key Reasons:</h5>
+              <ul>
+                ${rec.reasons.slice(0, 2).map(reason => `<li>${reason}</li>`).join('')}
+                ${rec.reasons.length > 2 ? `<li class="more-reasons-compact">+${rec.reasons.length - 2} more...</li>` : ''}
+              </ul>
+            </div>
+            <div class="rec-compact-actions">
+              <button class="btn btn-sm btn-secondary" data-action="view-details" data-card-name="${rec.cardName}">
+                View Details
+              </button>
+              ${rec.costConsideration === 'owned' ? 
+                '<button class="btn btn-sm btn-primary">Add to Deck</button>' : 
+                `<button class="btn btn-sm btn-outline" title="Craft ${rec.costConsideration.replace('_', ' ')}">${this.getCraftCost(rec.costConsideration)}</button>`
+              }
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  private renderDetailedCard(rec: SmartRecommendation): string {
+    const standardLegal = this.isStandardLegal(rec);
+    
+    return `
+      <div class="recommendation-item ${rec.costConsideration === 'owned' ? 'owned' : ''}">
+        <div class="rec-header">
+          <div class="rec-confidence">
+            <span class="confidence-badge">${rec.confidence.toFixed(1)}%</span>
+            <span class="synergy-score">Synergy: ${rec.synergyScore.toFixed(1)}%</span>
+            <span class="cmc-badge">CMC: ${rec.cmc}</span>
+            ${standardLegal ? '<span class="standard-badge" title="Standard Legal">⚖️ Standard</span>' : ''}
+          </div>
+        </div>
+        <div class="rec-card-info">
+          <h4 class="card-name">${rec.cardName} ${rec.costConsideration === 'owned' ? '✅' : ''}</h4>
+          <p class="card-type">${rec.cardType}</p>
+          <p class="card-cost">${rec.manaCost} • ${rec.rarity}</p>
+          <p class="card-scores">Meta: ${rec.metaScore.toFixed(1)}% • Fit: ${rec.deckFit.toFixed(1)}%</p>
+        </div>
+        <div class="rec-reasons">
+          <h5>Reasons/Notes</h5>
+          <ul>
+            ${rec.reasons.slice(0, 3).map(reason => `<li>${reason}</li>`).join('')}
+            ${rec.reasons.length > 3 ? `<li class="more-reasons">+${rec.reasons.length - 3} more reasons...</li>` : ''}
+          </ul>
+        </div>
+        <div class="rec-actions">
+          <button class="btn btn-sm btn-secondary" data-action="view-details" data-card-name="${rec.cardName}">
+            View Details
+          </button>
+          ${rec.costConsideration === 'owned' ? 
+            '<button class="btn btn-sm btn-primary">Add to Deck</button>' : 
+            `<button class="btn btn-sm btn-outline" title="Craft ${rec.costConsideration.replace('_', ' ')}">${this.getCraftCost(rec.costConsideration)}</button>`
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  private isStandardLegal(rec: SmartRecommendation): boolean {
+    // Check if the recommendation has legality info and is standard legal
+    return rec.legality?.standard === 'legal';
+  }
+
+  private setupCompactModeListeners(): void {
+    // Handle expand/collapse for compact mode only
+    if (this.compactMode) {
+      const expandHandlers = this.element.querySelectorAll('.rec-compact-header');
+      expandHandlers.forEach(header => {
+        header.addEventListener('click', (e) => {
+          const item = (e.currentTarget as HTMLElement).closest('.recommendation-item-compact');
+          if (!item) return;
+          
+          const cardName = item.getAttribute('data-card-name');
+          if (!cardName) return;
+          
+          if (this.expandedCards.has(cardName)) {
+            this.expandedCards.delete(cardName);
+          } else {
+            this.expandedCards.add(cardName);
+          }
+          this.renderRecommendations();
+        });
+      });
+    }
+
+    // Handle view details - use delegation for better performance (works for both modes)
+    // Remove any existing listeners to prevent duplicates
+    const existingHandler = (this as any)._viewDetailsHandler;
+    if (existingHandler) {
+      this.element.removeEventListener('click', existingHandler);
+    }
+    
+    const newHandler = (e: Event) => {
+      const button = (e.target as HTMLElement).closest('[data-action="view-details"]');
+      if (button) {
+        const cardName = button.getAttribute('data-card-name');
+        if (cardName) {
+          this.showCardDetails(cardName);
+        }
+      }
+    };
+    
+    (this as any)._viewDetailsHandler = newHandler;
+    this.element.addEventListener('click', newHandler);
+  }
+
+  private async showCardDetails(cardName: string): Promise<void> {
+    // Lazy load CardDetailsModal
+    if (!this.cardDetailsModal) {
+      const { CardDetailsModal } = await import('./CardDetailsModal');
+      this.cardDetailsModal = new CardDetailsModal();
+    }
+    
+    this.cardDetailsModal.show(cardName);
   }
 
   private getCraftCost(costConsideration: string): string {

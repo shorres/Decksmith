@@ -250,7 +250,7 @@ export class RecommendationEngine {
   }
 
   private calculateSynergyScore(scryfallCard: any, deckAnalysis?: DeckAnalysis): number {
-    // Context-aware synergy calculation
+    // Context-aware synergy calculation with enhanced granularity
     let score = 40; // Lower base score, earn through synergies
     
     if (!deckAnalysis) {
@@ -262,51 +262,125 @@ export class RecommendationEngine {
     const cardName = scryfallCard.name?.toLowerCase() || '';
     const typeLine = scryfallCard.type_line?.toLowerCase() || '';
     
-    // Keyword synergies with deck
+    // Keyword synergies with deck (more detailed scoring)
+    let keywordSynergyScore = 0;
     deckAnalysis.keywords.forEach(deckKeyword => {
       if (oracleText.includes(deckKeyword.toLowerCase())) {
-        score += 20;
+        keywordSynergyScore += 20;
+      }
+      // Partial keyword matches (prowess with spell-heavy decks, etc.)
+      if (deckKeyword === 'prowess' && (typeLine.includes('instant') || typeLine.includes('sorcery'))) {
+        keywordSynergyScore += 15;
+      }
+      if (deckKeyword === 'sacrifice' && oracleText.includes('dies')) {
+        keywordSynergyScore += 15;
       }
     });
+    score += Math.min(keywordSynergyScore, 40); // Cap keyword synergy
     
-    // Theme synergies
+    // Theme synergies with enhanced pattern matching
+    let themeSynergyScore = 0;
     deckAnalysis.themes.forEach(theme => {
-      const themeWords = theme.toLowerCase().split(' ');
+      const themeWords = theme.toLowerCase().split(/[_\s]+/);
       themeWords.forEach(word => {
-        if (cardName.includes(word) || oracleText.includes(word) || typeLine.includes(word)) {
-          score += 15;
+        if (word.length > 2) {
+          if (cardName.includes(word)) themeSynergyScore += 20; // Name match is strongest
+          else if (oracleText.includes(word)) themeSynergyScore += 15;
+          else if (typeLine.includes(word)) themeSynergyScore += 10;
         }
       });
     });
+    score += Math.min(themeSynergyScore, 35); // Cap theme synergy
     
-    // Archetype-specific synergies
+    // Tribal synergies (detailed creature type matching)
+    if (typeLine.includes('creature')) {
+      const creatureTypes = this.extractCreatureTypes(typeLine);
+      creatureTypes.forEach((type: string) => {
+        if (deckAnalysis.themes.some(theme => 
+          theme.toLowerCase().includes(type.toLowerCase()) ||
+          theme.toLowerCase().includes(type.toLowerCase() + 's') // plural
+        )) {
+          score += 25; // Strong tribal synergy
+        }
+      });
+    }
+    
+    // Archetype-specific synergies with more nuanced scoring
     if (deckAnalysis.archetype === 'aggro') {
       if (oracleText.includes('haste')) score += 25;
       if (oracleText.includes('double strike') || oracleText.includes('first strike')) score += 20;
       if (oracleText.includes('trample') || oracleText.includes('menace')) score += 15;
-      if (scryfallCard.cmc <= 2 && typeLine.includes('creature')) score += 10;
+      if (scryfallCard.cmc <= 2 && typeLine.includes('creature')) score += 15;
+      if (oracleText.includes('prowess') && oracleText.includes('instant')) score += 20;
+      // Burn synergy
+      if (oracleText.includes('damage') && oracleText.includes('target')) score += 18;
     } else if (deckAnalysis.archetype === 'control') {
       if (oracleText.includes('counter target spell')) score += 30;
       if (oracleText.includes('draw') && oracleText.includes('card')) score += 20;
       if (oracleText.includes('destroy') || oracleText.includes('exile')) score += 15;
-      if (oracleText.includes('flash')) score += 10;
+      if (oracleText.includes('flash')) score += 15;
+      if (oracleText.includes('scry') || oracleText.includes('surveil')) score += 12;
+      // Board wipe synergy
+      if (oracleText.includes('destroy all') || oracleText.includes('exile all')) score += 25;
     } else if (deckAnalysis.archetype === 'combo') {
       if (oracleText.includes('search your library')) score += 25;
       if (oracleText.includes('enters the battlefield')) score += 20;
       if (oracleText.includes('sacrifice') || oracleText.includes('activate')) score += 15;
+      if (oracleText.includes('untap') || oracleText.includes('tap')) score += 12;
+      // Combo protection
+      if (oracleText.includes('protection') || oracleText.includes('hexproof')) score += 18;
+    } else if (deckAnalysis.archetype === 'ramp') {
+      if (oracleText.includes('add') && oracleText.includes('mana')) score += 25;
+      if (oracleText.includes('search your library') && oracleText.includes('land')) score += 22;
+      if (scryfallCard.cmc >= 5 && typeLine.includes('creature')) score += 20;
+      if (oracleText.includes('landfall')) score += 18;
+    } else if (deckAnalysis.archetype === 'midrange') {
+      if (scryfallCard.cmc >= 2 && scryfallCard.cmc <= 5) score += 15;
+      if (oracleText.includes('enters the battlefield')) score += 18;
+      if (typeLine.includes('creature') && (scryfallCard.power >= 3 || scryfallCard.toughness >= 3)) {
+        score += 15;
+      }
     }
     
-    // Color synergy
+    // Color synergy (enhanced)
     const cardColors = scryfallCard.colors || [];
-    const colorSynergy = cardColors.some((color: string) => 
-      deckAnalysis.primaryColors.includes(this.convertScryfallColor(color))
-    );
-    if (colorSynergy) score += 10;
+    if (cardColors.length === 0) {
+      score += 8; // Colorless bonus for flexibility
+    } else {
+      const colorMatch = cardColors.some((color: string) => 
+        deckAnalysis.primaryColors.includes(this.convertScryfallColor(color))
+      );
+      if (colorMatch) {
+        score += 12;
+        // Bonus for mono-color in mono-color deck
+        if (cardColors.length === 1 && deckAnalysis.primaryColors.length === 1) {
+          score += 8;
+        }
+      }
+    }
     
-    // General powerful effects
-    if (oracleText.includes('draw')) score += 8;
-    if (oracleText.includes('search')) score += 12;
-    if (oracleText.includes('enters the battlefield')) score += 8;
+    // Mana curve synergy
+    const cardCmc = scryfallCard.cmc || 0;
+    const deckCurveTotal = Object.values(deckAnalysis.curve).reduce((a, b) => a + b, 0);
+    if (deckCurveTotal > 0) {
+      const currentCmcPercent = (deckAnalysis.curve[cardCmc] || 0) / deckCurveTotal;
+      if (currentCmcPercent < 0.2) score += 12; // Fill curve gaps
+      else if (currentCmcPercent < 0.3) score += 8; // Strengthen existing slots
+    }
+    
+    // General powerful effects (reduced to avoid double-counting)
+    if (oracleText.includes('draw') && !deckAnalysis.archetype.includes('aggro')) score += 6;
+    if (oracleText.includes('search') && !oracleText.includes('library')) score += 8; // Non-tutor search
+    if (oracleText.includes('enters the battlefield')) score += 6;
+    
+    // Card type synergy
+    const deckTypeTotal = Object.values(deckAnalysis.typeDistribution).reduce((a, b) => a + b, 0);
+    if (deckTypeTotal > 0) {
+      const cardTypeMatch = Object.keys(deckAnalysis.typeDistribution).some(deckType => 
+        typeLine.includes(deckType.toLowerCase())
+      );
+      if (cardTypeMatch) score += 8;
+    }
     
     return Math.min(100, Math.max(0, score));
   }
@@ -416,34 +490,57 @@ export class RecommendationEngine {
       reasons.push('Colorless - fits any deck');
     }
     
-    // Archetype-specific reasons
+    // Archetype-specific reasons with more granular analysis
     if (deckAnalysis.archetype === 'aggro') {
       if (cmc <= 3) reasons.push('Low cost supports aggressive strategy');
       if (oracleText.includes('haste')) reasons.push('Haste enables immediate pressure');
       if (oracleText.includes('trample') || oracleText.includes('menace')) reasons.push('Evasion breaks through defenses');
+      if (oracleText.includes('prowess')) reasons.push('Prowess scales with spells');
+      if (typeLine.includes('creature') && cmc <= 2 && (scryfallCard.power >= 2 || oracleText.includes('haste'))) {
+        reasons.push('Efficient early threat');
+      }
     } else if (deckAnalysis.archetype === 'control') {
       if (oracleText.includes('counter')) reasons.push('Counterspell supports control plan');
       if (oracleText.includes('draw')) reasons.push('Card advantage for late game');
       if (oracleText.includes('destroy') || oracleText.includes('exile')) reasons.push('Removal maintains board control');
+      if (oracleText.includes('flash')) reasons.push('Instant speed threats/answers');
+      if (oracleText.includes('scry') || oracleText.includes('surveil')) reasons.push('Card selection improves consistency');
+      if (typeLine.includes('instant') && cmc >= 2) reasons.push('Flexible instant speed option');
     } else if (deckAnalysis.archetype === 'combo') {
       if (oracleText.includes('search')) reasons.push('Tutoring supports combo consistency');
       if (oracleText.includes('enters the battlefield')) reasons.push('ETB triggers enable combo lines');
+      if (oracleText.includes('sacrifice')) reasons.push('Sacrifice outlet for combo');
+      if (oracleText.includes('activated ability')) reasons.push('Repeatable effect for combo');
+    } else if (deckAnalysis.archetype === 'midrange') {
+      if (cmc >= 2 && cmc <= 5) reasons.push('Good midrange mana cost');
+      if (typeLine.includes('creature') && (scryfallCard.power >= 3 || scryfallCard.toughness >= 3)) {
+        reasons.push('Efficient threat for midrange strategy');
+      }
+      if (oracleText.includes('enters the battlefield')) reasons.push('Value creature with immediate impact');
+    } else if (deckAnalysis.archetype === 'ramp') {
+      if (oracleText.includes('add') && oracleText.includes('mana')) reasons.push('Mana acceleration');
+      if (oracleText.includes('search your library') && oracleText.includes('land')) reasons.push('Land ramp effect');
+      if (cmc >= 5 && typeLine.includes('creature')) reasons.push('Big threat worth ramping to');
     }
     
-    // Curve reasons
+    // Curve reasons with more detail
     const totalCards = Object.values(deckAnalysis.curve).reduce((a, b) => a + b, 0);
     if (totalCards > 0) {
       const cmcPercent = (deckAnalysis.curve[cmc] || 0) / totalCards;
-      if (cmcPercent < 0.2) reasons.push(`Fills gap in ${cmc}-cost slot`);
+      if (cmcPercent < 0.15) reasons.push(`Fills gap in ${cmc}-cost slot`);
+      else if (cmcPercent < 0.25) reasons.push(`Strengthens ${cmc}-cost options`);
     }
     
-    // Theme synergies
+    // Theme synergies with more specific matching
     let themeMatches = 0;
     deckAnalysis.themes.forEach(theme => {
-      if (cardName.includes(theme.toLowerCase()) || oracleText.includes(theme.toLowerCase())) {
-        reasons.push(`Synergizes with ${theme} theme`);
-        themeMatches++;
-      }
+      const themeWords = theme.toLowerCase().split(/[_\s]+/);
+      themeWords.forEach(word => {
+        if (word.length > 2 && (cardName.includes(word) || oracleText.includes(word) || typeLine.includes(word))) {
+          reasons.push(`Synergizes with ${theme.replace('_', ' ')} theme`);
+          themeMatches++;
+        }
+      });
     });
     
     // Keyword synergies
@@ -453,9 +550,31 @@ export class RecommendationEngine {
       }
     });
     
-    // Generic powerful effects
-    if (oracleText.includes('draw') && !reasons.some(r => r.includes('advantage'))) {
+    // Tribal synergies
+    const creatureTypes = this.extractCreatureTypes(typeLine);
+    if (creatureTypes.length > 0) {
+      creatureTypes.forEach(type => {
+        const typeInDeck = deckAnalysis.themes.some(theme => 
+          theme.toLowerCase().includes(type.toLowerCase())
+        );
+        if (typeInDeck) {
+          reasons.push(`${type} tribal synergy`);
+        }
+      });
+    }
+    
+    // Meta and power level reasons
+    if (scryfallCard.rarity === 'mythic' || scryfallCard.rarity === 'rare') {
+      reasons.push('High power level card');
+    }
+    
+    // Generic powerful effects (only if not already covered)
+    if (oracleText.includes('draw') && !reasons.some(r => r.includes('advantage') || r.includes('draw'))) {
       reasons.push('Provides card advantage');
+    }
+    
+    if (oracleText.includes('flying') && !reasons.some(r => r.includes('evasion') || r.includes('flying'))) {
+      reasons.push('Flying evasion');
     }
     
     if (reasons.length === 0) {
@@ -482,6 +601,19 @@ export class RecommendationEngine {
     });
     
     return keywords;
+  }
+
+  private extractCreatureTypes(typeLine: string): string[] {
+    const types: string[] = [];
+    if (!typeLine) return types;
+    
+    const typeSection = typeLine.split('—')[1]?.trim() || '';
+    if (typeSection) {
+      const individualTypes = typeSection.split(' ').filter(t => t.length > 0);
+      types.push(...individualTypes);
+    }
+    
+    return types;
   }
 
   private synergyKeywords: { [category: string]: { [theme: string]: string[] } } = {
@@ -519,14 +651,14 @@ export class RecommendationEngine {
     const mainboard = deck.mainboard;
     const totalCards = mainboard.reduce((sum, card) => sum + card.quantity, 0);
 
-    // Analyze colors
+    // Analyze colors with more detail
     const colorCount: { [color: string]: number } = {};
     const colors: string[] = [];
 
     // Analyze mana curve
     const curve: { [cmc: number]: number } = {};
 
-    // Analyze card types
+    // Analyze card types with enhanced categorization
     const typeCount: { [type: string]: number } = {};
     const themes: string[] = [];
     const keywords: string[] = [];
@@ -544,27 +676,50 @@ export class RecommendationEngine {
       const cmc = deckCard.cmc || this.parseCMC(deckCard.manaCost || '');
       curve[cmc] = (curve[cmc] || 0) + deckCard.quantity;
 
-      // Count types
+      // Count types with more granular analysis
       if (deckCard.typeLine) {
         const types = this.extractTypes(deckCard.typeLine);
         types.forEach(type => {
-          typeCount[type.toLowerCase()] = (typeCount[type.toLowerCase()] || 0) + deckCard.quantity;
+          const normalizedType = type.toLowerCase();
+          typeCount[normalizedType] = (typeCount[normalizedType] || 0) + deckCard.quantity;
         });
       }
 
-      // Extract themes and keywords
+      // Extract themes and keywords with enhanced pattern matching
       if (deckCard.oracleText) {
         const cardKeywords = this.extractKeywords(deckCard.oracleText);
         keywords.push(...cardKeywords);
         themes.push(...this.extractThemes(deckCard.name, deckCard.oracleText, deckCard.typeLine));
       }
+      
+      // Extract creature types for tribal analysis
+      if (deckCard.typeLine && deckCard.typeLine.includes('Creature')) {
+        const creatureTypes = this.extractCreatureTypes(deckCard.typeLine);
+        creatureTypes.forEach((type: string) => {
+          themes.push(`tribal_${type.toLowerCase()}`);
+        });
+      }
+      
+      // Enhanced theme detection based on card names
+      const cardNameLower = deckCard.name.toLowerCase();
+      if (cardNameLower.includes('bolt') || cardNameLower.includes('burn') || cardNameLower.includes('lightning')) {
+        themes.push('burn');
+      }
+      if (cardNameLower.includes('counter') && deckCard.typeLine?.includes('Instant')) {
+        themes.push('counterspell');
+      }
+      if (cardNameLower.includes('draw') || cardNameLower.includes('divination')) {
+        themes.push('card_draw');
+      }
     }
 
+    // Determine primary colors (top 2 most used)
     const primaryColors = Object.entries(colorCount)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 2)
       .map(([color]) => color);
 
+    // Enhanced strategy and archetype determination
     const strategy = this.determineStrategy(curve, typeCount, themes, colorCount, totalCards);
     const archetype = this.determineArchetype(curve, typeCount, keywords, colors, totalCards);
     const health = this.calculateDeckHealth(curve, colors, typeCount, totalCards);
@@ -574,11 +729,11 @@ export class RecommendationEngine {
       colors,
       primaryColors,
       curve,
-      themes: [...new Set(themes)],
+      themes: [...new Set(themes)], // Remove duplicates
       typeDistribution: typeCount,
       totalCards,
       archetype,
-      keywords: [...new Set(keywords)],
+      keywords: [...new Set(keywords)], // Remove duplicates
       health
     };
   }
@@ -871,19 +1026,75 @@ export class RecommendationEngine {
     colors: string[],
     totalCards: number
   ): string {
+    if (totalCards === 0) return 'unknown';
+    
     const creatureRatio = (types['creature'] || 0) / totalCards;
+    const spellRatio = ((types['instant'] || 0) + (types['sorcery'] || 0)) / totalCards;
     const avgCMC = Object.entries(curve).reduce((sum, [cmc, count]) => sum + (parseInt(cmc) * count), 0) / totalCards;
-
-    if (creatureRatio > 0.6 && avgCMC < 3) {
+    
+    // Low curve percentage (CMC 0-2)
+    const lowCurveRatio = ((curve[0] || 0) + (curve[1] || 0) + (curve[2] || 0)) / totalCards;
+    
+    // High curve percentage (CMC 5+)
+    const highCurveRatio = ((curve[5] || 0) + (curve[6] || 0) + (curve[7] || 0) + (curve[8] || 0)) / totalCards;
+    
+    // Analyze keywords for archetype clues
+    const keywordSet = new Set(keywords.map(k => k.toLowerCase()));
+    const hasAggroKeywords = ['haste', 'prowess', 'menace', 'first strike', 'double strike', 'trample']
+      .some(k => keywordSet.has(k));
+    const hasControlKeywords = ['flash', 'hexproof', 'ward', 'vigilance', 'flying']
+      .some(k => keywordSet.has(k));
+    const hasRampKeywords = ['reach', 'trample', 'vigilance']
+      .some(k => keywordSet.has(k));
+    
+    // Aggro detection (more detailed)
+    if (creatureRatio > 0.6 && avgCMC <= 2.5 && (lowCurveRatio > 0.6 || hasAggroKeywords)) {
       return 'aggro';
     }
     
-    if (keywords.includes('counterspell') || keywords.includes('draw')) {
+    // Burn/aggro variant
+    if (spellRatio > 0.3 && avgCMC <= 3 && hasAggroKeywords) {
+      return 'aggro';
+    }
+    
+    // Control detection (more sophisticated)
+    if (spellRatio > 0.4 && (keywordSet.has('counterspell') || keywordSet.has('counter'))) {
       return 'control';
     }
     
-    if (avgCMC > 4 && keywords.includes('ramp')) {
+    // Control based on high instant/sorcery ratio with low creature count
+    if (creatureRatio < 0.3 && spellRatio > 0.5) {
+      return 'control';
+    }
+    
+    // Combo detection
+    if (keywordSet.has('tutor') || keywordSet.has('search') || keywordSet.has('sacrifice')) {
+      return 'combo';
+    }
+    
+    // Ramp detection (more detailed)
+    if (highCurveRatio > 0.3 && (hasRampKeywords || keywordSet.has('ramp'))) {
       return 'ramp';
+    }
+    
+    // Ramp based on high average CMC
+    if (avgCMC > 4.5) {
+      return 'ramp';
+    }
+    
+    // Tempo detection
+    if (creatureRatio > 0.4 && spellRatio > 0.2 && avgCMC <= 3 && hasControlKeywords) {
+      return 'tempo';
+    }
+    
+    // Midrange (refined criteria)
+    if (creatureRatio >= 0.3 && creatureRatio <= 0.7 && avgCMC >= 2.5 && avgCMC <= 4.5) {
+      return 'midrange';
+    }
+    
+    // Default fallback with more logic
+    if (creatureRatio > 0.5) {
+      return avgCMC <= 3 ? 'aggro' : 'midrange';
     }
     
     return 'midrange';
@@ -1334,6 +1545,11 @@ export class RecommendationEngine {
         const quantity = collectionMap.get(cardName)!;
         rec.costConsideration = 'owned';
         rec.reasons.unshift(`✅ Already in collection (${quantity}x)`); // Add to front
+        
+        // Boost confidence for owned cards (matching Python engine behavior)
+        rec.confidence = Math.min(100, rec.confidence + 10); // +10 points for owned cards
+        rec.deckFit = Math.min(100, rec.deckFit + 5); // +5 points deck fit bonus
+        
         ownedCount++;
       }
     }
