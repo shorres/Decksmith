@@ -10,6 +10,11 @@ export abstract class BaseComponent {
     this.element = element as HTMLElement;
   }
 
+  // Public getter to check initialization status
+  get initialized(): boolean {
+    return this.isInitialized;
+  }
+
   abstract render(): void;
   abstract initialize(): void;
 

@@ -150,17 +150,26 @@ class DecksmithApp {
     });
     document.getElementById(`${tabName}-tab`)?.classList.add('active');
 
-    // Render the appropriate component
-    console.log(`Rendering component for tab: ${tabName}`);
+    // Initialize components only if not already initialized (to preserve state)
+    console.log(`Ensuring component initialization for tab: ${tabName}`);
     switch (tabName) {
       case 'collection':
-        this.collectionTab?.render();
+        if (!this.collectionTab?.initialized) {
+          this.collectionTab?.initialize();
+        }
         break;
       case 'decks':
-        this.decksTab?.render();
+        if (!this.decksTab?.initialized) {
+          this.decksTab?.initialize();
+        }
         break;
       case 'ai-recommendations':
-        this.aiTab?.render();
+        if (!this.aiTab?.initialized) {
+          this.aiTab?.initialize();
+        } else {
+          // Just refresh the deck dropdown without re-rendering everything
+          this.aiTab.refreshDecksDropdown();
+        }
         break;
     }
 

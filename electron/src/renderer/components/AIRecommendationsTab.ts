@@ -11,6 +11,11 @@ export class AIRecommendationsTab extends BaseComponent {
   private recommendationEngine: RecommendationEngine;
   private collection: any = null; // Will be set by parent
   private availableDecks: Deck[] = []; // Store available decks
+  
+  // Pagination/infinite scroll properties
+  private displayedCount = 20; // Start with 20 cards
+  private readonly loadMoreIncrement = 20; // Load 20 more each time
+  private isLoadingMore = false;
 
   constructor() {
     super('#ai-recommendations-tab');
@@ -303,12 +308,23 @@ export class AIRecommendationsTab extends BaseComponent {
     this.showRecommendationsLoading();
 
     try {
-      // Use the real recommendation engine
-      this.recommendations = await this.recommendationEngine.generateRecommendations(
+      // Clear previous recommendations
+      this.recommendations = [];
+      this.filteredRecommendations = [];
+      
+      // Show initial loading state
+      this.showProgressiveLoading('Analyzing deck archetype...');
+      
+      // Use the real recommendation engine with progressive loading
+      this.recommendations = await this.recommendationEngine.generateRecommendationsWithProgress(
         this.selectedDeck,
         this.collection,
         100, // Get 100 recommendations
-        'standard' // Format - could be made configurable
+        'standard', // Format - could be made configurable
+        (progress: { phase: string, count: number, total: number, recommendations: any[] }) => {
+          // Update UI with partial results
+          this.showProgressiveResults(progress);
+        }
       );
       
       this.filteredRecommendations = [...this.recommendations];
@@ -320,6 +336,76 @@ export class AIRecommendationsTab extends BaseComponent {
     } finally {
       this.isLoading = false;
     }
+  }
+
+  private showProgressiveLoading(message: string): void {
+    const list = this.element.querySelector('#recommendations-list');
+    if (list) {
+      list.innerHTML = `
+        <div class="progressive-loading">
+          <div class="loading-spinner"></div>
+          <p><strong>🤖 AI Working...</strong></p>
+          <p class="loading-phase">${message}</p>
+          <div class="loading-progress">
+            <div class="progress-bar" style="width: 0%"></div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  private showProgressiveResults(progress: { phase: string, count: number, total: number, recommendations: any[] }): void {
+    const list = this.element.querySelector('#recommendations-list');
+    if (!list) return;
+
+    const percentage = Math.round((progress.count / progress.total) * 100);
+    
+    // Update progress bar and phase
+    const phaseElement = list.querySelector('.loading-phase');
+    const progressBar = list.querySelector('.progress-bar') as HTMLElement;
+    
+    if (phaseElement) phaseElement.textContent = progress.phase;
+    if (progressBar) progressBar.style.width = `${percentage}%`;
+
+    // Show partial results if we have any
+    if (progress.recommendations.length > 0) {
+      this.recommendations = [...progress.recommendations];
+      this.filteredRecommendations = [...progress.recommendations];
+      
+      // Reset pagination for progressive loading
+      this.resetPagination();
+      
+      // Render partial results below the loading indicator
+      const partialResults = this.generateRecommendationsHTML(progress.recommendations.slice(0, 20)); // Show first 20
+      
+      list.innerHTML = `
+        <div class="progressive-loading">
+          <div class="loading-spinner"></div>
+          <p><strong>🤖 AI Working...</strong></p>
+          <p class="loading-phase">${progress.phase}</p>
+          <div class="loading-progress">
+            <div class="progress-bar" style="width: ${percentage}%"></div>
+          </div>
+          <p class="progress-text">${progress.count} of ${progress.total} found...</p>
+        </div>
+        <div class="partial-results">
+          <p><strong>Partial Results (showing first 20):</strong></p>
+          ${partialResults}
+        </div>
+      `;
+    }
+  }
+
+  private generateRecommendationsHTML(recommendations: any[]): string {
+    return recommendations.map(rec => `
+      <div class="recommendation-item-mini ${rec.costConsideration === 'owned' ? 'owned' : ''}">
+        <div class="rec-header-mini">
+          <span class="card-name-mini">${rec.cardName} ${rec.costConsideration === 'owned' ? '✓' : ''}</span>
+          <span class="confidence-badge-mini">${rec.confidence.toFixed(0)}%</span>
+        </div>
+        <p class="card-type-mini">${rec.cardType} • ${rec.manaCost}</p>
+      </div>
+    `).join('');
   }
 
   private showAnalysisLoading(): void {
@@ -479,16 +565,16 @@ export class AIRecommendationsTab extends BaseComponent {
     const list = this.element.querySelector('#recommendations-list');
     if (!list) return;
 
-    const displayRecs = this.filteredRecommendations.slice(0, 50); // Show first 50
+    const displayRecs = this.filteredRecommendations.slice(0, this.displayedCount);
     const ownedCount = this.filteredRecommendations.filter(rec => rec.costConsideration === 'owned').length;
     const landCount = this.filteredRecommendations.filter(rec => rec.cardType.toLowerCase().includes('land')).length;
 
     list.innerHTML = `
       <div class="recommendations-header-info">
-        <p><strong>Total: ${displayRecs.length} of ${this.recommendations.length} recommendations</strong></p>
-        <p><small>${ownedCount} owned • ${landCount} lands • Showing top matches</small></p>
+        <p><strong>Showing: ${displayRecs.length} of ${this.filteredRecommendations.length} recommendations</strong></p>
+        <p><small>${ownedCount} owned • ${landCount} lands • Prioritizing owned cards</small></p>
       </div>
-      <div class="recommendations-grid">
+      <div class="recommendations-grid" id="recommendations-grid">
         ${displayRecs.map(rec => `
           <div class="recommendation-item ${rec.costConsideration === 'owned' ? 'owned' : ''}">
             <div class="rec-header">
@@ -499,7 +585,7 @@ export class AIRecommendationsTab extends BaseComponent {
               </div>
             </div>
             <div class="rec-card-info">
-              <h4 class="card-name">${rec.cardName} ${rec.costConsideration === 'owned' ? '✓' : ''}</h4>
+              <h4 class="card-name">${rec.cardName} ${rec.costConsideration === 'owned' ? '✅' : ''}</h4>
               <p class="card-type">${rec.cardType}</p>
               <p class="card-cost">${rec.manaCost} • ${rec.rarity}</p>
               <p class="card-scores">Meta: ${rec.metaScore.toFixed(1)}% • Fit: ${rec.deckFit.toFixed(1)}%</p>
@@ -523,7 +609,20 @@ export class AIRecommendationsTab extends BaseComponent {
           </div>
         `).join('')}
       </div>
+      ${displayRecs.length < this.filteredRecommendations.length ? `
+        <div class="load-more-section">
+          <button id="load-more-btn" class="btn btn-secondary ${this.isLoadingMore ? 'loading' : ''}" 
+                  ${this.isLoadingMore ? 'disabled' : ''}>
+            ${this.isLoadingMore ? 'Loading...' : `Load More (${this.filteredRecommendations.length - displayRecs.length} remaining)`}
+          </button>
+        </div>
+      ` : ''}
     `;
+
+    // Setup infinite scroll if more cards are available
+    if (displayRecs.length < this.filteredRecommendations.length) {
+      this.setupInfiniteScroll();
+    }
   }
 
   private getCraftCost(costConsideration: string): string {
@@ -556,6 +655,8 @@ export class AIRecommendationsTab extends BaseComponent {
       return true;
     });
 
+    // Reset pagination when filtering
+    this.resetPagination();
     this.renderRecommendations();
   }
 
@@ -616,5 +717,76 @@ export class AIRecommendationsTab extends BaseComponent {
         </div>
       `;
     }
+  }
+
+  // Method to refresh just the decks dropdown without re-rendering everything
+  refreshDecksDropdown(): void {
+    console.log('Refreshing decks dropdown without full re-render');
+    
+    const select = this.element.querySelector('#deck-select') as HTMLSelectElement;
+    if (!select) return;
+
+    const currentSelection = select.value;
+    
+    // Update the dropdown options
+    select.innerHTML = '<option value="">Select a deck...</option>';
+    this.availableDecks.forEach(deck => {
+      const option = document.createElement('option');
+      option.value = deck.id;
+      option.textContent = `${deck.name} (${deck.format || 'Unknown'})`;
+      select.appendChild(option);
+    });
+
+    // Restore selection if it still exists
+    if (currentSelection && this.availableDecks.some(d => d.id === currentSelection)) {
+      select.value = currentSelection;
+      this.enableAnalysisButtons();
+    } else {
+      this.disableAnalysisButtons();
+    }
+  }
+
+  private setupInfiniteScroll(): void {
+    const loadMoreBtn = this.element.querySelector('#load-more-btn');
+    const container = this.element.querySelector('#recommendations-list');
+    
+    if (loadMoreBtn) {
+      loadMoreBtn.addEventListener('click', () => this.loadMoreRecommendations());
+    }
+
+    // Also setup scroll-based infinite scroll
+    if (container) {
+      const scrollHandler = () => {
+        const scrollPosition = container.scrollTop + container.clientHeight;
+        const scrollHeight = container.scrollHeight;
+        
+        // Load more when scrolled to within 200px of bottom
+        if (scrollHeight - scrollPosition < 200 && !this.isLoadingMore) {
+          this.loadMoreRecommendations();
+        }
+      };
+
+      container.addEventListener('scroll', scrollHandler);
+    }
+  }
+
+  private loadMoreRecommendations(): void {
+    if (this.isLoadingMore || this.displayedCount >= this.filteredRecommendations.length) {
+      return;
+    }
+
+    this.isLoadingMore = true;
+    
+    // Simulate brief loading delay for better UX
+    setTimeout(() => {
+      this.displayedCount += this.loadMoreIncrement;
+      this.isLoadingMore = false;
+      this.renderRecommendations();
+    }, 300);
+  }
+
+  private resetPagination(): void {
+    this.displayedCount = 20;
+    this.isLoadingMore = false;
   }
 }
