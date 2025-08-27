@@ -233,22 +233,6 @@ class DecksmithApp {
       return app.getName();
     });
 
-    // Window operations
-    ipcMain.handle('window:minimize', () => {
-      this.mainWindow?.minimize();
-    });
-
-    ipcMain.handle('window:maximize', () => {
-      if (this.mainWindow?.isMaximized()) {
-        this.mainWindow.unmaximize();
-      } else {
-        this.mainWindow?.maximize();
-      }
-    });
-
-    ipcMain.handle('window:close', () => {
-      this.mainWindow?.close();
-    });
   }
 
   private sendToRenderer(channel: string, ...args: any[]): void {

@@ -62,19 +62,6 @@ class DecksmithApp {
       });
     });
 
-    // Window controls
-    document.getElementById('minimize-btn')?.addEventListener('click', () => {
-      window.electronAPI?.minimizeWindow();
-    });
-
-    document.getElementById('maximize-btn')?.addEventListener('click', () => {
-      window.electronAPI?.maximizeWindow();
-    });
-
-    document.getElementById('close-btn')?.addEventListener('click', () => {
-      window.electronAPI?.closeWindow();
-    });
-
     // Modal controls
     document.getElementById('modal-close')?.addEventListener('click', () => {
       this.closeModal();

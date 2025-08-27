@@ -117,6 +117,10 @@ export class CollectionTab extends BaseComponent {
               <span class="stat-label">Mythics:</span>
               <span class="stat-value" id="sidebar-mythics">0</span>
             </div>
+            <div class="stat-row">
+              <span class="stat-label">Collection Value:</span>
+              <span class="stat-value" id="sidebar-collection-value">$0.00</span>
+            </div>
           </div>
 
           <!-- Action Buttons -->
@@ -293,6 +297,19 @@ export class CollectionTab extends BaseComponent {
     
     const mythicsElement = this.element.querySelector('#sidebar-mythics');
     if (mythicsElement) mythicsElement.textContent = rarityCount.mythic.toString();
+    
+    // Calculate collection value (simplified calculation)
+    const collectionValue = this.filteredCards.reduce((total, card) => {
+      // Basic price estimation based on rarity
+      const priceEstimate = card.rarity === 'mythic' ? 5.00 :
+                           card.rarity === 'rare' ? 1.50 :
+                           card.rarity === 'uncommon' ? 0.25 : 0.10;
+      const quantity = card.quantity ?? 1;
+      return total + (priceEstimate * quantity);
+    }, 0);
+    
+    const valueElement = this.element.querySelector('#sidebar-collection-value');
+    if (valueElement) valueElement.textContent = `$${collectionValue.toFixed(2)}`;
   }
 
   private clearAllFilters(): void {

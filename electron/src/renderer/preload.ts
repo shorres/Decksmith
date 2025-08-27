@@ -18,11 +18,6 @@ const electronAPI = {
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   getAppName: () => ipcRenderer.invoke('app:getName'),
 
-  // Window operations
-  minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
-  maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
-  closeWindow: () => ipcRenderer.invoke('window:close'),
-
   // Menu events (from main process)
   onMenuAction: (callback: (action: string) => void) => {
     const handler = (event: any, action: string) => callback(action);

@@ -15,11 +15,6 @@
                     <h1>🃏 Decksmith</h1>
                     <span class="version">v2.0.0</span>
                 </div>
-                <div class="header-actions">
-                    <button id="minimize-btn" class="window-btn" title="Minimize">−</button>
-                    <button id="maximize-btn" class="window-btn" title="Maximize">□</button>
-                    <button id="close-btn" class="window-btn close" title="Close">×</button>
-                </div>
             </div>
         </header>
 
@@ -39,10 +34,6 @@
                     <span class="tab-icon">🤖</span>
                     AI Recommendations
                 </button>
-                <button class="tab-btn" data-tab="statistics">
-                    <span class="tab-icon">📊</span>
-                    Statistics
-                </button>
             </nav>
 
             <!-- Tab Content -->
@@ -60,34 +51,6 @@
                 <!-- AI Recommendations Tab -->
                 <div id="ai-recommendations-tab" class="tab-panel">
                     <!-- Content will be rendered by AIRecommendationsTab component -->
-                </div>
-
-                <!-- Statistics Tab -->
-                <div id="statistics-tab" class="tab-panel">
-                    <div class="panel-header">
-                        <h2>Collection Statistics</h2>
-                    </div>
-
-                    <div id="statistics-content" class="statistics-content">
-                        <div class="stats-grid">
-                            <div class="stat-card">
-                                <h3>Total Cards</h3>
-                                <div class="stat-value" id="total-cards">0</div>
-                            </div>
-                            <div class="stat-card">
-                                <h3>Unique Cards</h3>
-                                <div class="stat-value" id="unique-cards">0</div>
-                            </div>
-                            <div class="stat-card">
-                                <h3>Total Decks</h3>
-                                <div class="stat-value" id="total-decks">0</div>
-                            </div>
-                            <div class="stat-card">
-                                <h3>Collection Value</h3>
-                                <div class="stat-value" id="collection-value">$0.00</div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </main>
