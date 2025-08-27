@@ -22,7 +22,17 @@ export abstract class BaseComponent {
   protected bindEvent(selector: string, event: string, handler: (e: Event) => void): void {
     const element = this.element.querySelector(selector);
     if (element) {
-      element.addEventListener(event, handler);
+      console.log(`Binding ${event} event to ${selector}`, element);
+      element.addEventListener(event, (e) => {
+        console.log(`Event ${event} triggered on ${selector}`);
+        try {
+          handler(e);
+        } catch (error) {
+          console.error(`Error in ${event} handler for ${selector}:`, error);
+        }
+      });
+    } else {
+      console.warn(`Element not found for selector: ${selector}`);
     }
   }
 

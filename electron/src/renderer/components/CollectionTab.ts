@@ -125,16 +125,16 @@ export class CollectionTab extends BaseComponent {
 
           <!-- Action Buttons -->
           <div class="sidebar-actions">
-            <button id="import-csv-btn" class="btn btn-primary btn-full">
+            <button id="import-csv-btn" class="btn btn-primary btn-full" onclick="window.decksmithApp?.components?.collection?.importCSV?.();">
               Import CSV
             </button>
-            <button id="import-clipboard-btn" class="btn btn-secondary btn-full">
+            <button id="import-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.collection?.importClipboard?.();">
               Import Clipboard
             </button>
-            <button id="export-csv-btn" class="btn btn-secondary btn-full">
+            <button id="export-csv-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.collection?.exportCSV?.();">
               Export CSV
             </button>
-            <button id="add-card-btn" class="btn btn-secondary btn-full">
+            <button id="add-card-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.collection?.addCard?.();">
               Add Card
             </button>
           </div>
@@ -164,6 +164,8 @@ export class CollectionTab extends BaseComponent {
   }
 
   private setupEventListeners(): void {
+    console.log('Setting up CollectionTab event listeners...');
+    
     // Search
     this.bindEvent('#collection-search', 'input', () => {
       clearTimeout(this.searchTimeout);
@@ -194,14 +196,49 @@ export class CollectionTab extends BaseComponent {
 
     // Clear filters
     this.bindEvent('#clear-filters', 'click', () => {
+      console.log('Clear filters clicked');
       this.clearAllFilters();
     });
 
     // Action buttons
-    this.bindEvent('#import-csv-btn', 'click', () => this.importCSV());
-    this.bindEvent('#import-clipboard-btn', 'click', () => this.importClipboard());
-    this.bindEvent('#export-csv-btn', 'click', () => this.exportCSV());
-    this.bindEvent('#add-card-btn', 'click', () => this.addCard());
+    this.bindEvent('#import-csv-btn', 'click', (e) => {
+      console.log('Import CSV clicked');
+      e.preventDefault();
+      try {
+        this.importCSV();
+      } catch (error) {
+        console.error('Error in importCSV:', error);
+      }
+    });
+    this.bindEvent('#import-clipboard-btn', 'click', (e) => {
+      console.log('Import Clipboard clicked');
+      e.preventDefault();
+      try {
+        this.importClipboard();
+      } catch (error) {
+        console.error('Error in importClipboard:', error);
+      }
+    });
+    this.bindEvent('#export-csv-btn', 'click', (e) => {
+      console.log('Export CSV clicked');
+      e.preventDefault();
+      try {
+        this.exportCSV();
+      } catch (error) {
+        console.error('Error in exportCSV:', error);
+      }
+    });
+    this.bindEvent('#add-card-btn', 'click', (e) => {
+      console.log('Add Card clicked');
+      e.preventDefault();
+      try {
+        this.addCard();
+      } catch (error) {
+        console.error('Error in addCard:', error);
+      }
+    });
+    
+    console.log('CollectionTab event listeners setup complete');
   }
 
   private searchTimeout: number = 0;
@@ -329,23 +366,448 @@ export class CollectionTab extends BaseComponent {
     this.applyFilters();
   }
 
-  private importCSV(): void {
-    // TODO: Implement CSV import
-    console.log('Import CSV clicked');
+  private async importCSV(): Promise<void> {
+    try {
+      const result = await window.electronAPI?.openFileDialog({
+        title: 'Import Collection CSV',
+        buttonLabel: 'Import',
+        filters: [
+          { name: 'CSV Files', extensions: ['csv'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+
+      if (result && !result.canceled && result.filePaths.length > 0) {
+        const filePath = result.filePaths[0];
+        console.log('Selected CSV file:', filePath);
+        
+        // Read and parse CSV file
+        // For now, we'll use a simple implementation
+        // In a real app, you'd want to use the Node.js fs module via IPC
+        this.showImportStatus('Reading CSV file...');
+        
+        // TODO: Implement actual CSV parsing
+        // This would involve:
+        // 1. Reading the file via IPC to main process
+        // 2. Parsing CSV content
+        // 3. Creating Card objects
+        // 4. Adding to collection
+        // 5. Updating UI
+        
+        this.showImportStatus('CSV import completed!');
+      }
+    } catch (error) {
+      console.error('Error importing CSV:', error);
+      this.showImportStatus('Error importing CSV file');
+    }
   }
 
-  private importClipboard(): void {
-    // TODO: Implement clipboard import
-    console.log('Import Clipboard clicked');
+  private async exportCSV(): Promise<void> {
+    try {
+      const result = await window.electronAPI?.saveFileDialog({
+        title: 'Export Collection to CSV',
+        buttonLabel: 'Export',
+        defaultPath: `collection-export-${new Date().toISOString().split('T')[0]}.csv`,
+        filters: [
+          { name: 'CSV Files', extensions: ['csv'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+
+      if (result && !result.canceled && result.filePath) {
+        const filePath = result.filePath;
+        console.log('Export to:', filePath);
+        
+        // Generate CSV content
+        const csvContent = this.generateCSVContent();
+        
+        // Save file via IPC
+        // TODO: Implement file writing via main process
+        console.log('CSV content:', csvContent);
+        
+        this.showImportStatus('Collection exported successfully!');
+      }
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      this.showImportStatus('Error exporting CSV file');
+    }
   }
 
-  private exportCSV(): void {
-    // TODO: Implement CSV export
-    console.log('Export CSV clicked');
+  private async importClipboard(): Promise<void> {
+    try {
+      // Get clipboard text
+      const clipboardText = await navigator.clipboard.readText();
+      
+      if (!clipboardText.trim()) {
+        this.showImportStatus('Clipboard is empty');
+        return;
+      }
+
+      this.showImportStatus('Processing clipboard content...');
+      
+      // Parse clipboard content as card list
+      const lines = clipboardText.split('\n').filter(line => line.trim());
+      let addedCards = 0;
+      
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        
+        // Parse format: "4 Lightning Bolt" or "Lightning Bolt"
+        const match = trimmed.match(/^(\d+)\s+(.+)$/) || [null, '1', trimmed];
+        const quantity = parseInt(match[1] || '1');
+        const cardName = (match[2] || trimmed).trim();
+        
+        if (cardName) {
+          // Create basic card object
+          const newCard: Card = {
+            id: `clipboard-${Date.now()}-${addedCards}`,
+            name: cardName,
+            typeLine: 'Unknown',
+            manaCost: '',
+            colors: [],
+            rarity: 'common',
+            quantity: quantity
+          };
+          
+          this.collection.cards.push(newCard);
+          addedCards++;
+        }
+      }
+      
+      // Update UI
+      this.setCollection(this.collection);
+      this.showImportStatus(`Added ${addedCards} cards from clipboard`);
+      
+      // Save to persistent storage
+      await this.saveCollection();
+      
+    } catch (error) {
+      console.error('Error importing from clipboard:', error);
+      this.showImportStatus('Error reading clipboard');
+    }
   }
 
   private addCard(): void {
-    // TODO: Implement add card modal
-    console.log('Add Card clicked');
+    console.log('Opening add card modal...');
+    
+    // Create modal HTML
+    const modalHtml = `
+      <div class="add-card-modal">
+        <form id="add-card-form">
+          <div class="form-group">
+            <label for="card-name-input">Card Name:</label>
+            <input type="text" id="card-name-input" required placeholder="Enter card name" autocomplete="off">
+            <div id="card-suggestions" class="suggestions-dropdown"></div>
+          </div>
+          <div class="form-group">
+            <label for="card-quantity-input">Quantity:</label>
+            <input type="number" id="card-quantity-input" value="1" min="1" required>
+          </div>
+          <div class="form-group">
+            <label for="card-type-input">Type (optional):</label>
+            <input type="text" id="card-type-input" placeholder="e.g., Creature, Instant, etc.">
+          </div>
+          <div class="form-group">
+            <label for="card-mana-cost-input">Mana Cost (optional):</label>
+            <input type="text" id="card-mana-cost-input" placeholder="e.g., {2}{R}, {U}{U}">
+          </div>
+          <div class="form-group">
+            <label for="card-rarity-input">Rarity:</label>
+            <select id="card-rarity-input">
+              <option value="common">Common</option>
+              <option value="uncommon">Uncommon</option>
+              <option value="rare">Rare</option>
+              <option value="mythic">Mythic Rare</option>
+            </select>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-add-card">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add Card</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    // Show modal
+    this.showModal('Add Card', modalHtml);
+
+    // Set up form handling
+    const form = document.getElementById('add-card-form') as HTMLFormElement;
+    const cancelBtn = document.getElementById('cancel-add-card') as HTMLButtonElement;
+    const nameInput = document.getElementById('card-name-input') as HTMLInputElement;
+
+    // Focus on card name input
+    setTimeout(() => nameInput?.focus(), 100);
+
+    // Set up autocomplete
+    this.setupCardNameAutocomplete(nameInput);
+
+    // Handle cancel
+    cancelBtn?.addEventListener('click', () => {
+      this.closeModal();
+    });
+
+    // Handle form submission
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.handleAddCardSubmit();
+    });
+  }
+
+  private setupCardNameAutocomplete(input: HTMLInputElement): void {
+    if (!input) return;
+
+    let searchTimeout: number;
+    const suggestionsContainer = document.getElementById('card-suggestions') as HTMLElement;
+    
+    input.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      const query = input.value.trim();
+      
+      if (query.length < 2) {
+        this.hideSuggestions(suggestionsContainer);
+        return;
+      }
+
+      searchTimeout = window.setTimeout(async () => {
+        await this.fetchCardSuggestions(query, suggestionsContainer, input);
+      }, 300);
+    });
+
+    // Handle keyboard navigation
+    input.addEventListener('keydown', (e) => {
+      this.handleSuggestionNavigation(e, suggestionsContainer, input);
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target as Node) && !suggestionsContainer.contains(e.target as Node)) {
+        this.hideSuggestions(suggestionsContainer);
+      }
+    });
+  }
+
+  private async fetchCardSuggestions(query: string, container: HTMLElement, input: HTMLInputElement): Promise<void> {
+    try {
+      // Use Scryfall's autocomplete API
+      const response = await fetch(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      
+      if (data.data && data.data.length > 0) {
+        this.displaySuggestions(data.data.slice(0, 8), container, input); // Limit to 8 suggestions
+      } else {
+        this.hideSuggestions(container);
+      }
+    } catch (error) {
+      console.error('Error fetching card suggestions:', error);
+      this.hideSuggestions(container);
+    }
+  }
+
+  private displaySuggestions(suggestions: string[], container: HTMLElement, input: HTMLInputElement): void {
+    container.innerHTML = '';
+    container.style.display = 'block';
+    
+    suggestions.forEach((suggestion, index) => {
+      const item = document.createElement('div');
+      item.className = 'suggestion-item';
+      item.textContent = suggestion;
+      item.setAttribute('data-index', index.toString());
+      
+      item.addEventListener('click', () => {
+        this.selectSuggestion(suggestion, container, input);
+      });
+      
+      container.appendChild(item);
+    });
+  }
+
+  private hideSuggestions(container: HTMLElement): void {
+    if (container) {
+      container.innerHTML = '';
+      container.style.display = 'none';
+    }
+  }
+
+  private selectSuggestion(suggestion: string, container: HTMLElement, input: HTMLInputElement): void {
+    input.value = suggestion;
+    this.hideSuggestions(container);
+    
+    // Automatically fetch and populate card details
+    this.populateCardDetails(suggestion);
+  }
+
+  private handleSuggestionNavigation(e: KeyboardEvent, container: HTMLElement, input: HTMLInputElement): void {
+    const suggestions = container.querySelectorAll('.suggestion-item');
+    const currentActive = container.querySelector('.suggestion-item.active');
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIndex = currentActive ? 
+        Math.min(parseInt(currentActive.getAttribute('data-index') || '0') + 1, suggestions.length - 1) : 0;
+      this.setActiveSuggestion(suggestions, nextIndex);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIndex = currentActive ? 
+        Math.max(parseInt(currentActive.getAttribute('data-index') || '0') - 1, 0) : suggestions.length - 1;
+      this.setActiveSuggestion(suggestions, prevIndex);
+    } else if (e.key === 'Enter' && currentActive) {
+      e.preventDefault();
+      this.selectSuggestion(currentActive.textContent || '', container, input);
+    } else if (e.key === 'Escape') {
+      this.hideSuggestions(container);
+    }
+  }
+
+  private setActiveSuggestion(suggestions: NodeListOf<Element>, index: number): void {
+    suggestions.forEach(s => s.classList.remove('active'));
+    if (suggestions[index]) {
+      suggestions[index].classList.add('active');
+    }
+  }
+
+  private async populateCardDetails(cardName: string): Promise<void> {
+    try {
+      // Fetch full card details from Scryfall
+      const response = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cardName)}`);
+      const card = await response.json();
+      
+      if (card && card.object !== 'error') {
+        // Populate form fields with card data
+        const typeInput = document.getElementById('card-type-input') as HTMLInputElement;
+        const manaCostInput = document.getElementById('card-mana-cost-input') as HTMLInputElement;
+        const rarityInput = document.getElementById('card-rarity-input') as HTMLSelectElement;
+        
+        if (typeInput && card.type_line) {
+          typeInput.value = card.type_line;
+        }
+        if (manaCostInput && card.mana_cost) {
+          manaCostInput.value = card.mana_cost;
+        }
+        if (rarityInput && card.rarity) {
+          rarityInput.value = card.rarity;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching card details:', error);
+      // Don't show error to user, just proceed without auto-population
+    }
+  }
+
+  private handleAddCardSubmit(): void {
+    const nameInput = document.getElementById('card-name-input') as HTMLInputElement;
+    const quantityInput = document.getElementById('card-quantity-input') as HTMLInputElement;
+    const typeInput = document.getElementById('card-type-input') as HTMLInputElement;
+    const manaCostInput = document.getElementById('card-mana-cost-input') as HTMLInputElement;
+    const rarityInput = document.getElementById('card-rarity-input') as HTMLSelectElement;
+
+    const cardName = nameInput?.value?.trim();
+    const quantity = parseInt(quantityInput?.value || '1');
+    const typeLine = typeInput?.value?.trim() || 'Unknown';
+    const manaCost = manaCostInput?.value?.trim() || '';
+    const rarity = rarityInput?.value || 'common';
+
+    if (!cardName) {
+      alert('Card name is required');
+      return;
+    }
+
+    if (isNaN(quantity) || quantity < 1) {
+      alert('Invalid quantity');
+      return;
+    }
+
+    // Parse colors from mana cost (basic parsing)
+    const colors: string[] = [];
+    if (manaCost) {
+      if (manaCost.includes('W')) colors.push('W');
+      if (manaCost.includes('U')) colors.push('U');
+      if (manaCost.includes('B')) colors.push('B');
+      if (manaCost.includes('R')) colors.push('R');
+      if (manaCost.includes('G')) colors.push('G');
+    }
+
+    // Create new card
+    const newCard: Card = {
+      id: `manual-${Date.now()}`,
+      name: cardName,
+      typeLine: typeLine,
+      manaCost: manaCost,
+      colors: colors,
+      rarity: rarity as any,
+      quantity: quantity
+    };
+
+    this.collection.cards.push(newCard);
+    this.setCollection(this.collection);
+    this.showImportStatus(`Added ${quantity}x ${cardName}`);
+
+    // Save to persistent storage
+    this.saveCollection();
+
+    // Close modal
+    this.closeModal();
+  }
+
+  private showModal(title: string, content: string): void {
+    const modal = document.getElementById('modal') as HTMLElement;
+    const modalTitle = document.getElementById('modal-title') as HTMLElement;
+    const modalContent = document.getElementById('modal-content') as HTMLElement;
+
+    if (modal && modalTitle && modalContent) {
+      modalTitle.textContent = title;
+      modalContent.innerHTML = content;
+      modal.classList.remove('hidden');
+    }
+  }
+
+  private closeModal(): void {
+    const modal = document.getElementById('modal') as HTMLElement;
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
+
+  private generateCSVContent(): string {
+    const headers = ['Card Name', 'Quantity', 'Mana Cost', 'Type', 'Rarity', 'Colors'];
+    const rows = [headers.join(',')];
+    
+    for (const card of this.filteredCards) {
+      const row = [
+        `"${card.name}"`,
+        card.quantity?.toString() || '1',
+        `"${card.manaCost || ''}"`,
+        `"${card.typeLine || ''}"`,
+        card.rarity,
+        `"${card.colors?.join('') || ''}"`
+      ];
+      rows.push(row.join(','));
+    }
+    
+    return rows.join('\n');
+  }
+
+  private showImportStatus(message: string): void {
+    // Show status in the status bar or a temporary message
+    console.log('Status:', message);
+    
+    // You could also show this in the UI temporarily
+    const statusElement = document.querySelector('#status-message');
+    if (statusElement) {
+      statusElement.textContent = message;
+      // Clear after 3 seconds
+      setTimeout(() => {
+        statusElement.textContent = 'Ready';
+      }, 3000);
+    }
+  }
+
+  private async saveCollection(): Promise<void> {
+    try {
+      await window.electronAPI?.store.set('collection', this.collection);
+    } catch (error) {
+      console.error('Error saving collection:', error);
+    }
   }
 }

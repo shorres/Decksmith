@@ -15,6 +15,15 @@ class DecksmithApp {
   private decksTab!: DecksTab;
   private aiTab!: AIRecommendationsTab;
 
+  // Expose components for global access
+  public get components() {
+    return {
+      collection: this.collectionTab,
+      decks: this.decksTab,
+      ai: this.aiTab
+    };
+  }
+
   constructor() {
     this.init();
   }
@@ -318,5 +327,7 @@ class DecksmithApp {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  new DecksmithApp();
+  const app = new DecksmithApp();
+  // Expose app to global scope for direct onclick handlers
+  (window as any).decksmithApp = app;
 });

@@ -27,8 +27,7 @@ export interface Deck {
   mainboard: DeckCard[];
   sideboard: DeckCard[];
   created?: string;
-  modified?: string;
-  lastModified: string;
+  lastModified?: string;
 }
 
 export interface DeckCard extends Card {
@@ -38,4 +37,11 @@ export interface DeckCard extends Card {
 export interface Collection {
   cards: Card[];
   lastModified: string;
+}
+
+// Global window type extension
+declare global {
+  interface Window {
+    decksmithApp?: any;
+  }
 }
