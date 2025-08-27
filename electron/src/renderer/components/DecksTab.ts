@@ -1,9 +1,10 @@
 import { BaseComponent } from './BaseComponent';
-import type { Deck } from '../types';
+import type { Deck, DeckCard, Card, Collection } from '../types';
 
 export class DecksTab extends BaseComponent {
   private decks: Deck[] = [];
   private selectedDeck: Deck | null = null;
+  private collection: Collection = { cards: [], lastModified: new Date().toISOString() };
 
   constructor() {
     super('#decks-tab');
@@ -14,6 +15,7 @@ export class DecksTab extends BaseComponent {
     
     this.render();
     this.setupEventListeners();
+    this.loadDecks();
     this.isInitialized = true;
   }
 
@@ -24,22 +26,24 @@ export class DecksTab extends BaseComponent {
         <div class="deck-sidebar">
           <div class="sidebar-header">
             <h3>Decks</h3>
-            <button id="new-deck-btn" class="btn btn-primary">+ New</button>
+            <button id="new-deck-btn" class="btn btn-primary" onclick="window.decksmithApp?.components?.decks?.createNewDeck?.();">+ New</button>
           </div>
           
           <div class="deck-list" id="deck-list">
-            <div class="empty-state" id="deck-list-empty">
-              <p>No decks yet. Create your first deck!</p>
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <p>Loading decks...</p>
             </div>
           </div>
           
           <div class="deck-info-panel" id="deck-info">
             <h4>Deck Information</h4>
             <div class="deck-name-input">
+              <label for="deck-name">Name:</label>
               <input type="text" id="deck-name" placeholder="Deck Name" />
             </div>
-            <div class="deck-format">
-              <label>Format:</label>
+            <div class="deck-format-input">
+              <label for="deck-format">Format:</label>
               <select id="deck-format">
                 <option value="Standard">Standard</option>
                 <option value="Modern">Modern</option>
@@ -47,6 +51,9 @@ export class DecksTab extends BaseComponent {
                 <option value="Commander">Commander</option>
                 <option value="Pioneer">Pioneer</option>
                 <option value="Historic">Historic</option>
+                <option value="Explorer">Explorer</option>
+                <option value="Alchemy">Alchemy</option>
+                <option value="Brawl">Brawl</option>
               </select>
             </div>
             <div class="deck-stats">
@@ -55,14 +62,22 @@ export class DecksTab extends BaseComponent {
                 <span id="deck-total-cards">0</span>
               </div>
               <div class="stat-row">
+                <span>Mainboard:</span>
+                <span id="deck-mainboard-cards">0</span>
+              </div>
+              <div class="stat-row">
                 <span>Sideboard:</span>
                 <span id="deck-sideboard-cards">0</span>
               </div>
             </div>
             <div class="deck-actions">
-              <button id="import-deck-btn" class="btn btn-secondary btn-full">Import CSV</button>
-              <button id="export-deck-btn" class="btn btn-secondary btn-full">Export CSV</button>
-              <button id="copy-to-clipboard-btn" class="btn btn-secondary btn-full">Copy to Clipboard</button>
+              <button id="copy-deck-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.copyDeck?.();">Copy Deck</button>
+              <button id="delete-deck-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.deleteDeck?.();">Delete Deck</button>
+              <button id="clear-selection-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.clearDeckSelection?.();">Clear Selection</button>
+              <button id="import-deck-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.importDeck?.();">Import CSV</button>
+              <button id="import-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.importFromClipboard?.();">Import Clipboard</button>
+              <button id="export-deck-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.exportDeck?.();">Export CSV</button>
+              <button id="copy-to-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.copyToClipboard?.();">Copy to Clipboard</button>
             </div>
           </div>
         </div>
@@ -71,10 +86,10 @@ export class DecksTab extends BaseComponent {
         <div class="deck-main">
           <div class="deck-tabs">
             <button class="deck-tab-btn active" data-section="mainboard">
-              Mainboard
+              Mainboard (<span id="mainboard-count">0</span>)
             </button>
             <button class="deck-tab-btn" data-section="sideboard">
-              Sideboard
+              Sideboard (<span id="sideboard-count">0</span>)
             </button>
           </div>
 
@@ -82,14 +97,14 @@ export class DecksTab extends BaseComponent {
             <div id="deck-mainboard" class="deck-section active">
               <div class="deck-header">
                 <div class="add-card-section">
-                  <input type="text" id="add-card-input" placeholder="Add card..." />
+                  <input type="text" id="add-card-input" placeholder="Add card..." autocomplete="off" />
                   <input type="number" id="add-card-qty" value="1" min="1" max="4" />
-                  <button id="add-card-mainboard" class="btn btn-primary">Add</button>
+                  <button id="add-card-mainboard" class="btn btn-primary" onclick="window.decksmithApp?.components?.decks?.addCardToMainboard?.();">Add</button>
                 </div>
               </div>
               <div class="deck-cards" id="mainboard-cards">
                 <div class="empty-state">
-                  <p>Select a deck to edit</p>
+                  <p>Select or create a deck to start building</p>
                 </div>
               </div>
             </div>
@@ -97,9 +112,9 @@ export class DecksTab extends BaseComponent {
             <div id="deck-sideboard" class="deck-section">
               <div class="deck-header">
                 <div class="add-card-section">
-                  <input type="text" id="add-card-input-sb" placeholder="Add card to sideboard..." />
+                  <input type="text" id="add-card-input-sb" placeholder="Add card to sideboard..." autocomplete="off" />
                   <input type="number" id="add-card-qty-sb" value="1" min="1" max="4" />
-                  <button id="add-card-sideboard" class="btn btn-primary">Add</button>
+                  <button id="add-card-sideboard" class="btn btn-primary" onclick="window.decksmithApp?.components?.decks?.addCardToSideboard?.();">Add</button>
                 </div>
               </div>
               <div class="deck-cards" id="sideboard-cards">
@@ -115,15 +130,9 @@ export class DecksTab extends BaseComponent {
   }
 
   private setupEventListeners(): void {
-    // New deck button
-    this.bindEvent('#new-deck-btn', 'click', () => this.createNewDeck());
+    console.log('Setting up DecksTab event listeners...');
 
-    // Import/Export buttons
-    this.bindEvent('#import-deck-btn', 'click', () => this.importDeck());
-    this.bindEvent('#export-deck-btn', 'click', () => this.exportDeck());
-    this.bindEvent('#copy-to-clipboard-btn', 'click', () => this.copyToClipboard());
-
-    // Deck tabs
+    // Tab switching
     this.element.querySelectorAll('.deck-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
@@ -134,15 +143,14 @@ export class DecksTab extends BaseComponent {
       });
     });
 
-    // Add card buttons
-    this.bindEvent('#add-card-mainboard', 'click', () => this.addCardToMainboard());
-    this.bindEvent('#add-card-sideboard', 'click', () => this.addCardToSideboard());
-
-    // Deck name input
+    // Deck name and format inputs
     this.bindEvent('#deck-name', 'input', () => this.updateDeckName());
-
-    // Deck format select
     this.bindEvent('#deck-format', 'change', () => this.updateDeckFormat());
+  }
+
+  // Public methods for global access
+  setCollection(collection: Collection): void {
+    this.collection = collection;
   }
 
   setDecks(decks: Deck[]): void {
@@ -150,53 +158,305 @@ export class DecksTab extends BaseComponent {
     this.renderDeckList();
   }
 
+  getAllDecks(): Deck[] {
+    return [...this.decks];
+  }
+
+  getCurrentDeck(): Deck | null {
+    return this.selectedDeck;
+  }
+
+  createNewDeck(): void {
+    const newDeck: Deck = {
+      id: 'deck-' + Date.now(),
+      name: 'New Deck',
+      format: 'Standard',
+      mainboard: [],
+      sideboard: [],
+      lastModified: new Date().toISOString()
+    };
+
+    this.decks.push(newDeck);
+    this.renderDeckList();
+    this.selectDeck(newDeck);
+    this.saveDecks();
+  }
+
+  copyDeck(): void {
+    if (!this.selectedDeck) return;
+
+    const copiedDeck: Deck = {
+      ...this.selectedDeck,
+      id: 'deck-' + Date.now(),
+      name: this.selectedDeck.name + ' Copy',
+      mainboard: [...this.selectedDeck.mainboard],
+      sideboard: [...this.selectedDeck.sideboard],
+      lastModified: new Date().toISOString()
+    };
+
+    this.decks.push(copiedDeck);
+    this.renderDeckList();
+    this.selectDeck(copiedDeck);
+    this.saveDecks();
+  }
+
+  deleteDeck(): void {
+    if (!this.selectedDeck) return;
+
+    const confirmed = confirm(`Delete deck "${this.selectedDeck.name}"?`);
+    if (!confirmed) return;
+
+    const index = this.decks.indexOf(this.selectedDeck);
+    if (index > -1) {
+      this.decks.splice(index, 1);
+      this.selectedDeck = null;
+      
+      this.renderDeckList();
+      
+      if (this.decks.length > 0) {
+        this.selectDeck(this.decks[0]);
+      } else {
+        this.clearDeckEditor();
+      }
+      
+      this.saveDecks();
+    }
+  }
+
+  selectDeckById(deckId: string): void {
+    const deck = this.decks.find(d => d.id === deckId);
+    if (deck) {
+      this.selectDeck(deck);
+    }
+  }
+
+  addCardToMainboard(): void {
+    const input = this.element.querySelector('#add-card-input') as HTMLInputElement;
+    const qtyInput = this.element.querySelector('#add-card-qty') as HTMLInputElement;
+    
+    if (!input || !qtyInput || !this.selectedDeck) return;
+    
+    const cardName = input.value.trim();
+    const quantity = parseInt(qtyInput.value) || 1;
+    
+    if (!cardName) return;
+    
+    this.addCardToDeck(cardName, quantity, false);
+    input.value = '';
+    qtyInput.value = '1';
+  }
+
+  addCardToSideboard(): void {
+    const input = this.element.querySelector('#add-card-input-sb') as HTMLInputElement;
+    const qtyInput = this.element.querySelector('#add-card-qty-sb') as HTMLInputElement;
+    
+    if (!input || !qtyInput || !this.selectedDeck) return;
+    
+    const cardName = input.value.trim();
+    const quantity = parseInt(qtyInput.value) || 1;
+    
+    if (!cardName) return;
+    
+    this.addCardToDeck(cardName, quantity, true);
+    input.value = '';
+    qtyInput.value = '1';
+  }
+
+  adjustCardQuantity(cardName: string, isSideboard: boolean, change: number): void {
+    if (!this.selectedDeck) return;
+    
+    const section = isSideboard ? this.selectedDeck.sideboard : this.selectedDeck.mainboard;
+    const cardIndex = section.findIndex(card => card.name === cardName);
+    
+    if (cardIndex === -1) return;
+    
+    const newQuantity = section[cardIndex].quantity + change;
+    
+    if (newQuantity <= 0) {
+      section.splice(cardIndex, 1);
+    } else {
+      section[cardIndex].quantity = newQuantity;
+    }
+    
+    this.selectedDeck.lastModified = new Date().toISOString();
+    this.renderDeckEditor();
+    this.saveDecks();
+  }
+
+  removeCard(cardName: string, isSideboard: boolean): void {
+    if (!this.selectedDeck) return;
+    
+    const confirmed = confirm(`Remove all copies of "${cardName}"?`);
+    if (!confirmed) return;
+    
+    const section = isSideboard ? this.selectedDeck.sideboard : this.selectedDeck.mainboard;
+    const cardIndex = section.findIndex(card => card.name === cardName);
+    
+    if (cardIndex > -1) {
+      section.splice(cardIndex, 1);
+      this.selectedDeck.lastModified = new Date().toISOString();
+      this.renderDeckEditor();
+      this.saveDecks();
+    }
+  }
+
+  showCardDetails(cardName: string): void {
+    // Open card details modal (similar to CollectionTab)
+    console.log(`Show details for ${cardName}`);
+    // TODO: Implement card details modal
+  }
+
+  clearDeckSelection(): void {
+    this.selectedDeck = null;
+    this.renderDeckList();
+    this.clearDeckEditor();
+  }
+
+  importDeck(): void {
+    this.showImportDialog();
+  }
+
+  importFromClipboard(): void {
+    this.showImportDialog(true);
+  }
+
+  exportDeck(): void {
+    if (!this.selectedDeck) return;
+    
+    const csvContent = this.generateDeckCSV(this.selectedDeck);
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${this.selectedDeck.name || 'deck'}.csv`;
+    a.click();
+    
+    URL.revokeObjectURL(url);
+  }
+
+  copyToClipboard(): void {
+    if (!this.selectedDeck) return;
+    
+    const deckText = this.generateDeckText(this.selectedDeck);
+    navigator.clipboard.writeText(deckText).then(() => {
+      console.log('Deck copied to clipboard');
+    }).catch(err => {
+      console.error('Failed to copy deck to clipboard:', err);
+    });
+  }
+
+  private async loadDecks(): Promise<void> {
+    try {
+      console.log('Loading decks data...');
+      const savedDecks = await window.electronAPI?.store.get('decks');
+      
+      if (savedDecks && Array.isArray(savedDecks)) {
+        console.log(`Loaded ${savedDecks.length} decks from storage`);
+        this.decks = savedDecks;
+      } else {
+        console.log('No existing decks found, creating sample deck');
+        this.decks = [this.createSampleDeck()];
+        await this.saveDecks();
+      }
+      
+      this.renderDeckList();
+      
+      if (this.decks.length > 0) {
+        this.selectDeck(this.decks[0]);
+      }
+      
+    } catch (error) {
+      console.error('Error loading decks:', error);
+      this.decks = [];
+      this.renderDeckList();
+    }
+  }
+
+  private async saveDecks(): Promise<void> {
+    try {
+      await window.electronAPI?.store.set('decks', this.decks);
+      console.log('Decks saved successfully');
+    } catch (error) {
+      console.error('Error saving decks:', error);
+    }
+  }
+
+  private createSampleDeck(): Deck {
+    return {
+      id: 'sample-deck-' + Date.now(),
+      name: 'Sample Red Deck',
+      format: 'Standard',
+      mainboard: [
+        {
+          id: 'lightning-bolt-sample',
+          name: 'Lightning Bolt',
+          quantity: 4,
+          typeLine: 'Instant',
+          manaCost: '{R}',
+          colors: ['R'],
+          cmc: 1,
+          rarity: 'common'
+        },
+        {
+          id: 'mountain-sample',
+          name: 'Mountain',
+          quantity: 20,
+          typeLine: 'Basic Land — Mountain',
+          manaCost: '',
+          colors: [],
+          cmc: 0,
+          rarity: 'basic'
+        }
+      ],
+      sideboard: [],
+      lastModified: new Date().toISOString()
+    };
+  }
+
   private renderDeckList(): void {
     const deckList = this.element.querySelector('#deck-list');
-    const emptyState = this.element.querySelector('#deck-list-empty');
-    
     if (!deckList) return;
 
     if (this.decks.length === 0) {
-      emptyState?.classList.remove('hidden');
       deckList.innerHTML = `
         <div class="empty-state">
           <p>No decks yet. Create your first deck!</p>
         </div>
       `;
     } else {
-      emptyState?.classList.add('hidden');
-      deckList.innerHTML = this.decks.map(deck => `
-        <div class="deck-item ${deck === this.selectedDeck ? 'selected' : ''}" data-deck-id="${deck.id}">
-          <div class="deck-item-header">
-            <h4 class="deck-item-name">${deck.name || 'Untitled Deck'}</h4>
-            <span class="deck-item-count">${deck.mainboard.length + deck.sideboard.length} cards</span>
+      deckList.innerHTML = this.decks.map(deck => {
+        const mainboardCount = deck.mainboard.reduce((sum, card) => sum + card.quantity, 0);
+        const sideboardCount = deck.sideboard.reduce((sum, card) => sum + card.quantity, 0);
+        
+        return `
+          <div class="deck-item ${deck === this.selectedDeck ? 'selected' : ''}" 
+               onclick="window.decksmithApp?.components?.decks?.selectDeckById?.('${deck.id}');">
+            <div class="deck-item-header">
+              <h4 class="deck-item-name">${deck.name}</h4>
+              <span class="deck-item-count">${mainboardCount + sideboardCount}</span>
+            </div>
+            <div class="deck-item-details">
+              <span class="deck-item-format">${deck.format}</span>
+            </div>
           </div>
-          <div class="deck-item-format">${deck.format || 'Standard'}</div>
-        </div>
-      `).join('');
-
-      // Add click listeners for deck selection
-      deckList.querySelectorAll('.deck-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-          const deckId = (e.currentTarget as HTMLElement).dataset.deckId;
-          const deck = this.decks.find(d => d.id === deckId);
-          if (deck) {
-            this.selectDeck(deck);
-          }
-        });
-      });
+        `;
+      }).join('');
     }
   }
 
   private selectDeck(deck: Deck): void {
     this.selectedDeck = deck;
-    this.renderDeckList(); // Re-render to update selection
+    this.renderDeckList();
     this.renderDeckEditor();
     this.updateDeckInfo();
   }
 
   private renderDeckEditor(): void {
-    if (!this.selectedDeck) return;
+    if (!this.selectedDeck) {
+      this.clearDeckEditor();
+      return;
+    }
 
     const mainboardCards = this.element.querySelector('#mainboard-cards');
     const sideboardCards = this.element.querySelector('#sideboard-cards');
@@ -210,10 +470,17 @@ export class DecksTab extends BaseComponent {
         `;
       } else {
         mainboardCards.innerHTML = this.selectedDeck.mainboard.map(card => `
-          <div class="deck-card-item">
-            <span class="card-quantity">${card.quantity}</span>
-            <span class="card-name">${card.name}</span>
-            <button class="btn-icon remove-card" data-card-name="${card.name}" data-section="mainboard">×</button>
+          <div class="deck-card-item" onclick="window.decksmithApp?.components?.decks?.showCardDetails?.('${card.name}');">
+            <div class="deck-card-info">
+              <span class="deck-card-quantity">${card.quantity}x</span>
+              <span class="deck-card-name">${card.name}</span>
+              <span class="deck-card-type">${card.typeLine || ''}</span>
+            </div>
+            <div class="deck-card-actions">
+              <button class="btn-icon" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.adjustCardQuantity?.('${card.name}', false, -1);" title="Remove one">−</button>
+              <button class="btn-icon" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.adjustCardQuantity?.('${card.name}', false, 1);" title="Add one">+</button>
+              <button class="btn-icon remove" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.removeCard?.('${card.name}', false);" title="Remove all">×</button>
+            </div>
           </div>
         `).join('');
       }
@@ -228,14 +495,49 @@ export class DecksTab extends BaseComponent {
         `;
       } else {
         sideboardCards.innerHTML = this.selectedDeck.sideboard.map(card => `
-          <div class="deck-card-item">
-            <span class="card-quantity">${card.quantity}</span>
-            <span class="card-name">${card.name}</span>
-            <button class="btn-icon remove-card" data-card-name="${card.name}" data-section="sideboard">×</button>
+          <div class="deck-card-item" onclick="window.decksmithApp?.components?.decks?.showCardDetails?.('${card.name}');">
+            <div class="deck-card-info">
+              <span class="deck-card-quantity">${card.quantity}x</span>
+              <span class="deck-card-name">${card.name}</span>
+              <span class="deck-card-type">${card.typeLine || ''}</span>
+            </div>
+            <div class="deck-card-actions">
+              <button class="btn-icon" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.adjustCardQuantity?.('${card.name}', true, -1);" title="Remove one">−</button>
+              <button class="btn-icon" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.adjustCardQuantity?.('${card.name}', true, 1);" title="Add one">+</button>
+              <button class="btn-icon remove" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.removeCard?.('${card.name}', true);" title="Remove all">×</button>
+            </div>
           </div>
         `).join('');
       }
     }
+
+    this.updateCardCounts();
+  }
+
+  private clearDeckEditor(): void {
+    const mainboardCards = this.element.querySelector('#mainboard-cards');
+    const sideboardCards = this.element.querySelector('#sideboard-cards');
+
+    if (mainboardCards) {
+      mainboardCards.innerHTML = `
+        <div class="empty-state">
+          <p>Select or create a deck to start building</p>
+        </div>
+      `;
+    }
+
+    if (sideboardCards) {
+      sideboardCards.innerHTML = `
+        <div class="empty-state">
+          <p>No sideboard cards</p>
+        </div>
+      `;
+    }
+
+    const nameInput = this.element.querySelector('#deck-name') as HTMLInputElement;
+    if (nameInput) nameInput.value = '';
+
+    this.updateCardCounts();
   }
 
   private updateDeckInfo(): void {
@@ -247,53 +549,49 @@ export class DecksTab extends BaseComponent {
     const formatSelect = this.element.querySelector('#deck-format') as HTMLSelectElement;
     if (formatSelect) formatSelect.value = this.selectedDeck.format || 'Standard';
 
-    const totalCards = this.selectedDeck.mainboard.reduce((sum, card) => sum + card.quantity, 0);
-    const sideboardCards = this.selectedDeck.sideboard.reduce((sum, card) => sum + card.quantity, 0);
+    this.updateCardCounts();
+  }
+
+  private updateCardCounts(): void {
+    if (!this.selectedDeck) {
+      const elements = ['#deck-total-cards', '#deck-mainboard-cards', '#deck-sideboard-cards', '#mainboard-count', '#sideboard-count'];
+      elements.forEach(selector => {
+        const element = this.element.querySelector(selector);
+        if (element) element.textContent = '0';
+      });
+      return;
+    }
+
+    const mainboardCount = this.selectedDeck.mainboard.reduce((sum, card) => sum + card.quantity, 0);
+    const sideboardCount = this.selectedDeck.sideboard.reduce((sum, card) => sum + card.quantity, 0);
+    const totalCount = mainboardCount + sideboardCount;
 
     const totalElement = this.element.querySelector('#deck-total-cards');
-    if (totalElement) totalElement.textContent = totalCards.toString();
+    if (totalElement) totalElement.textContent = totalCount.toString();
+
+    const mainboardElement = this.element.querySelector('#deck-mainboard-cards');
+    if (mainboardElement) mainboardElement.textContent = mainboardCount.toString();
 
     const sideboardElement = this.element.querySelector('#deck-sideboard-cards');
-    if (sideboardElement) sideboardElement.textContent = sideboardCards.toString();
+    if (sideboardElement) sideboardElement.textContent = sideboardCount.toString();
+
+    const mainboardCountSpan = this.element.querySelector('#mainboard-count');
+    if (mainboardCountSpan) mainboardCountSpan.textContent = mainboardCount.toString();
+
+    const sideboardCountSpan = this.element.querySelector('#sideboard-count');
+    if (sideboardCountSpan) sideboardCountSpan.textContent = sideboardCount.toString();
   }
 
   private switchSection(section: string): void {
-    // Update tab buttons
     this.element.querySelectorAll('.deck-tab-btn').forEach(btn => {
       btn.classList.remove('active');
     });
     this.element.querySelector(`[data-section="${section}"]`)?.classList.add('active');
 
-    // Update sections
-    this.element.querySelectorAll('.deck-section').forEach(section => {
-      section.classList.remove('active');
+    this.element.querySelectorAll('.deck-section').forEach(sectionEl => {
+      sectionEl.classList.remove('active');
     });
     this.element.querySelector(`#deck-${section}`)?.classList.add('active');
-  }
-
-  private createNewDeck(): void {
-    const newDeck: Deck = {
-      id: Date.now().toString(),
-      name: 'New Deck',
-      format: 'Standard',
-      mainboard: [],
-      sideboard: [],
-      lastModified: new Date().toISOString()
-    };
-
-    this.decks.push(newDeck);
-    this.renderDeckList();
-    this.selectDeck(newDeck);
-  }
-
-  private addCardToMainboard(): void {
-    // TODO: Implement add card logic
-    console.log('Add card to mainboard');
-  }
-
-  private addCardToSideboard(): void {
-    // TODO: Implement add card logic
-    console.log('Add card to sideboard');
   }
 
   private updateDeckName(): void {
@@ -301,7 +599,9 @@ export class DecksTab extends BaseComponent {
     const nameInput = this.element.querySelector('#deck-name') as HTMLInputElement;
     if (nameInput) {
       this.selectedDeck.name = nameInput.value;
+      this.selectedDeck.lastModified = new Date().toISOString();
       this.renderDeckList();
+      this.saveDecks();
     }
   }
 
@@ -310,19 +610,146 @@ export class DecksTab extends BaseComponent {
     const formatSelect = this.element.querySelector('#deck-format') as HTMLSelectElement;
     if (formatSelect) {
       this.selectedDeck.format = formatSelect.value;
+      this.selectedDeck.lastModified = new Date().toISOString();
       this.renderDeckList();
+      this.saveDecks();
     }
   }
 
-  private importDeck(): void {
-    console.log('Import deck');
+  private addCardToDeck(cardName: string, quantity: number, isSideboard: boolean): void {
+    if (!this.selectedDeck) return;
+    
+    const section = isSideboard ? this.selectedDeck.sideboard : this.selectedDeck.mainboard;
+    const existingCard = section.find(card => card.name === cardName);
+    
+    if (existingCard) {
+      existingCard.quantity += quantity;
+    } else {
+      const newCard: DeckCard = {
+        id: `${cardName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
+        name: cardName,
+        quantity: quantity,
+        typeLine: 'Unknown',
+        manaCost: '',
+        colors: []
+      };
+      section.push(newCard);
+    }
+    
+    this.selectedDeck.lastModified = new Date().toISOString();
+    this.renderDeckEditor();
+    this.saveDecks();
   }
 
-  private exportDeck(): void {
-    console.log('Export deck');
+  private showImportDialog(fromClipboard: boolean = false): void {
+    const dialog = document.createElement('div');
+    dialog.className = 'import-dialog';
+    
+    dialog.innerHTML = `
+      <div class="import-content">
+        <div class="import-header">
+          <h3>${fromClipboard ? 'Import from Clipboard' : 'Import Deck'}</h3>
+          <button class="close-btn" onclick="this.parentElement.parentElement.parentElement.remove()">×</button>
+        </div>
+        <div class="import-body">
+          <div class="import-format">
+            <label>Paste deck list (format: quantity name, e.g., "4 Lightning Bolt"):</label>
+            <textarea class="import-textarea" id="import-text" placeholder="4 Lightning Bolt&#10;20 Mountain&#10;3 Goblin Guide"></textarea>
+          </div>
+        </div>
+        <div class="import-footer">
+          <button class="btn btn-secondary" onclick="this.parentElement.parentElement.parentElement.remove()">Cancel</button>
+          <button class="btn btn-primary" onclick="window.decksmithApp?.components?.decks?.processImport?.()">Import</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    const textarea = dialog.querySelector('#import-text') as HTMLTextAreaElement;
+    if (fromClipboard && textarea) {
+      navigator.clipboard.readText().then(text => {
+        textarea.value = text;
+      }).catch(() => {
+        console.log('Could not read clipboard');
+      });
+    }
   }
 
-  private copyToClipboard(): void {
-    console.log('Copy to clipboard');
+  processImport(): void {
+    const dialog = document.querySelector('.import-dialog');
+    const textarea = dialog?.querySelector('#import-text') as HTMLTextAreaElement;
+    
+    if (!textarea || !textarea.value.trim()) return;
+    
+    const lines = textarea.value.trim().split('\n');
+    const importedCards: DeckCard[] = [];
+    
+    for (const line of lines) {
+      const match = line.trim().match(/^(\d+)\s+(.+)$/);
+      if (match) {
+        const quantity = parseInt(match[1]);
+        const name = match[2].trim();
+        
+        importedCards.push({
+          id: `${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
+          name: name,
+          quantity: quantity,
+          typeLine: 'Unknown',
+          manaCost: '',
+          colors: []
+        });
+      }
+    }
+    
+    if (importedCards.length > 0) {
+      // Create new deck with imported cards
+      const newDeck: Deck = {
+        id: 'imported-deck-' + Date.now(),
+        name: 'Imported Deck',
+        format: 'Standard',
+        mainboard: importedCards,
+        sideboard: [],
+        lastModified: new Date().toISOString()
+      };
+      
+      this.decks.push(newDeck);
+      this.renderDeckList();
+      this.selectDeck(newDeck);
+      this.saveDecks();
+    }
+    
+    dialog?.remove();
+  }
+
+  private generateDeckCSV(deck: Deck): string {
+    let csv = 'Quantity,Name,Type,Section\n';
+    
+    deck.mainboard.forEach(card => {
+      csv += `${card.quantity},"${card.name}","${card.typeLine || 'Unknown'}",Mainboard\n`;
+    });
+    
+    deck.sideboard.forEach(card => {
+      csv += `${card.quantity},"${card.name}","${card.typeLine || 'Unknown'}",Sideboard\n`;
+    });
+    
+    return csv;
+  }
+
+  private generateDeckText(deck: Deck): string {
+    let text = `${deck.name}\n\nMainboard:\n`;
+    
+    deck.mainboard.forEach(card => {
+      text += `${card.quantity} ${card.name}\n`;
+    });
+    
+    if (deck.sideboard.length > 0) {
+      text += `\nSideboard:\n`;
+      deck.sideboard.forEach(card => {
+        text += `${card.quantity} ${card.name}\n`;
+      });
+    }
+    
+    return text;
   }
 }
