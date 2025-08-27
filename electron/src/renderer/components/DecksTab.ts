@@ -7,6 +7,7 @@ export class DecksTab extends BaseComponent {
   private selectedDeck: Deck | null = null;
   private collection: Collection = { cards: [], lastModified: new Date().toISOString() };
   private cardModal: CardDetailsModal;
+  private onDeckSelectionChange: ((deck: Deck | null) => void) | null = null;
 
   constructor() {
     super('#decks-tab');
@@ -29,7 +30,7 @@ export class DecksTab extends BaseComponent {
         <div class="deck-sidebar">
           <div class="sidebar-header">
             <h3>Decks</h3>
-            <button id="new-deck-btn" class="btn btn-primary" onclick="window.decksmithApp?.components?.decks?.createNewDeck?.();">+ New</button>
+            <button id="new-deck-btn" class="btn btn-primary" onclick="window.app?.components?.decks?.createNewDeck?.();">+ New</button>
           </div>
           
           <div class="deck-list" id="deck-list">
@@ -74,13 +75,13 @@ export class DecksTab extends BaseComponent {
               </div>
             </div>
             <div class="deck-actions">
-              <button id="copy-deck-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.copyDeck?.();">Copy Deck</button>
-              <button id="delete-deck-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.deleteDeck?.();">Delete Deck</button>
-              <button id="clear-selection-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.clearDeckSelection?.();">Clear Selection</button>
-              <button id="import-deck-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.importDeck?.();">Import CSV</button>
-              <button id="import-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.importFromClipboard?.();">Import Clipboard</button>
-              <button id="export-deck-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.exportDeck?.();">Export CSV</button>
-              <button id="copy-to-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.decks?.copyToClipboard?.();">Copy to Clipboard</button>
+              <button id="copy-deck-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.copyDeck?.();">Copy Deck</button>
+              <button id="delete-deck-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.deleteDeck?.();">Delete Deck</button>
+              <button id="clear-selection-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.clearDeckSelection?.();">Clear Selection</button>
+              <button id="import-deck-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.importDeck?.();">Import CSV</button>
+              <button id="import-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.importFromClipboard?.();">Import Clipboard</button>
+              <button id="export-deck-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.exportDeck?.();">Export CSV</button>
+              <button id="copy-to-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.copyToClipboard?.();">Copy to Clipboard</button>
             </div>
           </div>
         </div>
@@ -102,7 +103,7 @@ export class DecksTab extends BaseComponent {
                 <div class="add-card-section">
                   <input type="text" id="add-card-input" placeholder="Add card..." autocomplete="off" />
                   <input type="number" id="add-card-qty" value="1" min="1" max="4" />
-                  <button id="add-card-mainboard" class="btn btn-primary" onclick="window.decksmithApp?.components?.decks?.addCardToMainboard?.();">Add</button>
+                  <button id="add-card-mainboard" class="btn btn-primary" onclick="window.app?.components?.decks?.addCardToMainboard?.();">Add</button>
                 </div>
               </div>
               <div class="deck-cards" id="mainboard-cards">
@@ -117,7 +118,7 @@ export class DecksTab extends BaseComponent {
                 <div class="add-card-section">
                   <input type="text" id="add-card-input-sb" placeholder="Add card to sideboard..." autocomplete="off" />
                   <input type="number" id="add-card-qty-sb" value="1" min="1" max="4" />
-                  <button id="add-card-sideboard" class="btn btn-primary" onclick="window.decksmithApp?.components?.decks?.addCardToSideboard?.();">Add</button>
+                  <button id="add-card-sideboard" class="btn btn-primary" onclick="window.app?.components?.decks?.addCardToSideboard?.();">Add</button>
                 </div>
               </div>
               <div class="deck-cards" id="sideboard-cards">
@@ -167,6 +168,14 @@ export class DecksTab extends BaseComponent {
 
   getCurrentDeck(): Deck | null {
     return this.selectedDeck;
+  }
+
+  getDeckById(id: string): Deck | null {
+    return this.decks.find(deck => deck.id === id) || null;
+  }
+
+  setOnDeckSelectionChange(callback: (deck: Deck | null) => void): void {
+    this.onDeckSelectionChange = callback;
   }
 
   createNewDeck(): void {
@@ -432,7 +441,7 @@ export class DecksTab extends BaseComponent {
         
         return `
           <div class="deck-item ${deck === this.selectedDeck ? 'selected' : ''}" 
-               onclick="window.decksmithApp?.components?.decks?.selectDeckById?.('${deck.id}');">
+               onclick="window.app?.components?.decks?.selectDeckById?.('${deck.id}');">
             <div class="deck-item-header">
               <h4 class="deck-item-name">${deck.name}</h4>
               <span class="deck-item-count">${mainboardCount + sideboardCount}</span>
@@ -451,6 +460,11 @@ export class DecksTab extends BaseComponent {
     this.renderDeckList();
     this.renderDeckEditor();
     this.updateDeckInfo();
+    
+    // Notify listeners of deck selection change
+    if (this.onDeckSelectionChange) {
+      this.onDeckSelectionChange(deck);
+    }
   }
 
   private renderDeckEditor(): void {
@@ -471,16 +485,16 @@ export class DecksTab extends BaseComponent {
         `;
       } else {
         mainboardCards.innerHTML = this.selectedDeck.mainboard.map(card => `
-          <div class="deck-card-item" onclick="window.decksmithApp?.components?.decks?.showCardDetails?.('${card.name}');">
+          <div class="deck-card-item" onclick="window.app?.components?.decks?.showCardDetails?.('${card.name}');">
             <div class="deck-card-info">
               <span class="deck-card-quantity">${card.quantity}x</span>
               <span class="deck-card-name">${card.name}</span>
               <span class="deck-card-type">${card.typeLine || ''}</span>
             </div>
             <div class="deck-card-actions">
-              <button class="btn-icon" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.adjustCardQuantity?.('${card.name}', false, -1);" title="Remove one">−</button>
-              <button class="btn-icon" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.adjustCardQuantity?.('${card.name}', false, 1);" title="Add one">+</button>
-              <button class="btn-icon remove" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.removeCard?.('${card.name}', false);" title="Remove all">×</button>
+              <button class="btn-icon" onclick="event.stopPropagation(); window.app?.components?.decks?.adjustCardQuantity?.('${card.name}', false, -1);" title="Remove one">−</button>
+              <button class="btn-icon" onclick="event.stopPropagation(); window.app?.components?.decks?.adjustCardQuantity?.('${card.name}', false, 1);" title="Add one">+</button>
+              <button class="btn-icon remove" onclick="event.stopPropagation(); window.app?.components?.decks?.removeCard?.('${card.name}', false);" title="Remove all">×</button>
             </div>
           </div>
         `).join('');
@@ -496,16 +510,16 @@ export class DecksTab extends BaseComponent {
         `;
       } else {
         sideboardCards.innerHTML = this.selectedDeck.sideboard.map(card => `
-          <div class="deck-card-item" onclick="window.decksmithApp?.components?.decks?.showCardDetails?.('${card.name}');">
+          <div class="deck-card-item" onclick="window.app?.components?.decks?.showCardDetails?.('${card.name}');">
             <div class="deck-card-info">
               <span class="deck-card-quantity">${card.quantity}x</span>
               <span class="deck-card-name">${card.name}</span>
               <span class="deck-card-type">${card.typeLine || ''}</span>
             </div>
             <div class="deck-card-actions">
-              <button class="btn-icon" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.adjustCardQuantity?.('${card.name}', true, -1);" title="Remove one">−</button>
-              <button class="btn-icon" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.adjustCardQuantity?.('${card.name}', true, 1);" title="Add one">+</button>
-              <button class="btn-icon remove" onclick="event.stopPropagation(); window.decksmithApp?.components?.decks?.removeCard?.('${card.name}', true);" title="Remove all">×</button>
+              <button class="btn-icon" onclick="event.stopPropagation(); window.app?.components?.decks?.adjustCardQuantity?.('${card.name}', true, -1);" title="Remove one">−</button>
+              <button class="btn-icon" onclick="event.stopPropagation(); window.app?.components?.decks?.adjustCardQuantity?.('${card.name}', true, 1);" title="Add one">+</button>
+              <button class="btn-icon remove" onclick="event.stopPropagation(); window.app?.components?.decks?.removeCard?.('${card.name}', true);" title="Remove all">×</button>
             </div>
           </div>
         `).join('');
@@ -733,7 +747,7 @@ export class DecksTab extends BaseComponent {
         </div>
         <div class="import-footer">
           <button class="btn btn-secondary" onclick="this.parentElement.parentElement.parentElement.remove()">Cancel</button>
-          <button class="btn btn-primary" onclick="window.decksmithApp?.components?.decks?.processImport?.()">Import</button>
+          <button class="btn btn-primary" onclick="window.app?.components?.decks?.processImport?.()">Import</button>
         </div>
       </div>
     `;

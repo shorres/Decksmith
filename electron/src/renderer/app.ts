@@ -1,4 +1,4 @@
-// Main application TypeScript file
+// Main application script file
 import './styles.css';
 import { CollectionTab } from './components/CollectionTab';
 import { DecksTab } from './components/DecksTab';
@@ -7,8 +7,8 @@ import type { Card, Deck, Collection } from './types';
 
 class DecksmithApp {
   private currentTab = 'collection';
-  private collection: Collection = { cards: [], lastModified: new Date().toISOString() };
-  private decks: Deck[] = [];
+  private collectionData: Collection = { cards: [], lastModified: new Date().toISOString() };
+  private decksData: Deck[] = [];
   
   // Tab components
   private collectionTab!: CollectionTab;
@@ -16,12 +16,29 @@ class DecksmithApp {
   private aiTab!: AIRecommendationsTab;
 
   // Expose components for global access
-  public get components() {
+  get components() {
     return {
       collection: this.collectionTab,
       decks: this.decksTab,
       ai: this.aiTab
     };
+  }
+
+  // Direct component access for window.app
+  get collection() {
+    return this.collectionTab;
+  }
+
+  get decks() {
+    return this.decksTab;
+  }
+
+  get ai() {
+    return this.aiTab;
+  }
+
+  getDecks(): Deck[] {
+    return this.decksData;
   }
 
   constructor() {
@@ -52,10 +69,32 @@ class DecksmithApp {
     this.collectionTab.loadCollectionData();
     
     // Pass data to other components
-    this.decksTab.setDecks(this.decks);
-    this.aiTab.setDecks(this.decks);
+    this.decksTab.setDecks(this.decksData);
+    this.aiTab.setDecks(this.decksData);
+    this.aiTab.setCollection(this.collectionData);
+    
+    // Connect AI tab with deck selection
+    this.setupInterComponentCommunication();
     
     console.log('Components initialized');
+  }
+
+  private setupInterComponentCommunication(): void {
+    // Set up communication between components
+    // When a deck is selected in the decks tab, notify the AI tab
+    
+    this.decksTab.setOnDeckSelectionChange((deck: Deck | null) => {
+      if (this.aiTab && deck) {
+        this.aiTab.setSelectedDeck(deck);
+        console.log(`Deck selection changed to: ${deck.name}`);
+      }
+    });
+
+    // Initial setup - if there's already a current deck, set it in AI tab
+    const currentDeck = this.decksTab.getCurrentDeck();
+    if (currentDeck && this.aiTab) {
+      this.aiTab.setSelectedDeck(currentDeck);
+    }
   }
 
   private async setupEventListeners(): Promise<void> {
@@ -134,10 +173,10 @@ class DecksmithApp {
       // Load collection
       const savedCollection = await window.electronAPI?.store.get('collection');
       if (savedCollection) {
-        this.collection = savedCollection;
+        this.collectionData = savedCollection;
       } else {
         // Add some sample data for demonstration
-        this.collection = {
+        this.collectionData = {
           cards: [
             {
               id: '1',
@@ -201,16 +240,44 @@ class DecksmithApp {
       // Load decks
       const savedDecks = await window.electronAPI?.store.get('decks');
       if (savedDecks) {
-        this.decks = savedDecks;
+        this.decksData = savedDecks;
       } else {
-        // Add sample deck
-        this.decks = [
+        // Add sample decks with more realistic content
+        this.decksData = [
           {
             id: '1',
-            name: 'Sample Deck',
+            name: 'Sample Burn Deck',
             format: 'Standard',
             mainboard: [
-              { id: '1', name: 'Lightning Bolt', quantity: 4, typeLine: 'Instant', rarity: 'common' }
+              { id: '1', name: 'Lightning Bolt', quantity: 4, typeLine: 'Instant', rarity: 'common', manaCost: '{R}', colors: ['R'], cmc: 1 },
+              { id: '2', name: 'Monastery Swiftspear', quantity: 4, typeLine: 'Creature — Human Monk', rarity: 'common', manaCost: '{R}', colors: ['R'], cmc: 1 },
+              { id: '3', name: 'Goblin Guide', quantity: 4, typeLine: 'Creature — Goblin Scout', rarity: 'rare', manaCost: '{R}', colors: ['R'], cmc: 1 },
+              { id: '4', name: 'Lava Spike', quantity: 4, typeLine: 'Sorcery', rarity: 'common', manaCost: '{R}', colors: ['R'], cmc: 1 },
+              { id: '5', name: 'Rift Bolt', quantity: 4, typeLine: 'Sorcery', rarity: 'common', manaCost: '{2}{R}', colors: ['R'], cmc: 3 },
+              { id: '6', name: 'Lightning Helix', quantity: 4, typeLine: 'Instant', rarity: 'uncommon', manaCost: '{R}{W}', colors: ['R', 'W'], cmc: 2 },
+              { id: '7', name: 'Boros Charm', quantity: 4, typeLine: 'Instant', rarity: 'uncommon', manaCost: '{R}{W}', colors: ['R', 'W'], cmc: 2 },
+              { id: '8', name: 'Mountain', quantity: 12, typeLine: 'Basic Land — Mountain', rarity: 'common', manaCost: '', colors: [], cmc: 0 },
+              { id: '9', name: 'Sacred Foundry', quantity: 4, typeLine: 'Land — Mountain Plains', rarity: 'rare', manaCost: '', colors: [], cmc: 0 }
+            ],
+            sideboard: [
+              { id: '10', name: 'Searing Blaze', quantity: 3, typeLine: 'Instant', rarity: 'common', manaCost: '{1}{R}', colors: ['R'], cmc: 2 }
+            ],
+            lastModified: new Date().toISOString()
+          },
+          {
+            id: '2', 
+            name: 'Control Deck',
+            format: 'Standard',
+            mainboard: [
+              { id: '11', name: 'Counterspell', quantity: 4, typeLine: 'Instant', rarity: 'common', manaCost: '{U}{U}', colors: ['U'], cmc: 2 },
+              { id: '12', name: 'Wrath of God', quantity: 3, typeLine: 'Sorcery', rarity: 'rare', manaCost: '{2}{W}{W}', colors: ['W'], cmc: 4 },
+              { id: '13', name: 'Jace, the Mind Sculptor', quantity: 2, typeLine: 'Legendary Planeswalker — Jace', rarity: 'mythic', manaCost: '{2}{U}{U}', colors: ['U'], cmc: 4 },
+              { id: '14', name: 'Path to Exile', quantity: 4, typeLine: 'Instant', rarity: 'uncommon', manaCost: '{W}', colors: ['W'], cmc: 1 },
+              { id: '15', name: 'Brainstorm', quantity: 4, typeLine: 'Instant', rarity: 'common', manaCost: '{U}', colors: ['U'], cmc: 1 },
+              { id: '16', name: 'Island', quantity: 10, typeLine: 'Basic Land — Island', rarity: 'common', manaCost: '', colors: [], cmc: 0 },
+              { id: '17', name: 'Plains', quantity: 8, typeLine: 'Basic Land — Plains', rarity: 'common', manaCost: '', colors: [], cmc: 0 },
+              { id: '18', name: 'Hallowed Fountain', quantity: 4, typeLine: 'Land — Plains Island', rarity: 'rare', manaCost: '', colors: [], cmc: 0 },
+              { id: '19', name: 'Serra Angel', quantity: 3, typeLine: 'Creature — Angel', rarity: 'uncommon', manaCost: '{3}{W}{W}', colors: ['W'], cmc: 5 }
             ],
             sideboard: [],
             lastModified: new Date().toISOString()
@@ -270,8 +337,8 @@ class DecksmithApp {
   }
 
   private newCollection(): void {
-    this.collection = { cards: [], lastModified: new Date().toISOString() };
-    this.collectionTab?.setCollection(this.collection);
+    this.collectionData = { cards: [], lastModified: new Date().toISOString() };
+    this.collectionTab?.setCollection(this.collectionData);
     this.updateStatus('New collection created');
   }
 
@@ -328,5 +395,5 @@ class DecksmithApp {
 document.addEventListener('DOMContentLoaded', () => {
   const app = new DecksmithApp();
   // Expose app to global scope for direct onclick handlers
-  (window as any).decksmithApp = app;
+  (window as any).app = app;
 });

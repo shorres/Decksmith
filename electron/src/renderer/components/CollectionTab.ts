@@ -129,16 +129,16 @@ export class CollectionTab extends BaseComponent {
 
           <!-- Action Buttons -->
           <div class="sidebar-actions">
-            <button id="import-csv-btn" class="btn btn-primary btn-full" onclick="window.decksmithApp?.components?.collection?.importCSV?.();">
+            <button id="import-csv-btn" class="btn btn-primary btn-full" onclick="window.app?.components?.collection?.importCSV?.();">
               Import CSV
             </button>
-            <button id="import-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.collection?.importClipboard?.();">
+            <button id="import-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.collection?.importClipboard?.();">
               Import Clipboard
             </button>
-            <button id="export-csv-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.collection?.exportCSV?.();">
+            <button id="export-csv-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.collection?.exportCSV?.();">
               Export CSV
             </button>
-            <button id="add-card-btn" class="btn btn-secondary btn-full" onclick="window.decksmithApp?.components?.collection?.addCard?.();">
+            <button id="add-card-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.collection?.addCard?.();">
               Add Card
             </button>
           </div>
@@ -294,14 +294,14 @@ export class CollectionTab extends BaseComponent {
       grid.innerHTML = `
         <div class="empty-state">
           <p>No cards match your current filters</p>
-          <button class="btn btn-secondary" id="clear-filters-btn" onclick="window.decksmithApp?.components?.collection?.clearAllFilters?.();">Clear Filters</button>
+          <button class="btn btn-secondary" id="clear-filters-btn" onclick="window.app?.components?.collection?.clearAllFilters?.();">Clear Filters</button>
         </div>
       `;
     } else {
       grid.innerHTML = this.filteredCards.map(card => {
         const imageUrl = this.getCardImageUrl(card.name);
         return `
-          <div class="card-item" data-card-id="${card.id}" onclick="window.decksmithApp?.components?.collection?.showCardDetails?.('${card.id}');">
+          <div class="card-item" data-card-id="${card.id}" onclick="window.app?.components?.collection?.showCardDetails?.('${card.id}');">
             <div class="card-image-container">
               ${imageUrl ? 
                 `<img class="card-image" src="${imageUrl}" alt="${card.name}" 
