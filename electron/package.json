@@ -1,0 +1,85 @@
+{
+  "name": "decksmith",
+  "version": "2.0.0",
+  "description": "Modern Magic: The Gathering collection and deck manager built with Electron",
+  "main": "dist/main/main.js",
+  "author": "shorres",
+  "license": "MIT",
+  "homepage": "https://github.com/shorres/Magic-Tool",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shorres/Magic-Tool.git"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run build:watch\" \"npm run electron:dev\"",
+    "build": "npm run build:main && npm run build:renderer",
+    "build:main": "tsc -p src/main/tsconfig.json",
+    "build:renderer": "webpack --config webpack.config.js",
+    "build:watch": "concurrently \"npm run build:main -- --watch\" \"npm run build:renderer -- --watch\"",
+    "electron:dev": "wait-on dist/main/main.js && electron .",
+    "electron": "electron .",
+    "pack": "npm run build && electron-builder",
+    "dist": "npm run build && electron-builder --publish=never",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "clean": "rimraf dist",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.0",
+    "@typescript-eslint/parser": "^6.4.0",
+    "concurrently": "^8.2.0",
+    "css-loader": "^6.8.1",
+    "electron": "^25.3.0",
+    "electron-builder": "^24.6.3",
+    "eslint": "^8.47.0",
+    "html-webpack-plugin": "^5.5.3",
+    "mini-css-extract-plugin": "^2.7.6",
+    "rimraf": "^5.0.1",
+    "style-loader": "^3.3.3",
+    "ts-loader": "^9.4.4",
+    "typescript": "^5.1.6",
+    "wait-on": "^7.0.1",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "node-fetch": "^3.3.2"
+  },
+  "build": {
+    "appId": "com.shorres.deckmaster",
+    "productName": "Deckmaster",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "../assets/decksmith_icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "../assets/decksmith_icon.ico",
+      "uninstallerIcon": "../assets/decksmith_icon.ico"
+    }
+  }
+}

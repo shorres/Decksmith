@@ -1,0 +1,61 @@
+export abstract class BaseComponent {
+  protected element: HTMLElement;
+  protected isInitialized = false;
+
+  constructor(protected selector: string) {
+    console.log(`BaseComponent: Looking for element with selector: ${selector}`);
+    const element = document.querySelector(selector);
+    if (!element) {
+      console.error(`BaseComponent: Element with selector "${selector}" not found`);
+      console.log('Available elements:', document.querySelectorAll('*[id]'));
+      throw new Error(`Element with selector "${selector}" not found`);
+    }
+    console.log(`BaseComponent: Found element for ${selector}:`, element);
+    this.element = element as HTMLElement;
+  }
+
+  // Public getter to check initialization status
+  get initialized(): boolean {
+    return this.isInitialized;
+  }
+
+  abstract render(): void;
+  abstract initialize(): void;
+
+  protected createElementFromHTML(htmlString: string): HTMLElement {
+    const div = document.createElement('div');
+    div.innerHTML = htmlString.trim();
+    return div.firstChild as HTMLElement;
+  }
+
+  protected bindEvent(selector: string, event: string, handler: (e: Event) => void): void {
+    const element = this.element.querySelector(selector);
+    if (element) {
+      console.log(`Binding ${event} event to ${selector}`, element);
+      element.addEventListener(event, (e) => {
+        console.log(`Event ${event} triggered on ${selector}`);
+        try {
+          handler(e);
+        } catch (error) {
+          console.error(`Error in ${event} handler for ${selector}:`, error);
+        }
+      });
+    } else {
+      console.warn(`Element not found for selector: ${selector}`);
+    }
+  }
+
+  show(): void {
+    this.element.classList.remove('hidden');
+    this.element.classList.add('active');
+  }
+
+  hide(): void {
+    this.element.classList.remove('active');
+    this.element.classList.add('hidden');
+  }
+
+  destroy(): void {
+    // Override in subclasses if cleanup is needed
+  }
+}

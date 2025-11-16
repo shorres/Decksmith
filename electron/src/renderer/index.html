@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decksmith - MTG Collection & Deck Manager</title>
+    <script>
+        // Fix for webpack 5 global reference issue in Electron
+        if (typeof global === 'undefined') {
+            window.global = window;
+        }
+    </script>
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="app-title">
+                    <h1>🃏 Decksmith</h1>
+                    <span class="version">v2.0.0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Navigation Tabs -->
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="collection">
+                    <span class="tab-icon">📚</span>
+                    Collection
+                </button>
+                <button class="tab-btn" data-tab="decks">
+                    <span class="tab-icon">🏗️</span>
+                    Decks
+                </button>
+                <!-- Temporarily hidden - AI Recommendations tab
+                <button class="tab-btn" data-tab="ai-recommendations">
+                    <span class="tab-icon">🤖</span>
+                    AI Recommendations
+                </button>
+                -->
+            </nav>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <!-- Collection Tab -->
+                <div id="collection-tab" class="tab-panel active">
+                    <!-- Content will be rendered by CollectionTab component -->
+                </div>
+
+                <!-- Decks Tab -->
+                <div id="decks-tab" class="tab-panel">
+                    <!-- Content will be rendered by DecksTab component -->
+                </div>
+
+                <!-- Temporarily hidden - AI Recommendations Tab
+                <div id="ai-recommendations-tab" class="tab-panel">
+                    <!-- Content will be rendered by AIRecommendationsTab component -->
+                </div>
+                -->
+            </div>
+        </main>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <span id="status-message">Ready</span>
+            <span id="card-count">0 cards loaded</span>
+        </footer>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Modal Title</h3>
+                <button id="modal-close" class="btn-icon">×</button>
+            </div>
+            <div class="modal-body" id="modal-content">
+                Modal content goes here
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+</body>
+</html>
