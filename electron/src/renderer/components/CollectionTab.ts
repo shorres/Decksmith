@@ -141,6 +141,9 @@ export class CollectionTab extends BaseComponent {
             <button id="add-card-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.collection?.addCard?.();">
               Add Card
             </button>
+            <button id="refresh-cache-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.collection?.refreshCardData?.();" title="Update card information from Scryfall">
+              🔄 Update Card Data
+            </button>
           </div>
         </div>
 
@@ -643,6 +646,59 @@ export class CollectionTab extends BaseComponent {
     } catch (error) {
       console.error('Error importing from clipboard:', error);
       this.showImportStatus('Error reading clipboard');
+    }
+  }
+
+  private async refreshCardData(): Promise<void> {
+    try {
+      // Dynamically import CardCache
+      const { CardCache, ScryfallAPI } = await import('../utils');
+      
+      // Get cache stats before
+      const statsBefore = CardCache.getCacheStats();
+      
+      const confirmMsg = `This will update card information from Scryfall for all cards in your collection.\n\n` +
+                        `Current cache: ${statsBefore.cardCount} cards, ${statsBefore.priceCount} prices\n` +
+                        `Cache expiry: Cards (${statsBefore.cardExpiry}), Prices (${statsBefore.priceExpiry})\n\n` +
+                        `This may take a few minutes. Continue?`;
+      
+      if (!confirm(confirmMsg)) {
+        return;
+      }
+      
+      this.showImportStatus('Updating card data from Scryfall...');
+      
+      // Invalidate all caches to force refresh
+      CardCache.invalidateCache();
+      
+      let updatedCount = 0;
+      const uniqueCards = Array.from(new Set(this.collection.cards.map(c => c.name)));
+      
+      for (const cardName of uniqueCards) {
+        try {
+          // Force refresh by fetching with forceRefresh flag
+          await ScryfallAPI.getCardByName(cardName, true);
+          updatedCount++;
+          
+          // Update status periodically
+          if (updatedCount % 10 === 0) {
+            this.showImportStatus(`Updating... ${updatedCount}/${uniqueCards.length} cards`);
+          }
+        } catch (error) {
+          console.error(`Error updating ${cardName}:`, error);
+        }
+      }
+      
+      // Get cache stats after
+      const statsAfter = CardCache.getCacheStats();
+      
+      this.showImportStatus(
+        `✓ Updated ${updatedCount} cards! Cache now contains ${statsAfter.cardCount} cards, ${statsAfter.priceCount} prices.`
+      );
+      
+    } catch (error) {
+      console.error('Error refreshing card data:', error);
+      this.showImportStatus('Error updating card data');
     }
   }
 
