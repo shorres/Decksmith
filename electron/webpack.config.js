@@ -1,6 +1,7 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const webpack = require('webpack');
 
 module.exports = {
   mode: process.env.NODE_ENV || 'development',
@@ -13,7 +14,8 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'dist/renderer'),
     filename: '[name].js',
-    clean: true
+    clean: true,
+    globalObject: 'this'
   },
   
   target: 'electron-renderer',
@@ -48,6 +50,9 @@ module.exports = {
     }),
     new MiniCssExtractPlugin({
       filename: '[name].css'
+    }),
+    new webpack.ProvidePlugin({
+      global: ['global', 'default']
     })
   ],
   
