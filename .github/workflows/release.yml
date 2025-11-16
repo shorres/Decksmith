@@ -3,13 +3,13 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'  # Triggers on version tags like v2.0.0, v2.1.0, etc.
   workflow_dispatch:
     inputs:
       version:
         description: 'Version to release'
         required: true
-        default: '1.0.0'
+        default: '2.0.0'
 
 permissions:
   contents: write
@@ -22,39 +22,28 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
       with:
-        python-version: '3.11'
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: electron/package-lock.json
     
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install --upgrade setuptools wheel
-        
-        # Install requirements with specific versions to avoid conflicts
-        pip install -r requirements.txt --force-reinstall --no-deps
-        pip install -r requirements.txt  # Install dependencies
-        
-        # Ensure PyInstaller is latest version
-        pip install --upgrade pyinstaller
-        
-        # Force reinstall critical packages that commonly fail in CI
-        pip install --force-reinstall requests urllib3 certifi charset-normalizer pillow pyperclip
-        
-        # Verify critical packages are installed and importable
-        Write-Host "Verifying package installation..."
-        python -c "import requests; print('requests:', requests.__version__)"
-        python -c "import urllib3; print('urllib3:', urllib3.__version__)" 
-        python -c "import certifi; print('certifi:', certifi.__version__)"
-        python -c "import charset_normalizer; print('charset_normalizer:', charset_normalizer.__version__)"
-        python -c "import PIL; print('PIL:', PIL.__version__)"
-        python -c "import pyperclip; print('pyperclip:', pyperclip.__version__)"
-        
-        # Show Python environment info
-        Write-Host "Python environment:"
-        python -c "import sys; print('Python:', sys.version); print('Path:', sys.path[:3])"
-
+        cd electron
+        npm ci
+    
+    - name: Build TypeScript
+      run: |
+        cd electron
+        npm run build
+    
+    - name: Build Windows installer
+      run: |
+        cd electron
+        npm run dist:win
+    
     - name: Get version
       id: get_version
       run: |
@@ -65,184 +54,124 @@ jobs:
         }
         echo "VERSION=$VERSION" >> $env:GITHUB_OUTPUT
         echo "Building version: $VERSION"
-
-    - name: Update version file
+    
+    - name: List release files
       run: |
-        $version = "${{ steps.get_version.outputs.VERSION }}"
-        $content = @"
-        __version__ = "$version"
-        __app_name__ = "Decksmith"  
-        __description__ = "Magic: The Gathering Arena Deck Manager"
-        "@
-        $content | Out-File -FilePath "src\__version__.py" -Encoding UTF8
-
-    - name: Validate imports
-      run: |
-        # Run comprehensive import validation
-        # This ensures all critical dependencies are available before building
-        Write-Host "Running import validation..."
-        
-        try {
-          python validate_imports.py
-          Write-Host "Import validation passed successfully!"
-        }
-        catch {
-          Write-Host "Primary import validation failed. Running diagnostic checks..." -ForegroundColor Yellow
-          
-          # Run simple validation as fallback
-          Write-Host "Trying simple validation..."
-          python validate_imports_simple.py
-          
-          # If that also fails, provide detailed diagnostics
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "Detailed diagnostics:" -ForegroundColor Red
-            
-            # Check each critical package individually
-            $criticalPackages = @('requests', 'urllib3', 'certifi', 'charset_normalizer', 'PIL', 'pyperclip')
-            foreach ($package in $criticalPackages) {
-              try {
-                python -c "import ${package}; print('✓ ${package} OK')"
-              }
-              catch {
-                Write-Host "✗ ${package} FAILED" -ForegroundColor Red
-                pip show $package
-              }
-            }
-            
-            # Show installed packages
-            Write-Host "All installed packages:"
-            pip list
-            
-            throw "Import validation failed - cannot proceed with build"
-          }
-        }
-
-    - name: Build executable
-      run: |
-        $version = "${{ steps.get_version.outputs.VERSION }}"
-        $releaseDir = "release\$version"
-        New-Item -ItemType Directory -Path $releaseDir -Force
-        
-        # Create version info
-        $versionInfo = @"
-        VSVersionInfo(
-          ffi=FixedFileInfo(
-            filevers=(1,0,0,0),
-            prodvers=(1,0,0,0),
-            mask=0x3f,
-            flags=0x0,
-            OS=0x40004,
-            fileType=0x1,
-            subtype=0x0,
-            date=(0, 0)
-            ),
-          kids=[
-            StringFileInfo(
-              [
-              StringTable(
-                u'040904B0',
-                [StringStruct(u'CompanyName', u''),
-                StringStruct(u'FileDescription', u'Magic: The Gathering Arena Deck Manager'),
-                StringStruct(u'FileVersion', u'$version'),
-                StringStruct(u'InternalName', u'MagicTool'),
-                StringStruct(u'LegalCopyright', u''),
-                StringStruct(u'OriginalFilename', u'Decksmith v$version.exe'),
-                StringStruct(u'ProductName', u'Decksmith'),
-                StringStruct(u'ProductVersion', u'$version')])
-              ]),
-            VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
-          ]
-        )
-        "@
-        $versionInfo | Out-File -FilePath "$releaseDir\version_info.txt" -Encoding UTF8
-        
-        # Build with PyInstaller in directory mode (more reliable for complex dependencies)
-        $iconArg = ""
-        if (Test-Path "assets\decksmith_icon.ico") {
-          $iconArg = "--icon=assets\decksmith_icon.ico"
-          Write-Host "Using icon: assets\decksmith_icon.ico"
-        }
-        
-        # Use --onedir instead of --onefile for better dependency handling
-        pyinstaller --onedir --windowed --name "Decksmith v$version" $iconArg --distpath "$releaseDir" --workpath "$releaseDir\build" --version-file="$releaseDir\version_info.txt" --add-data "src;src" --add-data "data;data" --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.simpledialog --hidden-import=requests --hidden-import=requests.adapters --hidden-import=requests.auth --hidden-import=requests.cookies --hidden-import=requests.models --hidden-import=requests.sessions --hidden-import=urllib3 --hidden-import=urllib3.connection --hidden-import=urllib3.connectionpool --hidden-import=urllib3.poolmanager --hidden-import=urllib3.util --hidden-import=urllib3.util.retry --hidden-import=certifi --hidden-import=charset_normalizer --hidden-import=json --hidden-import=threading --hidden-import=queue --hidden-import=csv --hidden-import=re --hidden-import=pyperclip --hidden-import=datetime --hidden-import=os --hidden-import=time --hidden-import=math --hidden-import=collections --hidden-import=dataclasses --hidden-import=typing --hidden-import=PIL --hidden-import=PIL.Image --hidden-import=PIL.ImageTk --hidden-import=io --hidden-import=sys --hidden-import=pathlib --hidden-import=logging main.py
-
-    - name: Create directory-based release package
-      run: |
-        $version = "${{ steps.get_version.outputs.VERSION }}"
-        $releaseDir = "release\$version" 
-        $appDir = "$releaseDir\Decksmith v$version"
-        
-        # Verify directory exists (PyInstaller creates a directory with --onedir)
-        if (-not (Test-Path $appDir)) {
-          throw "Application directory not found at: $appDir"
-        }
-        
-        # Create comprehensive release package directory
-        $packageDir = "$releaseDir\package"
-        New-Item -ItemType Directory -Path $packageDir -Force
-        
-        # Copy the entire application directory
-        Copy-Item $appDir -Destination "$packageDir\Decksmith v$version" -Recurse
-        
-        # Create data directory structure (for user data persistence)
-        $dataDir = "$packageDir\data"
-        New-Item -ItemType Directory -Path $dataDir -Force
-        New-Item -ItemType Directory -Path "$dataDir\cache" -Force
-        New-Item -ItemType Directory -Path "$dataDir\collections" -Force  
-        New-Item -ItemType Directory -Path "$dataDir\decks" -Force
-        
-        # Copy default collection if it exists
-        if (Test-Path "data\collections\default.json") {
-          Copy-Item "data\collections\default.json" -Destination "$dataDir\collections\default.json"
-        }
-        
-        # Create README for users
-        $readmeContent = "# Decksmith v$version`n`n## Installation`n1. Extract all files to a folder of your choice`n2. Navigate to the 'Decksmith v$version' folder`n3. Run 'Decksmith v$version.exe' to start the application`n`n## Data Storage`n- Your decks will be saved in the 'data/decks' folder`n- Collections are stored in the 'data/collections' folder`n- Cache files are stored in the 'data/cache' folder`n`n## Support`nFor issues or questions, visit: https://github.com/shorres/Magic-Tool"
-        $readmeContent | Out-File -FilePath "$packageDir\README.txt" -Encoding UTF8
-        
-        # Create enhanced ZIP package
-        $packageName = "Decksmith-v$version-Windows.zip"
-        $packagePath = "$releaseDir\$packageName"
-        Compress-Archive -Path "$packageDir\*" -DestinationPath $packagePath -Force
-        
-        # Verify package was created
-        if (-not (Test-Path $packagePath)) {
-          throw "Package not created at: $packagePath"
-        }
-        
-        # Clean up temporary directory
-        Remove-Item $packageDir -Recurse -Force
-        
-        # Convert paths to use forward slashes for GitHub Actions compatibility
-        $packagePathForGitHub = $packagePath -replace '\\', '/'
-        
-        # Set outputs with proper paths
-        echo "PACKAGE_PATH=$packagePathForGitHub" >> $env:GITHUB_OUTPUT
-        echo "PACKAGE_NAME=$packageName" >> $env:GITHUB_OUTPUT
-        
-        Write-Host "Enhanced package created: $packagePath"
-        Write-Host "Package path for GitHub: $packagePathForGitHub"
-        Write-Host "Package size: $((Get-Item $packagePath).Length / 1MB) MB"
-        
-        # List files to verify
-        Write-Host "Files in release directory:"
-        Get-ChildItem $releaseDir -Recurse
-      id: package
-
-    - name: Upload artifact
+        Write-Host "Files in electron/release:"
+        Get-ChildItem electron\release -Recurse | Select-Object FullName, Length
+    
+    - name: Upload Windows installer
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ steps.package.outputs.PACKAGE_NAME }}
-        path: ${{ steps.package.outputs.PACKAGE_PATH }}
-
-    - name: Create Release
+        name: windows-installer
+        path: electron/release/*.exe
+    
+    - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
-        files: ${{ steps.package.outputs.PACKAGE_PATH }}
+        files: electron/release/*.exe
         draft: false
         prerelease: false
         generate_release_notes: true
         fail_on_unmatched_files: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: electron/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd electron
+        npm ci
+    
+    - name: Build TypeScript
+      run: |
+        cd electron
+        npm run build
+    
+    - name: Build macOS installer
+      run: |
+        cd electron
+        npm run dist:mac
+    
+    - name: List release files
+      run: |
+        echo "Files in electron/release:"
+        ls -lh electron/release/
+    
+    - name: Upload macOS installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-installer
+        path: electron/release/*.dmg
+    
+    - name: Upload to Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: electron/release/*.dmg
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: electron/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd electron
+        npm ci
+    
+    - name: Build TypeScript
+      run: |
+        cd electron
+        npm run build
+    
+    - name: Build Linux installer
+      run: |
+        cd electron
+        npm run dist:linux
+    
+    - name: List release files
+      run: |
+        echo "Files in electron/release:"
+        ls -lh electron/release/
+    
+    - name: Upload Linux installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-installer
+        path: electron/release/*.AppImage
+    
+    - name: Upload to Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: electron/release/*.AppImage
+        draft: false
+        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

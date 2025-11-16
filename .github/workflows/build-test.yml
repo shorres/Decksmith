@@ -1,0 +1,86 @@
+name: Build Test
+
+on:
+  pull_request:
+    branches: [ main, electron-migration ]
+  push:
+    branches: [ main, electron-migration ]
+    paths:
+      - 'electron/**'
+      - '.github/workflows/build-test.yml'
+
+jobs:
+  test-build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: electron/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd electron
+        npm ci
+    
+    - name: Build TypeScript
+      run: |
+        cd electron
+        npm run build
+    
+    - name: Test build (no packaging)
+      run: |
+        cd electron
+        # Just verify the build works, don't create installer
+        npm run build
+        Write-Host "Build successful!" -ForegroundColor Green
+    
+    - name: Verify build output
+      run: |
+        if (-not (Test-Path "electron\dist\main\main.js")) {
+          throw "Main process build failed"
+        }
+        if (-not (Test-Path "electron\dist\renderer")) {
+          throw "Renderer process build failed"
+        }
+        Write-Host "All build artifacts present!" -ForegroundColor Green
+
+  test-build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: electron/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd electron
+        npm ci
+    
+    - name: Build TypeScript
+      run: |
+        cd electron
+        npm run build
+    
+    - name: Verify build output
+      run: |
+        if [ ! -f "electron/dist/main/main.js" ]; then
+          echo "Main process build failed"
+          exit 1
+        fi
+        if [ ! -d "electron/dist/renderer" ]; then
+          echo "Renderer process build failed"
+          exit 1
+        fi
+        echo "All build artifacts present!"
