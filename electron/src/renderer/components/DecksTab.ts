@@ -26,68 +26,66 @@ export class DecksTab extends BaseComponent {
   render(): void {
     this.element.innerHTML = `
       <div class="decks-layout">
-        <!-- Deck List Sidebar -->
-        <div class="deck-sidebar">
-          <div class="sidebar-header">
-            <h3>Decks</h3>
-            <button id="new-deck-btn" class="btn btn-primary" onclick="window.app?.components?.decks?.createNewDeck?.();">+ New</button>
+        <!-- Deck Selection View (shown when no deck is selected) -->
+        <div class="deck-selection-view" id="deck-selection-view">
+          <div class="deck-selection-header">
+            <h2>My Decks</h2>
+            <button id="new-deck-btn-main" class="btn btn-primary" onclick="window.app?.components?.decks?.createNewDeck?.();">
+              + New Deck
+            </button>
           </div>
           
-          <div class="deck-list" id="deck-list">
+          <div class="deck-grid" id="deck-grid">
             <div class="loading-state">
               <div class="spinner"></div>
               <p>Loading decks...</p>
             </div>
           </div>
-          
-          <div class="deck-info-panel" id="deck-info">
-            <h4>Deck Information</h4>
-            <div class="deck-name-input">
-              <label for="deck-name">Name:</label>
-              <input type="text" id="deck-name" placeholder="Deck Name" />
-            </div>
-            <div class="deck-format-input">
-              <label for="deck-format">Format:</label>
-              <select id="deck-format">
-                <option value="Standard">Standard</option>
-                <option value="Modern">Modern</option>
-                <option value="Legacy">Legacy</option>
-                <option value="Commander">Commander</option>
-                <option value="Pioneer">Pioneer</option>
-                <option value="Historic">Historic</option>
-                <option value="Explorer">Explorer</option>
-                <option value="Alchemy">Alchemy</option>
-                <option value="Brawl">Brawl</option>
-              </select>
-            </div>
-            <div class="deck-stats">
-              <div class="stat-row">
-                <span>Total Cards:</span>
-                <span id="deck-total-cards">0</span>
-              </div>
-              <div class="stat-row">
-                <span>Mainboard:</span>
-                <span id="deck-mainboard-cards">0</span>
-              </div>
-              <div class="stat-row">
-                <span>Sideboard:</span>
-                <span id="deck-sideboard-cards">0</span>
-              </div>
-            </div>
-            <div class="deck-actions">
-              <button id="copy-deck-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.copyDeck?.();">Copy Deck</button>
-              <button id="delete-deck-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.deleteDeck?.();">Delete Deck</button>
-              <button id="clear-selection-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.clearDeckSelection?.();">Clear Selection</button>
-              <button id="import-deck-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.importDeck?.();">Import CSV</button>
-              <button id="import-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.importFromClipboard?.();">Import Clipboard</button>
-              <button id="export-deck-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.exportDeck?.();">Export CSV</button>
-              <button id="copy-to-clipboard-btn" class="btn btn-secondary btn-full" onclick="window.app?.components?.decks?.copyToClipboard?.();">Copy to Clipboard</button>
-            </div>
-          </div>
         </div>
 
-        <!-- Deck Editor -->
-        <div class="deck-main">
+        <!-- Deck Editor View (shown when a deck is selected) -->
+        <div class="deck-editor-view hidden" id="deck-editor-view">
+          <div class="deck-editor-header">
+            <div class="deck-header-left">
+              <button id="back-to-decks" class="btn btn-secondary" onclick="window.app?.components?.decks?.clearDeckSelection?.();">
+                ← Back to Decks
+              </button>
+              <div class="deck-title-section">
+                <input type="text" id="deck-name" class="deck-name-input-large" placeholder="Deck Name" />
+                <select id="deck-format" class="deck-format-select">
+                  <option value="Standard">Standard</option>
+                  <option value="Modern">Modern</option>
+                  <option value="Legacy">Legacy</option>
+                  <option value="Commander">Commander</option>
+                  <option value="Pioneer">Pioneer</option>
+                  <option value="Historic">Historic</option>
+                  <option value="Explorer">Explorer</option>
+                  <option value="Alchemy">Alchemy</option>
+                  <option value="Brawl">Brawl</option>
+                </select>
+              </div>
+            </div>
+            <div class="deck-header-right">
+              <div class="deck-stats-inline">
+                <span class="stat-badge">
+                  <strong id="deck-total-cards">0</strong> cards
+                </span>
+                <span class="stat-badge">
+                  Main: <strong id="deck-mainboard-cards">0</strong>
+                </span>
+                <span class="stat-badge">
+                  Side: <strong id="deck-sideboard-cards">0</strong>
+                </span>
+              </div>
+              <div class="deck-actions-inline">
+                <button id="copy-deck-btn" class="btn btn-secondary btn-sm" onclick="window.app?.components?.decks?.copyDeck?.();" title="Copy Deck">📋 Copy</button>
+                <button id="import-clipboard-btn" class="btn btn-secondary btn-sm" onclick="window.app?.components?.decks?.importFromClipboard?.();" title="Import from Clipboard">📥 Import</button>
+                <button id="export-deck-btn" class="btn btn-secondary btn-sm" onclick="window.app?.components?.decks?.exportDeck?.();" title="Export Deck">📤 Export</button>
+                <button id="delete-deck-btn" class="btn btn-danger btn-sm" onclick="window.app?.components?.decks?.deleteDeck?.();" title="Delete Deck">🗑️ Delete</button>
+              </div>
+            </div>
+          </div>
+
           <div class="deck-tabs">
             <button class="deck-tab-btn active" data-section="mainboard">
               Mainboard (<span id="mainboard-count">0</span>)
@@ -103,6 +101,21 @@ export class DecksTab extends BaseComponent {
                 <div class="add-card-section">
                   <input type="text" id="add-card-input" placeholder="Add card..." autocomplete="off" />
                   <input type="number" id="add-card-qty" value="1" min="1" max="4" />
+                  <button id="add-card-mainboard" class="btn btn-primary" onclick="window.app?.components?.decks?.addCardToMainboard?.();">Add</button>
+                </div>
+              </div>
+              <div class="deck-cards" id="mainboard-cards">
+                <div class="empty-state">
+                  <p>No cards in mainboard</p>
+                </div>
+              </div>
+            </div>
+
+            <div id="deck-sideboard" class="deck-section">
+              <div class="deck-header">
+                <div class="add-card-section">
+                  <input type="text" id="add-card-input-sb" placeholder="Add card to sideboard..." autocomplete="off" />
+                  <input type="number" id="add-card-qty-sb" value="1" min="1" max="4" />
                   <button id="add-card-mainboard" class="btn btn-primary" onclick="window.app?.components?.decks?.addCardToMainboard?.();">Add</button>
                 </div>
               </div>
@@ -318,6 +331,14 @@ export class DecksTab extends BaseComponent {
 
   clearDeckSelection(): void {
     this.selectedDeck = null;
+    
+    // Show selection view, hide editor view
+    const selectionView = this.element.querySelector('#deck-selection-view');
+    const editorView = this.element.querySelector('#deck-editor-view');
+    
+    if (selectionView) selectionView.classList.remove('hidden');
+    if (editorView) editorView.classList.add('hidden');
+    
     this.renderDeckList();
     this.clearDeckEditor();
   }
@@ -372,9 +393,10 @@ export class DecksTab extends BaseComponent {
       
       this.renderDeckList();
       
-      if (this.decks.length > 0) {
-        this.selectDeck(this.decks[0]);
-      }
+      // Don't auto-select first deck - let user choose
+      // if (this.decks.length > 0) {
+      //   this.selectDeck(this.decks[0]);
+      // }
       
     } catch (error) {
       console.error('Error loading decks:', error);
@@ -425,29 +447,66 @@ export class DecksTab extends BaseComponent {
   }
 
   private renderDeckList(): void {
-    const deckList = this.element.querySelector('#deck-list');
-    if (!deckList) return;
+    const deckGrid = this.element.querySelector('#deck-grid');
+    if (!deckGrid) return;
 
     if (this.decks.length === 0) {
-      deckList.innerHTML = `
-        <div class="empty-state">
-          <p>No decks yet. Create your first deck!</p>
+      deckGrid.innerHTML = `
+        <div class="empty-state-large">
+          <div class="empty-icon">🃏</div>
+          <h3>No Decks Yet</h3>
+          <p>Create your first deck to get started!</p>
+          <button class="btn btn-primary btn-lg" onclick="window.app?.components?.decks?.createNewDeck?.();">
+            + Create First Deck
+          </button>
         </div>
       `;
     } else {
-      deckList.innerHTML = this.decks.map(deck => {
+      deckGrid.innerHTML = this.decks.map(deck => {
         const mainboardCount = deck.mainboard.reduce((sum, card) => sum + card.quantity, 0);
         const sideboardCount = deck.sideboard.reduce((sum, card) => sum + card.quantity, 0);
+        const totalCards = mainboardCount + sideboardCount;
+        
+        // Get color identity from deck cards
+        const colors = new Set<string>();
+        [...deck.mainboard, ...deck.sideboard].forEach(card => {
+          if (card.colors) {
+            card.colors.forEach(c => colors.add(c));
+          }
+        });
+        const colorBadges = Array.from(colors).map(c => {
+          const colorClass = c === 'W' ? 'white' : 
+                            c === 'U' ? 'blue' : 
+                            c === 'B' ? 'black' :
+                            c === 'R' ? 'red' : 'green';
+          return `<span class="mana-symbol ${colorClass}">${c}</span>`;
+        }).join('');
         
         return `
-          <div class="deck-item ${deck === this.selectedDeck ? 'selected' : ''}" 
-               onclick="window.app?.components?.decks?.selectDeckById?.('${deck.id}');">
-            <div class="deck-item-header">
-              <h4 class="deck-item-name">${deck.name}</h4>
-              <span class="deck-item-count">${mainboardCount + sideboardCount}</span>
+          <div class="deck-card" onclick="window.app?.components?.decks?.selectDeckById?.('${deck.id}');">
+            <div class="deck-card-header">
+              <h3 class="deck-card-name">${deck.name}</h3>
+              <span class="deck-card-format">${deck.format}</span>
             </div>
-            <div class="deck-item-details">
-              <span class="deck-item-format">${deck.format}</span>
+            <div class="deck-card-colors">
+              ${colorBadges || '<span class="text-muted">Colorless</span>'}
+            </div>
+            <div class="deck-card-stats">
+              <div class="deck-stat">
+                <span class="deck-stat-label">Total</span>
+                <span class="deck-stat-value">${totalCards}</span>
+              </div>
+              <div class="deck-stat">
+                <span class="deck-stat-label">Main</span>
+                <span class="deck-stat-value">${mainboardCount}</span>
+              </div>
+              <div class="deck-stat">
+                <span class="deck-stat-label">Side</span>
+                <span class="deck-stat-value">${sideboardCount}</span>
+              </div>
+            </div>
+            <div class="deck-card-footer">
+              <span class="deck-modified">Modified: ${deck.lastModified ? new Date(deck.lastModified).toLocaleDateString() : 'Never'}</span>
             </div>
           </div>
         `;
@@ -457,7 +516,14 @@ export class DecksTab extends BaseComponent {
 
   private selectDeck(deck: Deck): void {
     this.selectedDeck = deck;
-    this.renderDeckList();
+    
+    // Show editor view, hide selection view
+    const selectionView = this.element.querySelector('#deck-selection-view');
+    const editorView = this.element.querySelector('#deck-editor-view');
+    
+    if (selectionView) selectionView.classList.add('hidden');
+    if (editorView) editorView.classList.remove('hidden');
+    
     this.renderDeckEditor();
     this.updateDeckInfo();
     
