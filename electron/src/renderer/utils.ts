@@ -1,6 +1,143 @@
 // Scryfall API integration for Electron renderer
 import type { Card, Deck, DeckCard } from './types';
 
+// Cache configuration
+interface CachedData<T> {
+  data: T;
+  timestamp: number;
+  cachedAt: string;
+}
+
+class CardCache {
+  private static readonly CARD_CACHE_KEY = 'decksmith_card_cache';
+  private static readonly PRICE_CACHE_KEY = 'decksmith_price_cache';
+  
+  // Cache expiration times (in milliseconds)
+  private static readonly CARD_EXPIRY = 180 * 24 * 60 * 60 * 1000; // 6 months - card data rarely changes
+  private static readonly PRICE_EXPIRY = 1 * 24 * 60 * 60 * 1000;  // 1 day - prices update more frequently
+  
+  static getCardData(cardName: string): any | null {
+    const cache = this.loadCache(this.CARD_CACHE_KEY);
+    const key = cardName.toLowerCase().trim();
+    
+    if (cache[key]) {
+      const entry = cache[key] as CachedData<any>;
+      if (!this.isExpired(entry.timestamp, this.CARD_EXPIRY)) {
+        console.log(`Cache hit for card: ${cardName}`);
+        return entry.data;
+      } else {
+        // Remove expired entry
+        delete cache[key];
+        this.saveCache(this.CARD_CACHE_KEY, cache);
+      }
+    }
+    
+    return null;
+  }
+  
+  static cacheCardData(cardName: string, cardData: any): void {
+    const cache = this.loadCache(this.CARD_CACHE_KEY);
+    const key = cardName.toLowerCase().trim();
+    
+    cache[key] = {
+      data: cardData,
+      timestamp: Date.now(),
+      cachedAt: new Date().toISOString()
+    };
+    
+    this.saveCache(this.CARD_CACHE_KEY, cache);
+    console.log(`Cached card data for: ${cardName}`);
+  }
+  
+  static getPriceData(cardName: string): any | null {
+    const cache = this.loadCache(this.PRICE_CACHE_KEY);
+    const key = cardName.toLowerCase().trim();
+    
+    if (cache[key]) {
+      const entry = cache[key] as CachedData<any>;
+      if (!this.isExpired(entry.timestamp, this.PRICE_EXPIRY)) {
+        return entry.data;
+      } else {
+        delete cache[key];
+        this.saveCache(this.PRICE_CACHE_KEY, cache);
+      }
+    }
+    
+    return null;
+  }
+  
+  static cachePriceData(cardName: string, priceData: any): void {
+    const cache = this.loadCache(this.PRICE_CACHE_KEY);
+    const key = cardName.toLowerCase().trim();
+    
+    cache[key] = {
+      data: priceData,
+      timestamp: Date.now(),
+      cachedAt: new Date().toISOString()
+    };
+    
+    this.saveCache(this.PRICE_CACHE_KEY, cache);
+  }
+  
+  static invalidateCache(cardName?: string): void {
+    if (cardName) {
+      const key = cardName.toLowerCase().trim();
+      const cardCache = this.loadCache(this.CARD_CACHE_KEY);
+      const priceCache = this.loadCache(this.PRICE_CACHE_KEY);
+      
+      delete cardCache[key];
+      delete priceCache[key];
+      
+      this.saveCache(this.CARD_CACHE_KEY, cardCache);
+      this.saveCache(this.PRICE_CACHE_KEY, priceCache);
+      console.log(`Invalidated cache for: ${cardName}`);
+    } else {
+      localStorage.removeItem(this.CARD_CACHE_KEY);
+      localStorage.removeItem(this.PRICE_CACHE_KEY);
+      console.log('Invalidated all card caches');
+    }
+  }
+  
+  static invalidatePriceCache(): void {
+    localStorage.removeItem(this.PRICE_CACHE_KEY);
+    console.log('Invalidated price cache');
+  }
+  
+  static getCacheStats(): { cardCount: number; priceCount: number; cardExpiry: string; priceExpiry: string } {
+    const cardCache = this.loadCache(this.CARD_CACHE_KEY);
+    const priceCache = this.loadCache(this.PRICE_CACHE_KEY);
+    
+    return {
+      cardCount: Object.keys(cardCache).length,
+      priceCount: Object.keys(priceCache).length,
+      cardExpiry: '6 months',
+      priceExpiry: '1 week'
+    };
+  }
+  
+  private static loadCache(key: string): Record<string, CachedData<any>> {
+    try {
+      const cached = localStorage.getItem(key);
+      return cached ? JSON.parse(cached) : {};
+    } catch (error) {
+      console.error(`Error loading cache ${key}:`, error);
+      return {};
+    }
+  }
+  
+  private static saveCache(key: string, cache: Record<string, CachedData<any>>): void {
+    try {
+      localStorage.setItem(key, JSON.stringify(cache));
+    } catch (error) {
+      console.error(`Error saving cache ${key}:`, error);
+    }
+  }
+  
+  private static isExpired(timestamp: number, expiryMs: number): boolean {
+    return (Date.now() - timestamp) > expiryMs;
+  }
+}
+
 class ScryfallAPI {
   private static readonly BASE_URL = 'https://api.scryfall.com';
   private static readonly REQUEST_DELAY = 100; // 100ms between requests
@@ -27,7 +164,15 @@ class ScryfallAPI {
     }
   }
 
-  static async getCardByName(name: string): Promise<any> {
+  static async getCardByName(name: string, forceRefresh = false): Promise<any> {
+    // Check cache first unless force refresh is requested
+    if (!forceRefresh) {
+      const cached = CardCache.getCardData(name);
+      if (cached) {
+        return cached;
+      }
+    }
+    
     await this.rateLimit();
     
     const url = new URL(`${this.BASE_URL}/cards/named`);
@@ -43,14 +188,36 @@ class ScryfallAPI {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      
+      // Cache the card data (excluding prices)
+      const cardDataWithoutPrices = { ...data };
+      delete cardDataWithoutPrices.prices;
+      CardCache.cacheCardData(name, cardDataWithoutPrices);
+      
+      // Cache prices separately with shorter expiry
+      if (data.prices) {
+        CardCache.cachePriceData(name, data.prices);
+      }
+      
+      return data;
     } catch (error) {
       console.error('Scryfall API error:', error);
       throw error;
     }
   }
 
-  static async getCardByFuzzyName(name: string): Promise<any> {
+  static async getCardByFuzzyName(name: string, forceRefresh = false): Promise<any> {
+    const cacheKey = name.trim().toLowerCase();
+    
+    // Check cache first unless force refresh is requested
+    if (!forceRefresh) {
+      const cached = CardCache.getCardData(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+    
     await this.rateLimit();
     
     const url = new URL(`${this.BASE_URL}/cards/named`);
@@ -66,7 +233,25 @@ class ScryfallAPI {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      
+      // Cache the card data (excluding prices)
+      const cardDataWithoutPrices = { ...data };
+      delete cardDataWithoutPrices.prices;
+      const actualName = data.name || cacheKey;
+      CardCache.cacheCardData(actualName, cardDataWithoutPrices);
+      
+      // Also cache under search term for future fuzzy searches
+      if (actualName.toLowerCase() !== cacheKey) {
+        CardCache.cacheCardData(cacheKey, cardDataWithoutPrices);
+      }
+      
+      // Cache prices separately
+      if (data.prices) {
+        CardCache.cachePriceData(actualName, data.prices);
+      }
+      
+      return data;
     } catch (error) {
       console.error('Scryfall API error:', error);
       throw error;
@@ -239,4 +424,4 @@ class CSVHandler {
 }
 
 // Export for use in other modules
-export { ScryfallAPI, CSVHandler };
+export { ScryfallAPI, CSVHandler, CardCache };
