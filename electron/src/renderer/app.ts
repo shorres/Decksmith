@@ -2,8 +2,12 @@
 import './styles.css';
 import { CollectionTab } from './components/CollectionTab';
 import { DecksTab } from './components/DecksTab';
-import { AIRecommendationsTab } from './components/AIRecommendationsTab';
+// Temporarily disabled - AI Recommendations feature
+// import { AIRecommendationsTab } from './components/AIRecommendationsTab';
 import type { Card, Deck, Collection } from './types';
+
+// Feature flags
+const ENABLE_AI_RECOMMENDATIONS = false; // Set to true to re-enable AI recommendations
 
 class DecksmithApp {
   private currentTab = 'collection';
@@ -13,14 +17,14 @@ class DecksmithApp {
   // Tab components
   private collectionTab!: CollectionTab;
   private decksTab!: DecksTab;
-  private aiTab!: AIRecommendationsTab;
+  // private aiTab!: AIRecommendationsTab;
 
   // Expose components for global access
   get components() {
     return {
       collection: this.collectionTab,
       decks: this.decksTab,
-      ai: this.aiTab
+      // ai: this.aiTab
     };
   }
 
@@ -33,9 +37,9 @@ class DecksmithApp {
     return this.decksTab;
   }
 
-  get ai() {
-    return this.aiTab;
-  }
+  // get ai() {
+  //   return this.aiTab;
+  // }
 
   getDecks(): Deck[] {
     return this.decksData;
@@ -66,44 +70,54 @@ class DecksmithApp {
     
     this.collectionTab = new CollectionTab();
     this.decksTab = new DecksTab();
-    this.aiTab = new AIRecommendationsTab();
+    // Temporarily disabled - AI Recommendations
+    // if (ENABLE_AI_RECOMMENDATIONS) {
+    //   this.aiTab = new AIRecommendationsTab();
+    // }
     
     // Initialize components
     console.log('Calling initialize on components...');
     this.collectionTab.initialize();
     this.decksTab.initialize();
-    this.aiTab.initialize();
+    // if (ENABLE_AI_RECOMMENDATIONS && this.aiTab) {
+    //   this.aiTab.initialize();
+    // }
     
     // Load collection data asynchronously
     this.collectionTab.loadCollectionData();
     
     // Pass data to other components
     this.decksTab.setDecks(this.decksData);
-    this.aiTab.setDecks(this.decksData);
-    this.aiTab.setCollection(this.collectionData);
+    // if (ENABLE_AI_RECOMMENDATIONS && this.aiTab) {
+    //   this.aiTab.setDecks(this.decksData);
+    //   this.aiTab.setCollection(this.collectionData);
+    // }
     
-    // Connect AI tab with deck selection
-    this.setupInterComponentCommunication();
+    // Connect AI tab with deck selection (if enabled)
+    // if (ENABLE_AI_RECOMMENDATIONS) {
+    //   this.setupInterComponentCommunication();
+    // }
     
     console.log('Components initialized');
   }
 
   private setupInterComponentCommunication(): void {
+    // Temporarily disabled - AI Recommendations
     // Set up communication between components
     // When a deck is selected in the decks tab, notify the AI tab
     
-    this.decksTab.setOnDeckSelectionChange((deck: Deck | null) => {
-      if (this.aiTab && deck) {
-        this.aiTab.setSelectedDeck(deck);
-        console.log(`Deck selection changed to: ${deck.name}`);
-      }
-    });
+    // this.decksTab.setOnDeckSelectionChange((deck: Deck | null) => {
+    //   if (this.aiTab && deck) {
+    //     this.aiTab.setSelectedDeck(deck);
+    //     console.log(`Deck selection changed to: ${deck.name}`);
+    //   }
+    // });
 
     // Initial setup - if there's already a current deck, set it in AI tab
-    const currentDeck = this.decksTab.getCurrentDeck();
-    if (currentDeck && this.aiTab) {
-      this.aiTab.setSelectedDeck(currentDeck);
-    }
+    // const currentDeck = this.decksTab.getCurrentDeck();
+    // if (currentDeck && this.aiTab) {
+    //   this.aiTab.setSelectedDeck(currentDeck);
+    // }
   }
 
   private async setupEventListeners(): Promise<void> {
@@ -172,14 +186,15 @@ class DecksmithApp {
           this.decksTab?.initialize();
         }
         break;
-      case 'ai-recommendations':
-        if (!this.aiTab?.initialized) {
-          this.aiTab?.initialize();
-        } else {
-          // Just refresh the deck dropdown without re-rendering everything
-          this.aiTab.refreshDecksDropdown();
-        }
-        break;
+      // Temporarily disabled - AI Recommendations
+      // case 'ai-recommendations':
+      //   if (!this.aiTab?.initialized) {
+      //     this.aiTab?.initialize();
+      //   } else {
+      //     // Just refresh the deck dropdown without re-rendering everything
+      //     this.aiTab.refreshDecksDropdown();
+      //   }
+      //   break;
     }
 
     this.currentTab = tabName;

@@ -4,7 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Decksmith - MTG Collection & Deck Manager</title>
-    <link rel="stylesheet" href="styles.css">
+    <script>
+        // Fix for webpack 5 global reference issue in Electron
+        if (typeof global === 'undefined') {
+            window.global = window;
+        }
+    </script>
+    <link rel="stylesheet" href="app.css">
 </head>
 <body>
     <div id="app">
@@ -30,10 +36,12 @@
                     <span class="tab-icon">🏗️</span>
                     Decks
                 </button>
+                <!-- Temporarily hidden - AI Recommendations tab
                 <button class="tab-btn" data-tab="ai-recommendations">
                     <span class="tab-icon">🤖</span>
                     AI Recommendations
                 </button>
+                -->
             </nav>
 
             <!-- Tab Content -->
@@ -48,10 +56,11 @@
                     <!-- Content will be rendered by DecksTab component -->
                 </div>
 
-                <!-- AI Recommendations Tab -->
+                <!-- Temporarily hidden - AI Recommendations Tab
                 <div id="ai-recommendations-tab" class="tab-panel">
                     <!-- Content will be rendered by AIRecommendationsTab component -->
                 </div>
+                -->
             </div>
         </main>
 
