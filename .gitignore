@@ -1,37 +1,3 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual Environment
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
 # IDE
 .vscode/
 .idea/
@@ -62,6 +28,9 @@ yarn-error.log*
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+
+# Allow electron package-lock for reproducible builds
+!electron/package-lock.json
 
 # Electron specific
 electron/node_modules/
@@ -98,42 +67,20 @@ coverage/
 *_GUIDE.md
 *_INTEGRATION.md
 *_CONTEXT.md
+*_SETUP.md
 ELECTRON_DEV_CONTEXT.md
 SCRYFALL_API_INTEGRATION.md
 MODAL_IMPROVEMENTS_SUMMARY.md
+BUILD_QUICK_REF.md
+
+# Keep important documentation
+!ELECTRON_BUILD_GUIDE.md
+!GITHUB_ACTIONS_SETUP.md
 
 # Build files
-*.spec
-build_enhanced.bat
-build_enhanced.ps1
-build.bat
-build.sh
-setup_cx_freeze.py
-requirements-build.txt
-magic_tool.spec
-decksmith.spec
-Magic\ Tool.spec
-Decksmith.spec
-manifest.xml
-version_info.txt
-magic_tool.ico
-decksmith.ico
-
-# Release builds (keep the script, ignore the output)
+# Release builds
 release/
 dist/
 build/
 
-# Keep release build script
-!build_release.ps1
-!decksmith_release.spec
-
-# Test files
-test_*.py
-test_*.txt
-test_*.csv
-sample_*.txt
-
-# Recovery and utility scripts
-recovery_utility.py
-cache_manager.py
+# Electron specific
