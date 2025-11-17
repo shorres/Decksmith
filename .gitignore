@@ -29,6 +29,9 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
+# Allow electron package-lock for reproducible builds
+!electron/package-lock.json
+
 # Electron specific
 electron/node_modules/
 electron/dist/
