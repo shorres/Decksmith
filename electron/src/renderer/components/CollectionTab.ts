@@ -7,6 +7,8 @@ export class CollectionTab extends BaseComponent {
   private filteredCards: Card[] = [];
   private searchTimeout: number = 0;
   private cardModal: CardDetailsModal;
+  private selectionMode: boolean = false;
+  private selectedCards: Set<string> = new Set();
 
   constructor() {
     super('#collection-tab');
@@ -153,6 +155,22 @@ export class CollectionTab extends BaseComponent {
             <div class="collection-title">
               <h2>Collection</h2>
               <span class="collection-count" id="collection-count">0 cards shown</span>
+            </div>
+            <div class="collection-actions">
+              <button id="toggle-selection-btn" class="btn btn-secondary" onclick="window.app?.components?.collection?.toggleSelectionMode?.();">
+                Select Cards
+              </button>
+              <div id="bulk-actions" class="bulk-actions hidden">
+                <button id="select-all-btn" class="btn btn-secondary" onclick="window.app?.components?.collection?.selectAll?.();">
+                  Select All
+                </button>
+                <button id="deselect-all-btn" class="btn btn-secondary" onclick="window.app?.components?.collection?.deselectAll?.();">
+                  Deselect All
+                </button>
+                <button id="delete-selected-btn" class="btn btn-danger" onclick="window.app?.components?.collection?.deleteSelected?.();">
+                  Delete Selected (<span id="selected-count">0</span>)
+                </button>
+              </div>
             </div>
           </div>
 
@@ -303,37 +321,49 @@ export class CollectionTab extends BaseComponent {
     } else {
       grid.innerHTML = this.filteredCards.map(card => {
         const imageUrl = this.getCardImageUrl(card.name);
+        const isSelected = this.selectedCards.has(card.id);
+        const selectionClass = isSelected ? 'selected' : '';
+        const selectionModeClass = this.selectionMode ? 'selection-mode' : '';
+        
         return `
-          <div class="card-item" data-card-id="${card.id}" onclick="window.app?.components?.collection?.showCardDetails?.('${card.id}');">
-            <div class="card-image-container">
-              ${imageUrl ? 
-                `<img class="card-image" src="${imageUrl}" alt="${card.name}" 
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                 <div class="card-image-placeholder" style="display: none;">
-                   <div class="placeholder-content">
-                     <span class="placeholder-icon">🃏</span>
-                     <span class="placeholder-text">${card.name}</span>
-                   </div>
-                 </div>` : 
-                `<div class="card-image-placeholder">
-                   <div class="placeholder-content">
-                     <span class="placeholder-icon">🃏</span>
-                     <span class="placeholder-text">${card.name}</span>
-                   </div>
-                 </div>`}
-            </div>
-            <div class="card-info">
-              <div class="card-name" title="${card.name}">${card.name}</div>
-              <div class="card-type" title="${card.typeLine || ''}">${card.typeLine || 'Unknown'}</div>
-              <div class="card-meta">
-                <span class="card-rarity ${card.rarity || 'common'}">${this.formatRarity(card.rarity || 'common')}</span>
-                <span class="card-quantity">×${card.quantity || 1}</span>
-                ${card.manaCost ? `<span class="mana-cost" title="Mana Cost">${card.manaCost}</span>` : ''}
+          <div class="card-item ${selectionClass} ${selectionModeClass}" data-card-id="${card.id}">
+            ${this.selectionMode ? `
+              <div class="card-checkbox-wrapper">
+                <input type="checkbox" class="card-checkbox" data-card-id="${card.id}" ${isSelected ? 'checked' : ''} 
+                       onclick="event.stopPropagation(); window.app?.components?.collection?.toggleCardSelection?.('${card.id}');" />
               </div>
-              ${card.colors && card.colors.length > 0 ? 
-                `<div class="card-colors">
-                   ${card.colors.map(color => `<span class="color-pip color-${color.toLowerCase()}">${color}</span>`).join('')}
-                 </div>` : ''}
+            ` : ''}
+            <div class="card-content" onclick="window.app?.components?.collection?.${this.selectionMode ? `toggleCardSelection?.('${card.id}')` : `showCardDetails?.('${card.id}')`};">
+              <div class="card-image-container">
+                ${imageUrl ? 
+                  `<img class="card-image" src="${imageUrl}" alt="${card.name}" 
+                       onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                   <div class="card-image-placeholder" style="display: none;">
+                     <div class="placeholder-content">
+                       <span class="placeholder-icon">🃏</span>
+                       <span class="placeholder-text">${card.name}</span>
+                     </div>
+                   </div>` : 
+                  `<div class="card-image-placeholder">
+                     <div class="placeholder-content">
+                       <span class="placeholder-icon">🃏</span>
+                       <span class="placeholder-text">${card.name}</span>
+                     </div>
+                   </div>`}
+              </div>
+              <div class="card-info">
+                <div class="card-name" title="${card.name}">${card.name}</div>
+                <div class="card-type" title="${card.typeLine || ''}">${card.typeLine || 'Unknown'}</div>
+                <div class="card-meta">
+                  <span class="card-rarity ${card.rarity || 'common'}">${this.formatRarity(card.rarity || 'common')}</span>
+                  <span class="card-quantity">×${card.quantity || 1}</span>
+                  ${card.manaCost ? `<span class="mana-cost" title="Mana Cost">${card.manaCost}</span>` : ''}
+                </div>
+                ${card.colors && card.colors.length > 0 ? 
+                  `<div class="card-colors">
+                     ${card.colors.map(color => `<span class="color-pip color-${color.toLowerCase()}">${color}</span>`).join('')}
+                   </div>` : ''}
+              </div>
             </div>
           </div>
         `;
@@ -1154,5 +1184,135 @@ export class CollectionTab extends BaseComponent {
       ],
       lastModified: new Date().toISOString()
     };
+  }
+
+  // Selection and deletion methods
+  toggleSelectionMode(): void {
+    this.selectionMode = !this.selectionMode;
+    
+    if (!this.selectionMode) {
+      // Clear selections when exiting selection mode
+      this.selectedCards.clear();
+    }
+    
+    // Update button text
+    const toggleBtn = this.element.querySelector('#toggle-selection-btn');
+    if (toggleBtn) {
+      toggleBtn.textContent = this.selectionMode ? 'Cancel Selection' : 'Select Cards';
+    }
+    
+    // Show/hide bulk actions
+    const bulkActions = this.element.querySelector('#bulk-actions');
+    if (bulkActions) {
+      if (this.selectionMode) {
+        bulkActions.classList.remove('hidden');
+      } else {
+        bulkActions.classList.add('hidden');
+      }
+    }
+    
+    // Re-render cards to show/hide checkboxes
+    this.renderCards();
+    this.updateSelectionCount();
+  }
+
+  toggleCardSelection(cardId: string): void {
+    if (this.selectedCards.has(cardId)) {
+      this.selectedCards.delete(cardId);
+    } else {
+      this.selectedCards.add(cardId);
+    }
+    
+    // Update the checkbox state and card styling
+    const cardElement = this.element.querySelector(`.card-item[data-card-id="${cardId}"]`);
+    const checkbox = this.element.querySelector(`.card-checkbox[data-card-id="${cardId}"]`) as HTMLInputElement;
+    
+    if (cardElement) {
+      if (this.selectedCards.has(cardId)) {
+        cardElement.classList.add('selected');
+      } else {
+        cardElement.classList.remove('selected');
+      }
+    }
+    
+    if (checkbox) {
+      checkbox.checked = this.selectedCards.has(cardId);
+    }
+    
+    this.updateSelectionCount();
+  }
+
+  selectAll(): void {
+    this.filteredCards.forEach(card => {
+      this.selectedCards.add(card.id);
+    });
+    this.renderCards();
+    this.updateSelectionCount();
+  }
+
+  deselectAll(): void {
+    this.selectedCards.clear();
+    this.renderCards();
+    this.updateSelectionCount();
+  }
+
+  private updateSelectionCount(): void {
+    const countElement = this.element.querySelector('#selected-count');
+    if (countElement) {
+      countElement.textContent = this.selectedCards.size.toString();
+    }
+  }
+
+  async deleteSelected(): Promise<void> {
+    if (this.selectedCards.size === 0) {
+      alert('No cards selected');
+      return;
+    }
+
+    const deletedCount = this.selectedCards.size;
+    const cardNames = Array.from(this.selectedCards)
+      .map(id => this.collection.cards.find(c => c.id === id)?.name)
+      .filter(name => name)
+      .slice(0, 5);
+    
+    const moreText = this.selectedCards.size > 5 ? `\n...and ${this.selectedCards.size - 5} more` : '';
+    const confirmMessage = `Are you sure you want to delete ${this.selectedCards.size} card(s)?\n\n${cardNames.join('\n')}${moreText}`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    // Delete selected cards
+    this.collection.cards = this.collection.cards.filter(card => !this.selectedCards.has(card.id));
+    
+    // Clear selection
+    this.selectedCards.clear();
+    
+    // Save and refresh
+    await this.saveCollection();
+    this.setCollection(this.collection);
+    
+    // Exit selection mode
+    this.toggleSelectionMode();
+    
+    this.showImportStatus(`Deleted ${deletedCount} card(s)`);
+  }
+
+  async deleteCard(cardId: string): Promise<void> {
+    const card = this.collection.cards.find(c => c.id === cardId);
+    if (!card) return;
+
+    if (!confirm(`Are you sure you want to delete ${card.name}?`)) {
+      return;
+    }
+
+    // Remove the card
+    this.collection.cards = this.collection.cards.filter(c => c.id !== cardId);
+    
+    // Save and refresh
+    await this.saveCollection();
+    this.setCollection(this.collection);
+    
+    this.showImportStatus(`Deleted ${card.name}`);
   }
 }

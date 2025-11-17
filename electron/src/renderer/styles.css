@@ -3319,3 +3319,105 @@ body {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+/* Selection and Bulk Delete Styles */
+.collection-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.bulk-actions.hidden {
+  display: none;
+}
+
+.btn-danger {
+  background-color: var(--danger-color);
+  color: white;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-danger:hover {
+  background-color: #dc2626;
+}
+
+.btn-danger:active {
+  background-color: #b91c1c;
+}
+
+/* Card Selection Styles */
+.card-item.selection-mode {
+  cursor: pointer;
+  position: relative;
+}
+
+.card-item.selection-mode .card-content {
+  cursor: pointer;
+}
+
+.card-item.selected {
+  outline: 3px solid var(--primary-color);
+  outline-offset: -3px;
+  background-color: rgba(37, 99, 235, 0.05);
+}
+
+.card-checkbox-wrapper {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  background: white;
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  box-shadow: var(--shadow-md);
+}
+
+.card-checkbox {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--primary-color);
+}
+
+.card-item .card-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Ensure the collection header has proper layout */
+.collection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.collection-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.collection-title h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.collection-count {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
