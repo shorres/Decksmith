@@ -545,10 +545,12 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  pointer-events: auto;
 }
 
 .modal-overlay.hidden {
   display: none;
+  pointer-events: none;
 }
 
 .modal-content {
@@ -559,6 +561,9 @@ body {
   max-height: 90vh;
   overflow: hidden;
   min-width: 400px;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1001;
 }
 
 .modal-header {
@@ -2184,6 +2189,11 @@ body {
   z-index: 1000;
   max-height: 200px;
   overflow-y: auto;
+  pointer-events: none;
+}
+
+.suggestions-dropdown[style*="display: block"] {
+  pointer-events: auto;
 }
 
 .suggestion-item {

@@ -733,8 +733,6 @@ export class CollectionTab extends BaseComponent {
   }
 
   private addCard(): void {
-    console.log('Opening add card modal...');
-    
     // Create modal HTML
     const modalHtml = `
       <div class="add-card-modal">
@@ -962,30 +960,40 @@ export class CollectionTab extends BaseComponent {
       return;
     }
 
-    // Parse colors from mana cost (basic parsing)
-    const colors: string[] = [];
-    if (manaCost) {
-      if (manaCost.includes('W')) colors.push('W');
-      if (manaCost.includes('U')) colors.push('U');
-      if (manaCost.includes('B')) colors.push('B');
-      if (manaCost.includes('R')) colors.push('R');
-      if (manaCost.includes('G')) colors.push('G');
+    // Check if card already exists in collection
+    const existingCard = this.collection.cards.find(c => c.name.toLowerCase() === cardName.toLowerCase());
+    
+    if (existingCard) {
+      // Card exists - increment quantity
+      existingCard.quantity = (existingCard.quantity || 1) + quantity;
+      this.setCollection(this.collection);
+      this.showImportStatus(`Added ${quantity}x ${cardName} (now ${existingCard.quantity} total)`);
+    } else {
+      // Parse colors from mana cost (basic parsing)
+      const colors: string[] = [];
+      if (manaCost) {
+        if (manaCost.includes('W')) colors.push('W');
+        if (manaCost.includes('U')) colors.push('U');
+        if (manaCost.includes('B')) colors.push('B');
+        if (manaCost.includes('R')) colors.push('R');
+        if (manaCost.includes('G')) colors.push('G');
+      }
+
+      // Create new card
+      const newCard: Card = {
+        id: `manual-${Date.now()}`,
+        name: cardName,
+        typeLine: typeLine,
+        manaCost: manaCost,
+        colors: colors,
+        rarity: rarity as any,
+        quantity: quantity
+      };
+
+      this.collection.cards.push(newCard);
+      this.setCollection(this.collection);
+      this.showImportStatus(`Added ${quantity}x ${cardName}`);
     }
-
-    // Create new card
-    const newCard: Card = {
-      id: `manual-${Date.now()}`,
-      name: cardName,
-      typeLine: typeLine,
-      manaCost: manaCost,
-      colors: colors,
-      rarity: rarity as any,
-      quantity: quantity
-    };
-
-    this.collection.cards.push(newCard);
-    this.setCollection(this.collection);
-    this.showImportStatus(`Added ${quantity}x ${cardName}`);
 
     // Save to persistent storage
     this.saveCollection();
