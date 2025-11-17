@@ -41,6 +41,8 @@ jobs:
       run: |
         cd electron
         npm run dist:win
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Get version
       id: get_version
@@ -101,6 +103,8 @@ jobs:
       run: |
         cd electron
         npm run dist:mac
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: List release files
       run: |
@@ -148,6 +152,8 @@ jobs:
       run: |
         cd electron
         npm run dist:linux
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: List release files
       run: |
