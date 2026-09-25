@@ -1,11 +1,12 @@
 import { BaseComponent } from './BaseComponent';
 import { CardDetailsModal } from './CardDetailsModal';
-import type { Deck, DeckCard, Card, Collection } from '../types';
+import { ScryfallAPI, CSVHandler } from '../utils';
+import { setStatus, escapeHtml } from '../ui';
+import type { Deck, DeckCard } from '../types';
 
 export class DecksTab extends BaseComponent {
   private decks: Deck[] = [];
   private selectedDeck: Deck | null = null;
-  private collection: Collection = { cards: [], lastModified: new Date().toISOString() };
   private cardModal: CardDetailsModal;
   private onDeckSelectionChange: ((deck: Deck | null) => void) | null = null;
 
@@ -79,7 +80,7 @@ export class DecksTab extends BaseComponent {
               </div>
               <div class="deck-actions-inline">
                 <button id="copy-deck-btn" class="btn btn-secondary btn-sm" onclick="window.app?.components?.decks?.copyDeck?.();" title="Copy Deck">📋 Copy</button>
-                <button id="import-clipboard-btn" class="btn btn-secondary btn-sm" onclick="window.app?.components?.decks?.importFromClipboard?.();" title="Import from Clipboard">📥 Import</button>
+                <button id="deck-import-clipboard-btn" class="btn btn-secondary btn-sm" onclick="window.app?.components?.decks?.importFromClipboard?.();" title="Import from Clipboard">📥 Import</button>
                 <button id="export-deck-btn" class="btn btn-secondary btn-sm" onclick="window.app?.components?.decks?.exportDeck?.();" title="Export Deck">📤 Export</button>
                 <button id="delete-deck-btn" class="btn btn-danger btn-sm" onclick="window.app?.components?.decks?.deleteDeck?.();" title="Delete Deck">🗑️ Delete</button>
               </div>
@@ -107,21 +108,6 @@ export class DecksTab extends BaseComponent {
               <div class="deck-cards" id="mainboard-cards">
                 <div class="empty-state">
                   <p>No cards in mainboard</p>
-                </div>
-              </div>
-            </div>
-
-            <div id="deck-sideboard" class="deck-section">
-              <div class="deck-header">
-                <div class="add-card-section">
-                  <input type="text" id="add-card-input-sb" placeholder="Add card to sideboard..." autocomplete="off" />
-                  <input type="number" id="add-card-qty-sb" value="1" min="1" max="4" />
-                  <button id="add-card-mainboard" class="btn btn-primary" onclick="window.app?.components?.decks?.addCardToMainboard?.();">Add</button>
-                </div>
-              </div>
-              <div class="deck-cards" id="mainboard-cards">
-                <div class="empty-state">
-                  <p>Select or create a deck to start building</p>
                 </div>
               </div>
             </div>
@@ -166,25 +152,12 @@ export class DecksTab extends BaseComponent {
   }
 
   // Public methods for global access
-  setCollection(collection: Collection): void {
-    this.collection = collection;
-  }
-
-  setDecks(decks: Deck[]): void {
-    this.decks = decks;
-    this.renderDeckList();
-  }
-
   getAllDecks(): Deck[] {
     return [...this.decks];
   }
 
   getCurrentDeck(): Deck | null {
     return this.selectedDeck;
-  }
-
-  getDeckById(id: string): Deck | null {
-    return this.decks.find(deck => deck.id === id) || null;
   }
 
   setOnDeckSelectionChange(callback: (deck: Deck | null) => void): void {
@@ -287,14 +260,14 @@ export class DecksTab extends BaseComponent {
     qtyInput.value = '1';
   }
 
-  adjustCardQuantity(cardName: string, isSideboard: boolean, change: number): void {
+  // Cards are addressed by their position in the section so names never have to be
+  // embedded in inline onclick strings (names like "Urza's Saga" would break them).
+  adjustCardQuantity(cardIndex: number, isSideboard: boolean, change: number): void {
     if (!this.selectedDeck) return;
-    
+
     const section = isSideboard ? this.selectedDeck.sideboard : this.selectedDeck.mainboard;
-    const cardIndex = section.findIndex(card => card.name === cardName);
-    
-    if (cardIndex === -1) return;
-    
+    if (!section[cardIndex]) return;
+
     const newQuantity = section[cardIndex].quantity + change;
     
     if (newQuantity <= 0) {
@@ -308,25 +281,28 @@ export class DecksTab extends BaseComponent {
     this.saveDecks();
   }
 
-  removeCard(cardName: string, isSideboard: boolean): void {
+  removeCard(cardIndex: number, isSideboard: boolean): void {
     if (!this.selectedDeck) return;
-    
-    const confirmed = confirm(`Remove all copies of "${cardName}"?`);
-    if (!confirmed) return;
-    
+
     const section = isSideboard ? this.selectedDeck.sideboard : this.selectedDeck.mainboard;
-    const cardIndex = section.findIndex(card => card.name === cardName);
-    
-    if (cardIndex > -1) {
-      section.splice(cardIndex, 1);
-      this.selectedDeck.lastModified = new Date().toISOString();
-      this.renderDeckEditor();
-      this.saveDecks();
-    }
+    const card = section[cardIndex];
+    if (!card) return;
+
+    const confirmed = confirm(`Remove all copies of "${card.name}"?`);
+    if (!confirmed) return;
+
+    section.splice(cardIndex, 1);
+    this.selectedDeck.lastModified = new Date().toISOString();
+    this.renderDeckEditor();
+    this.saveDecks();
   }
 
-  showCardDetails(cardName: string): void {
-    this.cardModal.show(cardName);
+  showCardDetails(cardIndex: number, isSideboard: boolean): void {
+    const section = isSideboard ? this.selectedDeck?.sideboard : this.selectedDeck?.mainboard;
+    const card = section?.[cardIndex];
+    if (card) {
+      this.cardModal.show(card.name);
+    }
   }
 
   clearDeckSelection(): void {
@@ -351,30 +327,34 @@ export class DecksTab extends BaseComponent {
     this.showImportDialog(true);
   }
 
-  exportDeck(): void {
-    if (!this.selectedDeck) return;
-    
-    const csvContent = this.generateDeckCSV(this.selectedDeck);
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${this.selectedDeck.name || 'deck'}.csv`;
-    a.click();
-    
-    URL.revokeObjectURL(url);
-  }
+  async exportDeck(): Promise<void> {
+    const deck = this.selectedDeck;
+    if (!deck) {
+      setStatus('Open a deck to export it');
+      return;
+    }
 
-  copyToClipboard(): void {
-    if (!this.selectedDeck) return;
-    
-    const deckText = this.generateDeckText(this.selectedDeck);
-    navigator.clipboard.writeText(deckText).then(() => {
-      console.log('Deck copied to clipboard');
-    }).catch(err => {
-      console.error('Failed to copy deck to clipboard:', err);
-    });
+    // Deck list text by default; CSV if the user picks a .csv file name
+    const baseName = (deck.name || 'deck').replace(/[\\/:*?"<>|]/g, '_');
+    try {
+      const result = await window.electronAPI?.saveTextFile({
+        title: 'Export Deck',
+        defaultPath: `${baseName}.txt`,
+        filters: [
+          { name: 'Deck List (Arena/MTGO)', extensions: ['txt'] },
+          { name: 'CSV Files', extensions: ['csv'] }
+        ],
+        content: CSVHandler.exportDeckToArenaFormat(deck),
+        contentByExtension: { csv: CSVHandler.exportDeckToCSV(deck) }
+      });
+
+      if (result && !result.canceled) {
+        setStatus(`Exported "${deck.name}" to ${result.filePath}`);
+      }
+    } catch (error) {
+      console.error('Error exporting deck:', error);
+      setStatus('Error exporting deck');
+    }
   }
 
   private async loadDecks(): Promise<void> {
@@ -485,8 +465,8 @@ export class DecksTab extends BaseComponent {
         return `
           <div class="deck-card" onclick="window.app?.components?.decks?.selectDeckById?.('${deck.id}');">
             <div class="deck-card-header">
-              <h3 class="deck-card-name">${deck.name}</h3>
-              <span class="deck-card-format">${deck.format}</span>
+              <h3 class="deck-card-name">${escapeHtml(deck.name)}</h3>
+              <span class="deck-card-format">${escapeHtml(deck.format)}</span>
             </div>
             <div class="deck-card-colors">
               ${colorBadges || '<span class="text-muted">Colorless</span>'}
@@ -539,60 +519,39 @@ export class DecksTab extends BaseComponent {
       return;
     }
 
-    const mainboardCards = this.element.querySelector('#mainboard-cards');
-    const sideboardCards = this.element.querySelector('#sideboard-cards');
-
-    if (mainboardCards) {
-      if (this.selectedDeck.mainboard.length === 0) {
-        mainboardCards.innerHTML = `
-          <div class="empty-state">
-            <p>No cards in mainboard</p>
-          </div>
-        `;
-      } else {
-        mainboardCards.innerHTML = this.selectedDeck.mainboard.map(card => `
-          <div class="deck-card-item" onclick="window.app?.components?.decks?.showCardDetails?.('${card.name}');">
-            <div class="deck-card-info">
-              <span class="deck-card-quantity">${card.quantity}x</span>
-              <span class="deck-card-name">${card.name}</span>
-              <span class="deck-card-type">${card.typeLine || ''}</span>
-            </div>
-            <div class="deck-card-actions">
-              <button class="btn-icon" onclick="event.stopPropagation(); window.app?.components?.decks?.adjustCardQuantity?.('${card.name}', false, -1);" title="Remove one">−</button>
-              <button class="btn-icon" onclick="event.stopPropagation(); window.app?.components?.decks?.adjustCardQuantity?.('${card.name}', false, 1);" title="Add one">+</button>
-              <button class="btn-icon remove" onclick="event.stopPropagation(); window.app?.components?.decks?.removeCard?.('${card.name}', false);" title="Remove all">×</button>
-            </div>
-          </div>
-        `).join('');
-      }
-    }
-
-    if (sideboardCards) {
-      if (this.selectedDeck.sideboard.length === 0) {
-        sideboardCards.innerHTML = `
-          <div class="empty-state">
-            <p>No sideboard cards</p>
-          </div>
-        `;
-      } else {
-        sideboardCards.innerHTML = this.selectedDeck.sideboard.map(card => `
-          <div class="deck-card-item" onclick="window.app?.components?.decks?.showCardDetails?.('${card.name}');">
-            <div class="deck-card-info">
-              <span class="deck-card-quantity">${card.quantity}x</span>
-              <span class="deck-card-name">${card.name}</span>
-              <span class="deck-card-type">${card.typeLine || ''}</span>
-            </div>
-            <div class="deck-card-actions">
-              <button class="btn-icon" onclick="event.stopPropagation(); window.app?.components?.decks?.adjustCardQuantity?.('${card.name}', true, -1);" title="Remove one">−</button>
-              <button class="btn-icon" onclick="event.stopPropagation(); window.app?.components?.decks?.adjustCardQuantity?.('${card.name}', true, 1);" title="Add one">+</button>
-              <button class="btn-icon remove" onclick="event.stopPropagation(); window.app?.components?.decks?.removeCard?.('${card.name}', true);" title="Remove all">×</button>
-            </div>
-          </div>
-        `).join('');
-      }
-    }
-
+    this.renderDeckSection('#mainboard-cards', this.selectedDeck.mainboard, false, 'No cards in mainboard');
+    this.renderDeckSection('#sideboard-cards', this.selectedDeck.sideboard, true, 'No sideboard cards');
     this.updateCardCounts();
+  }
+
+  private renderDeckSection(selector: string, cards: DeckCard[], isSideboard: boolean, emptyText: string): void {
+    const container = this.element.querySelector(selector);
+    if (!container) return;
+
+    if (cards.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <p>${emptyText}</p>
+        </div>
+      `;
+      return;
+    }
+
+    const decks = 'window.app?.components?.decks';
+    container.innerHTML = cards.map((card, index) => `
+      <div class="deck-card-item" onclick="${decks}?.showCardDetails?.(${index}, ${isSideboard});">
+        <div class="deck-card-info">
+          <span class="deck-card-quantity">${card.quantity}x</span>
+          <span class="deck-card-name">${escapeHtml(card.name)}</span>
+          <span class="deck-card-type">${escapeHtml(card.typeLine)}</span>
+        </div>
+        <div class="deck-card-actions">
+          <button class="btn-icon" onclick="event.stopPropagation(); ${decks}?.adjustCardQuantity?.(${index}, ${isSideboard}, -1);" title="Remove one">−</button>
+          <button class="btn-icon" onclick="event.stopPropagation(); ${decks}?.adjustCardQuantity?.(${index}, ${isSideboard}, 1);" title="Add one">+</button>
+          <button class="btn-icon remove" onclick="event.stopPropagation(); ${decks}?.removeCard?.(${index}, ${isSideboard});" title="Remove all">×</button>
+        </div>
+      </div>
+    `).join('');
   }
 
   private clearDeckEditor(): void {
@@ -699,21 +658,26 @@ export class DecksTab extends BaseComponent {
 
   private async addCardToDeck(cardName: string, quantity: number, isSideboard: boolean): Promise<void> {
     if (!this.selectedDeck) return;
-    
+
     const section = isSideboard ? this.selectedDeck.sideboard : this.selectedDeck.mainboard;
-    const existingCard = section.find(card => card.name === cardName);
-    
+    const existingCard = section.find(card => card.name.toLowerCase() === cardName.toLowerCase());
+
     if (existingCard) {
       existingCard.quantity += quantity;
     } else {
-      // Fetch real card data from Scryfall
+      let cardData = null;
       try {
-        const cardData = await this.fetchCardData(cardName);
-        if (cardData) {
-          const newCard: DeckCard = {
+        cardData = await ScryfallAPI.getCard(cardName);
+      } catch (error) {
+        console.error('Error fetching card data:', error);
+      }
+
+      // Fall back to a bare entry if Scryfall doesn't know the card (or is unreachable)
+      section.push(cardData
+        ? {
             id: cardData.id,
             name: cardData.name,
-            quantity: quantity,
+            quantity,
             typeLine: cardData.typeLine || 'Unknown',
             manaCost: cardData.manaCost || '',
             colors: cardData.colors || [],
@@ -721,84 +685,34 @@ export class DecksTab extends BaseComponent {
             rarity: cardData.rarity || 'common',
             power: cardData.power,
             toughness: cardData.toughness,
+            setCode: cardData.setCode,
+            collectorNumber: cardData.collectorNumber,
             imageUri: cardData.imageUri,
             scryfallId: cardData.scryfallId
-          };
-          section.push(newCard);
-        } else {
-          // Fallback if card not found
-          const newCard: DeckCard = {
-            id: `${cardName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
-            name: cardName,
-            quantity: quantity,
-            typeLine: 'Unknown',
-            manaCost: '',
-            colors: []
-          };
-          section.push(newCard);
-        }
-      } catch (error) {
-        console.error('Error fetching card data:', error);
-        // Fallback card
-        const newCard: DeckCard = {
-          id: `${cardName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
-          name: cardName,
-          quantity: quantity,
-          typeLine: 'Unknown',
-          manaCost: '',
-          colors: []
-        };
-        section.push(newCard);
-      }
+          }
+        : this.createPlaceholderCard(cardName, quantity));
     }
-    
+
     this.selectedDeck.lastModified = new Date().toISOString();
     this.renderDeckEditor();
     this.saveDecks();
   }
 
-  private async fetchCardData(cardName: string): Promise<Card | null> {
-    try {
-      const encodedName = encodeURIComponent(cardName);
-      const response = await fetch(`https://api.scryfall.com/cards/named?exact=${encodedName}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      return {
-        id: data.id,
-        name: data.name,
-        manaCost: data.mana_cost || '',
-        cmc: data.cmc || 0,
-        typeLine: data.type_line || '',
-        oracleText: data.oracle_text || '',
-        colors: data.colors || [],
-        colorIdentity: data.color_identity || [],
-        power: data.power || '',
-        toughness: data.toughness || '',
-        rarity: data.rarity || '',
-        setCode: data.set || '',
-        setName: data.set_name || '',
-        collectorNumber: data.collector_number || '',
-        imageUri: data.image_uris?.normal || data.image_uris?.large || '',
-        scryfallId: data.id,
-        scryfallUri: data.scryfall_uri || '',
-        legalities: data.legalities || {},
-        prices: data.prices || {}
-      };
-    } catch (error) {
-      console.error('Error fetching from Scryfall:', error);
-      return null;
-    }
+  private createPlaceholderCard(name: string, quantity: number): DeckCard {
+    return {
+      id: `${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
+      name,
+      quantity,
+      typeLine: 'Unknown',
+      manaCost: '',
+      colors: []
+    };
   }
 
   private showImportDialog(fromClipboard: boolean = false): void {
     const dialog = document.createElement('div');
     dialog.className = 'import-dialog';
-    
+
     dialog.innerHTML = `
       <div class="import-content">
         <div class="import-header">
@@ -807,8 +721,8 @@ export class DecksTab extends BaseComponent {
         </div>
         <div class="import-body">
           <div class="import-format">
-            <label>Paste deck list (format: quantity name, e.g., "4 Lightning Bolt"):</label>
-            <textarea class="import-textarea" id="import-text" placeholder="4 Lightning Bolt&#10;20 Mountain&#10;3 Goblin Guide"></textarea>
+            <label>Paste deck list (e.g. "4 Lightning Bolt"; put sideboard cards after a "Sideboard" line):</label>
+            <textarea class="import-textarea" id="import-text" placeholder="4 Lightning Bolt&#10;20 Mountain&#10;&#10;Sideboard&#10;3 Searing Blaze"></textarea>
           </div>
         </div>
         <div class="import-footer">
@@ -817,9 +731,9 @@ export class DecksTab extends BaseComponent {
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(dialog);
-    
+
     const textarea = dialog.querySelector('#import-text') as HTMLTextAreaElement;
     if (fromClipboard && textarea) {
       navigator.clipboard.readText().then(text => {
@@ -833,77 +747,30 @@ export class DecksTab extends BaseComponent {
   processImport(): void {
     const dialog = document.querySelector('.import-dialog');
     const textarea = dialog?.querySelector('#import-text') as HTMLTextAreaElement;
-    
+
     if (!textarea || !textarea.value.trim()) return;
-    
-    const lines = textarea.value.trim().split('\n');
-    const importedCards: DeckCard[] = [];
-    
-    for (const line of lines) {
-      const match = line.trim().match(/^(\d+)\s+(.+)$/);
-      if (match) {
-        const quantity = parseInt(match[1]);
-        const name = match[2].trim();
-        
-        importedCards.push({
-          id: `${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
-          name: name,
-          quantity: quantity,
-          typeLine: 'Unknown',
-          manaCost: '',
-          colors: []
-        });
-      }
-    }
-    
-    if (importedCards.length > 0) {
-      // Create new deck with imported cards
+
+    const parsed = CSVHandler.parseArenaFormat(textarea.value);
+    const mainboard = parsed.filter(card => !card.sideboard).map(card => this.createPlaceholderCard(card.name, card.quantity));
+    const sideboard = parsed.filter(card => card.sideboard).map(card => this.createPlaceholderCard(card.name, card.quantity));
+
+    if (parsed.length > 0) {
       const newDeck: Deck = {
         id: 'imported-deck-' + Date.now(),
         name: 'Imported Deck',
         format: 'Standard',
-        mainboard: importedCards,
-        sideboard: [],
+        mainboard,
+        sideboard,
         lastModified: new Date().toISOString()
       };
-      
+
       this.decks.push(newDeck);
       this.renderDeckList();
       this.selectDeck(newDeck);
       this.saveDecks();
+      setStatus(`Imported ${parsed.length} card entries`);
     }
-    
+
     dialog?.remove();
-  }
-
-  private generateDeckCSV(deck: Deck): string {
-    let csv = 'Quantity,Name,Type,Section\n';
-    
-    deck.mainboard.forEach(card => {
-      csv += `${card.quantity},"${card.name}","${card.typeLine || 'Unknown'}",Mainboard\n`;
-    });
-    
-    deck.sideboard.forEach(card => {
-      csv += `${card.quantity},"${card.name}","${card.typeLine || 'Unknown'}",Sideboard\n`;
-    });
-    
-    return csv;
-  }
-
-  private generateDeckText(deck: Deck): string {
-    let text = `${deck.name}\n\nMainboard:\n`;
-    
-    deck.mainboard.forEach(card => {
-      text += `${card.quantity} ${card.name}\n`;
-    });
-    
-    if (deck.sideboard.length > 0) {
-      text += `\nSideboard:\n`;
-      deck.sideboard.forEach(card => {
-        text += `${card.quantity} ${card.name}\n`;
-      });
-    }
-    
-    return text;
   }
 }

@@ -1,3 +1,4 @@
+import { ScryfallAPI } from '../utils';
 import type { Card } from '../types';
 
 export class CardDetailsModal {
@@ -25,10 +26,6 @@ export class CardDetailsModal {
                 <div class="spinner"></div>
                 <p>Loading image...</p>
               </div>
-            </div>
-            <div class="card-actions">
-              <button class="btn btn-primary" id="add-to-deck-btn">Add to Deck</button>
-              <input type="number" id="card-quantity-input" value="1" min="1" max="4" />
             </div>
           </div>
           <div class="card-details-right">
@@ -143,37 +140,7 @@ export class CardDetailsModal {
 
   private async fetchCardData(cardName: string): Promise<Card | null> {
     try {
-      const encodedName = encodeURIComponent(cardName);
-      const response = await fetch(`https://api.scryfall.com/cards/named?exact=${encodedName}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Transform Scryfall data to our Card interface
-      return {
-        id: data.id,
-        name: data.name,
-        manaCost: data.mana_cost || '',
-        cmc: data.cmc || 0,
-        typeLine: data.type_line || '',
-        oracleText: data.oracle_text || '',
-        colors: data.colors || [],
-        colorIdentity: data.color_identity || [],
-        power: data.power || '',
-        toughness: data.toughness || '',
-        rarity: data.rarity || '',
-        setCode: data.set || '',
-        setName: data.set_name || '',
-        collectorNumber: data.collector_number || '',
-        imageUri: data.image_uris?.normal || data.image_uris?.large || '',
-        scryfallId: data.id,
-        legalities: data.legalities || {},
-        prices: data.prices || {},
-        scryfallUri: data.scryfall_uri || ''
-      };
+      return await ScryfallAPI.getCard(cardName, true);
     } catch (error) {
       console.error('Error fetching from Scryfall:', error);
       return null;
@@ -333,13 +300,6 @@ export class CardDetailsModal {
   close(): void {
     if (this.modal) {
       this.modal.style.display = 'none';
-    }
-  }
-
-  destroy(): void {
-    if (this.modal) {
-      this.modal.remove();
-      this.modal = null;
     }
   }
 }

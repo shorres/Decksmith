@@ -42,9 +42,9 @@ export interface Collection {
   lastModified: string;
 }
 
-// Global window type extension
+// Global window type extension - the app instance, used by inline onclick handlers
 declare global {
   interface Window {
-    decksmithApp?: any;
+    app?: any;
   }
 }

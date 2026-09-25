@@ -1,5 +1,7 @@
 import { BaseComponent } from './BaseComponent';
 import { CardDetailsModal } from './CardDetailsModal';
+import { ScryfallAPI, CSVHandler, CardCache, type ParsedCard } from '../utils';
+import { openModal, closeModal, setStatus, setCardCount, escapeHtml } from '../ui';
 import type { Card, Collection } from '../types';
 
 export class CollectionTab extends BaseComponent {
@@ -9,6 +11,7 @@ export class CollectionTab extends BaseComponent {
   private cardModal: CardDetailsModal;
   private selectionMode: boolean = false;
   private selectedCards: Set<string> = new Set();
+  private nextCardId = 0;
 
   constructor() {
     super('#collection-tab');
@@ -307,6 +310,22 @@ export class CollectionTab extends BaseComponent {
     this.applyFilters();
   }
 
+  getCollection(): Collection {
+    return this.collection;
+  }
+
+  // Replaces the collection with an empty one (File > New Collection)
+  async newCollection(): Promise<void> {
+    if (this.collection.cards.length > 0 &&
+        !confirm(`Start a new, empty collection? This removes all ${this.collection.cards.length} cards currently in your collection.`)) {
+      return;
+    }
+
+    this.setCollection({ cards: [], lastModified: new Date().toISOString() });
+    await this.saveCollection();
+    setStatus('New collection created');
+  }
+
   private renderCards(): void {
     const grid = this.element.querySelector('#collection-grid');
     if (!grid) return;
@@ -321,6 +340,8 @@ export class CollectionTab extends BaseComponent {
     } else {
       grid.innerHTML = this.filteredCards.map(card => {
         const imageUrl = this.getCardImageUrl(card.name);
+        const name = escapeHtml(card.name);
+        const typeLine = escapeHtml(card.typeLine);
         const isSelected = this.selectedCards.has(card.id);
         const selectionClass = isSelected ? 'selected' : '';
         const selectionModeClass = this.selectionMode ? 'selection-mode' : '';
@@ -336,28 +357,28 @@ export class CollectionTab extends BaseComponent {
             <div class="card-content" onclick="window.app?.components?.collection?.${this.selectionMode ? `toggleCardSelection?.('${card.id}')` : `showCardDetails?.('${card.id}')`};">
               <div class="card-image-container">
                 ${imageUrl ? 
-                  `<img class="card-image" src="${imageUrl}" alt="${card.name}" 
+                  `<img class="card-image" src="${imageUrl}" alt="${name}"
                        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
                    <div class="card-image-placeholder" style="display: none;">
                      <div class="placeholder-content">
                        <span class="placeholder-icon">🃏</span>
-                       <span class="placeholder-text">${card.name}</span>
+                       <span class="placeholder-text">${name}</span>
                      </div>
-                   </div>` : 
+                   </div>` :
                   `<div class="card-image-placeholder">
                      <div class="placeholder-content">
                        <span class="placeholder-icon">🃏</span>
-                       <span class="placeholder-text">${card.name}</span>
+                       <span class="placeholder-text">${name}</span>
                      </div>
                    </div>`}
               </div>
               <div class="card-info">
-                <div class="card-name" title="${card.name}">${card.name}</div>
-                <div class="card-type" title="${card.typeLine || ''}">${card.typeLine || 'Unknown'}</div>
+                <div class="card-name" title="${name}">${name}</div>
+                <div class="card-type" title="${typeLine}">${typeLine || 'Unknown'}</div>
                 <div class="card-meta">
-                  <span class="card-rarity ${card.rarity || 'common'}">${this.formatRarity(card.rarity || 'common')}</span>
+                  <span class="card-rarity ${escapeHtml(card.rarity || 'common')}">${this.formatRarity(card.rarity || 'common')}</span>
                   <span class="card-quantity">×${card.quantity || 1}</span>
-                  ${card.manaCost ? `<span class="mana-cost" title="Mana Cost">${card.manaCost}</span>` : ''}
+                  ${card.manaCost ? `<span class="mana-cost" title="Mana Cost">${escapeHtml(card.manaCost)}</span>` : ''}
                 </div>
                 ${card.colors && card.colors.length > 0 ? 
                   `<div class="card-colors">
@@ -369,9 +390,6 @@ export class CollectionTab extends BaseComponent {
         `;
       }).join('');
     }
-
-    // Re-bind any additional event listeners needed for the rendered cards
-    this.bindCardEvents();
   }
 
   private getCardImageUrl(cardName: string): string | null {
@@ -393,12 +411,6 @@ export class CollectionTab extends BaseComponent {
     }
   }
 
-  private bindCardEvents(): void {
-    // Add any additional event listeners for rendered cards if needed
-    // This method can be extended for card-specific interactions
-  }
-
-  // Forward-thinking method for card details modal (for future tabs)
   showCardDetails(cardId: string): void {
     const card = this.collection.cards.find(c => c.id === cardId);
     if (!card) return;
@@ -416,8 +428,11 @@ export class CollectionTab extends BaseComponent {
     }
 
     // Update sidebar stats
+    const totalCards = this.filteredCards.reduce((sum, card) => sum + (card.quantity || 1), 0);
     const totalElement = this.element.querySelector('#sidebar-total-cards');
-    if (totalElement) totalElement.textContent = this.filteredCards.length.toString();
+    if (totalElement) totalElement.textContent = totalCards.toString();
+
+    setCardCount(this.collection.cards.reduce((sum, card) => sum + (card.quantity || 1), 0));
     
     const uniqueCards = new Set(this.filteredCards.map(card => card.name)).size;
     const uniqueElement = this.element.querySelector('#sidebar-unique-cards');
@@ -456,7 +471,7 @@ export class CollectionTab extends BaseComponent {
     if (valueElement) valueElement.textContent = `$${collectionValue.toFixed(2)}`;
   }
 
-  private clearAllFilters(): void {
+  clearAllFilters(): void {
     console.log('Clearing all filters');
     
     const searchInput = this.element.querySelector('#collection-search') as HTMLInputElement;
@@ -475,265 +490,113 @@ export class CollectionTab extends BaseComponent {
     this.applyFilters();
   }
 
-  // Forward-thinking methods for integration with other tabs
-  
-  // Get all cards (useful for deck building)
-  getAllCards(): Card[] {
-    return [...this.collection.cards];
-  }
-
-  // Get filtered cards (useful for exporting or other operations)  
-  getFilteredCards(): Card[] {
-    return [...this.filteredCards];
-  }
-
-  // Get card by ID (useful for card details, deck building)
-  getCardById(cardId: string): Card | undefined {
-    return this.collection.cards.find(card => card.id === cardId);
-  }
-
-  // Get cards by name (useful for deck building - handling different printings)
-  getCardsByName(cardName: string): Card[] {
-    return this.collection.cards.filter(card => 
-      card.name.toLowerCase() === cardName.toLowerCase()
-    );
-  }
-
-  // Check if card exists in collection (useful for deck building validation)
-  hasCard(cardName: string, quantity: number = 1): boolean {
-    const cards = this.getCardsByName(cardName);
-    const totalQuantity = cards.reduce((sum, card) => sum + (card.quantity || 1), 0);
-    return totalQuantity >= quantity;
-  }
-
-  // Get collection statistics (useful for AI recommendations and analytics)
-  getCollectionStats() {
-    const stats = {
-      totalCards: this.collection.cards.reduce((sum, card) => sum + (card.quantity || 1), 0),
-      uniqueCards: this.collection.cards.length,
-      cardsByRarity: {
-        common: this.collection.cards.filter(card => card.rarity === 'common').length,
-        uncommon: this.collection.cards.filter(card => card.rarity === 'uncommon').length,
-        rare: this.collection.cards.filter(card => card.rarity === 'rare').length,
-        mythic: this.collection.cards.filter(card => card.rarity === 'mythic').length,
-      },
-      cardsByColor: {
-        white: this.collection.cards.filter(card => card.colors?.includes('W')).length,
-        blue: this.collection.cards.filter(card => card.colors?.includes('U')).length,
-        black: this.collection.cards.filter(card => card.colors?.includes('B')).length,
-        red: this.collection.cards.filter(card => card.colors?.includes('R')).length,
-        green: this.collection.cards.filter(card => card.colors?.includes('G')).length,
-        colorless: this.collection.cards.filter(card => !card.colors || card.colors.length === 0).length,
-      },
-      cardsByType: this.getCardTypeDistribution()
-    };
-    
-    return stats;
-  }
-
-  private getCardTypeDistribution(): Record<string, number> {
-    const typeDistribution: Record<string, number> = {};
-    
-    this.collection.cards.forEach(card => {
-      if (card.typeLine) {
-        // Extract primary type (e.g., "Legendary Creature — Dragon" -> "Creature")
-        const primaryType = this.extractPrimaryType(card.typeLine);
-        typeDistribution[primaryType] = (typeDistribution[primaryType] || 0) + 1;
-      }
-    });
-    
-    return typeDistribution;
-  }
-
-  private extractPrimaryType(typeLine: string): string {
-    const types = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Battle'];
-    
-    for (const type of types) {
-      if (typeLine.includes(type)) {
-        return type;
-      }
-    }
-    
-    return 'Other';
-  }
-
-  private async importCSV(): Promise<void> {
+  async importCSV(): Promise<void> {
     try {
-      const result = await window.electronAPI?.openFileDialog({
+      const result = await window.electronAPI?.openTextFile({
         title: 'Import Collection CSV',
-        buttonLabel: 'Import',
         filters: [
           { name: 'CSV Files', extensions: ['csv'] },
           { name: 'All Files', extensions: ['*'] }
         ]
       });
+      if (!result || result.canceled || result.content === undefined) return;
 
-      if (result && !result.canceled && result.filePaths.length > 0) {
-        const filePath = result.filePaths[0];
-        console.log('Selected CSV file:', filePath);
-        
-        // Read and parse CSV file
-        // For now, we'll use a simple implementation
-        // In a real app, you'd want to use the Node.js fs module via IPC
-        this.showImportStatus('Reading CSV file...');
-        
-        // TODO: Implement actual CSV parsing
-        // This would involve:
-        // 1. Reading the file via IPC to main process
-        // 2. Parsing CSV content
-        // 3. Creating Card objects
-        // 4. Adding to collection
-        // 5. Updating UI
-        
-        this.showImportStatus('CSV import completed!');
+      const parsed = CSVHandler.parseCollectionCSV(result.content);
+      if (parsed.length === 0) {
+        setStatus('No cards found in that CSV file');
+        return;
       }
+
+      parsed.forEach(card => this.addOrMergeCard(card));
+      await this.commitCollectionChanges(`Imported ${parsed.length} card entries from CSV`);
     } catch (error) {
       console.error('Error importing CSV:', error);
-      this.showImportStatus('Error importing CSV file');
+      setStatus('Error importing CSV file');
     }
   }
 
-  private async exportCSV(): Promise<void> {
+  async exportCSV(): Promise<void> {
     try {
-      const result = await window.electronAPI?.saveFileDialog({
+      const result = await window.electronAPI?.saveTextFile({
         title: 'Export Collection to CSV',
-        buttonLabel: 'Export',
         defaultPath: `collection-export-${new Date().toISOString().split('T')[0]}.csv`,
         filters: [
           { name: 'CSV Files', extensions: ['csv'] },
           { name: 'All Files', extensions: ['*'] }
-        ]
+        ],
+        content: CSVHandler.exportCollectionToCSV(this.collection.cards)
       });
 
-      if (result && !result.canceled && result.filePath) {
-        const filePath = result.filePath;
-        console.log('Export to:', filePath);
-        
-        // Generate CSV content
-        const csvContent = this.generateCSVContent();
-        
-        // Save file via IPC
-        // TODO: Implement file writing via main process
-        console.log('CSV content:', csvContent);
-        
-        this.showImportStatus('Collection exported successfully!');
+      if (result && !result.canceled) {
+        setStatus(`Exported ${this.collection.cards.length} cards to ${result.filePath}`);
       }
     } catch (error) {
       console.error('Error exporting CSV:', error);
-      this.showImportStatus('Error exporting CSV file');
+      setStatus('Error exporting CSV file');
     }
   }
 
   private async importClipboard(): Promise<void> {
     try {
-      // Get clipboard text
       const clipboardText = await navigator.clipboard.readText();
-      
       if (!clipboardText.trim()) {
-        this.showImportStatus('Clipboard is empty');
+        setStatus('Clipboard is empty');
         return;
       }
 
-      this.showImportStatus('Processing clipboard content...');
-      
-      // Parse clipboard content as card list
-      const lines = clipboardText.split('\n').filter(line => line.trim());
-      let addedCards = 0;
-      
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        
-        // Parse format: "4 Lightning Bolt" or "Lightning Bolt"
-        const match = trimmed.match(/^(\d+)\s+(.+)$/) || [null, '1', trimmed];
-        const quantity = parseInt(match[1] || '1');
-        const cardName = (match[2] || trimmed).trim();
-        
-        if (cardName) {
-          // Create basic card object
-          const newCard: Card = {
-            id: `clipboard-${Date.now()}-${addedCards}`,
-            name: cardName,
-            typeLine: 'Unknown',
-            manaCost: '',
-            colors: [],
-            rarity: 'common',
-            quantity: quantity
-          };
-          
-          this.collection.cards.push(newCard);
-          addedCards++;
-        }
-      }
-      
-      // Update UI
-      this.setCollection(this.collection);
-      this.showImportStatus(`Added ${addedCards} cards from clipboard`);
-      
-      // Save to persistent storage
-      await this.saveCollection();
-      
+      // Accepts deck-list style lines: "4 Lightning Bolt" or "Lightning Bolt"
+      const parsed = CSVHandler.parseArenaFormat(clipboardText);
+      parsed.forEach(({ sideboard, ...card }) => this.addOrMergeCard(card));
+      await this.commitCollectionChanges(`Added ${parsed.length} card entries from clipboard`);
     } catch (error) {
       console.error('Error importing from clipboard:', error);
-      this.showImportStatus('Error reading clipboard');
+      setStatus('Error reading clipboard');
     }
   }
 
   private async refreshCardData(): Promise<void> {
     try {
-      // Dynamically import CardCache
-      const { CardCache, ScryfallAPI } = await import('../utils');
-      
-      // Get cache stats before
       const statsBefore = CardCache.getCacheStats();
-      
+
       const confirmMsg = `This will update card information from Scryfall for all cards in your collection.\n\n` +
                         `Current cache: ${statsBefore.cardCount} cards, ${statsBefore.priceCount} prices\n` +
                         `Cache expiry: Cards (${statsBefore.cardExpiry}), Prices (${statsBefore.priceExpiry})\n\n` +
                         `This may take a few minutes. Continue?`;
-      
+
       if (!confirm(confirmMsg)) {
         return;
       }
-      
-      this.showImportStatus('Updating card data from Scryfall...');
-      
+
+      setStatus('Updating card data from Scryfall...', false);
+
       // Invalidate all caches to force refresh
       CardCache.invalidateCache();
-      
+
       let updatedCount = 0;
       const uniqueCards = Array.from(new Set(this.collection.cards.map(c => c.name)));
-      
+
       for (const cardName of uniqueCards) {
         try {
-          // Force refresh by fetching with forceRefresh flag
           await ScryfallAPI.getCardByName(cardName, true);
           updatedCount++;
-          
-          // Update status periodically
+
           if (updatedCount % 10 === 0) {
-            this.showImportStatus(`Updating... ${updatedCount}/${uniqueCards.length} cards`);
+            setStatus(`Updating... ${updatedCount}/${uniqueCards.length} cards`, false);
           }
         } catch (error) {
           console.error(`Error updating ${cardName}:`, error);
         }
       }
-      
-      // Get cache stats after
+
       const statsAfter = CardCache.getCacheStats();
-      
-      this.showImportStatus(
-        `✓ Updated ${updatedCount} cards! Cache now contains ${statsAfter.cardCount} cards, ${statsAfter.priceCount} prices.`
-      );
-      
+      setStatus(`✓ Updated ${updatedCount} cards! Cache now contains ${statsAfter.cardCount} cards, ${statsAfter.priceCount} prices.`);
     } catch (error) {
       console.error('Error refreshing card data:', error);
-      this.showImportStatus('Error updating card data');
+      setStatus('Error updating card data');
     }
   }
 
   private addCard(): void {
-    // Create modal HTML
     const modalHtml = `
       <div class="add-card-modal">
         <form id="add-card-form">
@@ -771,96 +634,80 @@ export class CollectionTab extends BaseComponent {
       </div>
     `;
 
-    // Show modal
-    this.showModal('Add Card', modalHtml);
+    // The document-level listener added for autocomplete is removed when the modal closes
+    let removeAutocompleteListener: (() => void) | undefined;
+    openModal('Add Card', modalHtml, () => removeAutocompleteListener?.());
 
-    // Set up form handling
     const form = document.getElementById('add-card-form') as HTMLFormElement;
     const cancelBtn = document.getElementById('cancel-add-card') as HTMLButtonElement;
     const nameInput = document.getElementById('card-name-input') as HTMLInputElement;
 
-    // Focus on card name input
     setTimeout(() => nameInput?.focus(), 100);
 
-    // Set up autocomplete
-    this.setupCardNameAutocomplete(nameInput);
+    removeAutocompleteListener = this.setupCardNameAutocomplete(nameInput);
 
-    // Handle cancel
-    cancelBtn?.addEventListener('click', () => {
-      this.closeModal();
-    });
+    cancelBtn?.addEventListener('click', () => closeModal());
 
-    // Handle form submission
     form?.addEventListener('submit', (e) => {
       e.preventDefault();
       this.handleAddCardSubmit();
     });
   }
 
-  private setupCardNameAutocomplete(input: HTMLInputElement): void {
-    if (!input) return;
+  // Wires up autocomplete on the name input. Returns a function that removes the document-level listener.
+  private setupCardNameAutocomplete(input: HTMLInputElement): (() => void) | undefined {
+    const suggestionsContainer = document.getElementById('card-suggestions') as HTMLElement;
+    if (!input || !suggestionsContainer) return undefined;
 
     let searchTimeout: number;
-    const suggestionsContainer = document.getElementById('card-suggestions') as HTMLElement;
-    
+
     input.addEventListener('input', () => {
       clearTimeout(searchTimeout);
       const query = input.value.trim();
-      
+
       if (query.length < 2) {
         this.hideSuggestions(suggestionsContainer);
         return;
       }
 
       searchTimeout = window.setTimeout(async () => {
-        await this.fetchCardSuggestions(query, suggestionsContainer, input);
+        const suggestions = await ScryfallAPI.autocompleteCard(query);
+        if (suggestions.length > 0) {
+          this.displaySuggestions(suggestions.slice(0, 8), suggestionsContainer, input);
+        } else {
+          this.hideSuggestions(suggestionsContainer);
+        }
       }, 300);
     });
 
-    // Handle keyboard navigation
     input.addEventListener('keydown', (e) => {
       this.handleSuggestionNavigation(e, suggestionsContainer, input);
     });
 
     // Hide suggestions when clicking outside
-    document.addEventListener('click', (e) => {
+    const onDocumentClick = (e: MouseEvent) => {
       if (!input.contains(e.target as Node) && !suggestionsContainer.contains(e.target as Node)) {
         this.hideSuggestions(suggestionsContainer);
       }
-    });
-  }
-
-  private async fetchCardSuggestions(query: string, container: HTMLElement, input: HTMLInputElement): Promise<void> {
-    try {
-      // Use Scryfall's autocomplete API
-      const response = await fetch(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(query)}`);
-      const data = await response.json();
-      
-      if (data.data && data.data.length > 0) {
-        this.displaySuggestions(data.data.slice(0, 8), container, input); // Limit to 8 suggestions
-      } else {
-        this.hideSuggestions(container);
-      }
-    } catch (error) {
-      console.error('Error fetching card suggestions:', error);
-      this.hideSuggestions(container);
-    }
+    };
+    document.addEventListener('click', onDocumentClick);
+    return () => document.removeEventListener('click', onDocumentClick);
   }
 
   private displaySuggestions(suggestions: string[], container: HTMLElement, input: HTMLInputElement): void {
     container.innerHTML = '';
     container.style.display = 'block';
-    
+
     suggestions.forEach((suggestion, index) => {
       const item = document.createElement('div');
       item.className = 'suggestion-item';
       item.textContent = suggestion;
       item.setAttribute('data-index', index.toString());
-      
+
       item.addEventListener('click', () => {
         this.selectSuggestion(suggestion, container, input);
       });
-      
+
       container.appendChild(item);
     });
   }
@@ -875,7 +722,7 @@ export class CollectionTab extends BaseComponent {
   private selectSuggestion(suggestion: string, container: HTMLElement, input: HTMLInputElement): void {
     input.value = suggestion;
     this.hideSuggestions(container);
-    
+
     // Automatically fetch and populate card details
     this.populateCardDetails(suggestion);
   }
@@ -883,15 +730,15 @@ export class CollectionTab extends BaseComponent {
   private handleSuggestionNavigation(e: KeyboardEvent, container: HTMLElement, input: HTMLInputElement): void {
     const suggestions = container.querySelectorAll('.suggestion-item');
     const currentActive = container.querySelector('.suggestion-item.active');
-    
+
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      const nextIndex = currentActive ? 
+      const nextIndex = currentActive ?
         Math.min(parseInt(currentActive.getAttribute('data-index') || '0') + 1, suggestions.length - 1) : 0;
       this.setActiveSuggestion(suggestions, nextIndex);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      const prevIndex = currentActive ? 
+      const prevIndex = currentActive ?
         Math.max(parseInt(currentActive.getAttribute('data-index') || '0') - 1, 0) : suggestions.length - 1;
       this.setActiveSuggestion(suggestions, prevIndex);
     } else if (e.key === 'Enter' && currentActive) {
@@ -911,33 +758,26 @@ export class CollectionTab extends BaseComponent {
 
   private async populateCardDetails(cardName: string): Promise<void> {
     try {
-      // Fetch full card details from Scryfall
-      const response = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cardName)}`);
-      const card = await response.json();
-      
-      if (card && card.object !== 'error') {
-        // Populate form fields with card data
-        const typeInput = document.getElementById('card-type-input') as HTMLInputElement;
-        const manaCostInput = document.getElementById('card-mana-cost-input') as HTMLInputElement;
-        const rarityInput = document.getElementById('card-rarity-input') as HTMLSelectElement;
-        
-        if (typeInput && card.type_line) {
-          typeInput.value = card.type_line;
-        }
-        if (manaCostInput && card.mana_cost) {
-          manaCostInput.value = card.mana_cost;
-        }
-        if (rarityInput && card.rarity) {
-          rarityInput.value = card.rarity;
-        }
+      const card = await ScryfallAPI.getCard(cardName);
+      if (!card) return;
+
+      const typeInput = document.getElementById('card-type-input') as HTMLInputElement;
+      const manaCostInput = document.getElementById('card-mana-cost-input') as HTMLInputElement;
+      const rarityInput = document.getElementById('card-rarity-input') as HTMLSelectElement;
+
+      if (typeInput && card.typeLine) typeInput.value = card.typeLine;
+      if (manaCostInput && card.manaCost) manaCostInput.value = card.manaCost;
+      // Only set rarities the dropdown offers (Scryfall also has "special" and "bonus")
+      if (rarityInput && card.rarity && rarityInput.querySelector(`option[value="${card.rarity}"]`)) {
+        rarityInput.value = card.rarity;
       }
     } catch (error) {
+      // Not fatal - the user can still fill in the fields manually
       console.error('Error fetching card details:', error);
-      // Don't show error to user, just proceed without auto-population
     }
   }
 
-  private handleAddCardSubmit(): void {
+  private async handleAddCardSubmit(): Promise<void> {
     const nameInput = document.getElementById('card-name-input') as HTMLInputElement;
     const quantityInput = document.getElementById('card-quantity-input') as HTMLInputElement;
     const typeInput = document.getElementById('card-type-input') as HTMLInputElement;
@@ -946,9 +786,6 @@ export class CollectionTab extends BaseComponent {
 
     const cardName = nameInput?.value?.trim();
     const quantity = parseInt(quantityInput?.value || '1');
-    const typeLine = typeInput?.value?.trim() || 'Unknown';
-    const manaCost = manaCostInput?.value?.trim() || '';
-    const rarity = rarityInput?.value || 'common';
 
     if (!cardName) {
       alert('Card name is required');
@@ -960,99 +797,45 @@ export class CollectionTab extends BaseComponent {
       return;
     }
 
-    // Check if card already exists in collection
-    const existingCard = this.collection.cards.find(c => c.name.toLowerCase() === cardName.toLowerCase());
-    
+    this.addOrMergeCard({
+      name: cardName,
+      quantity,
+      typeLine: typeInput?.value?.trim() || undefined,
+      manaCost: manaCostInput?.value?.trim() || undefined,
+      rarity: rarityInput?.value || undefined
+    });
+
+    closeModal();
+    const total = this.collection.cards.find(c => c.name.toLowerCase() === cardName.toLowerCase())?.quantity ?? quantity;
+    await this.commitCollectionChanges(
+      total > quantity ? `Added ${quantity}x ${cardName} (now ${total} total)` : `Added ${quantity}x ${cardName}`
+    );
+  }
+
+  // Adds a card to the collection, or increases the quantity if a card with that name already exists.
+  // Callers should follow up with commitCollectionChanges().
+  private addOrMergeCard(entry: ParsedCard): void {
+    const existingCard = this.collection.cards.find(c => c.name.toLowerCase() === entry.name.toLowerCase());
     if (existingCard) {
-      // Card exists - increment quantity
-      existingCard.quantity = (existingCard.quantity || 1) + quantity;
-      this.setCollection(this.collection);
-      this.showImportStatus(`Added ${quantity}x ${cardName} (now ${existingCard.quantity} total)`);
-    } else {
-      // Parse colors from mana cost (basic parsing)
-      const colors: string[] = [];
-      if (manaCost) {
-        if (manaCost.includes('W')) colors.push('W');
-        if (manaCost.includes('U')) colors.push('U');
-        if (manaCost.includes('B')) colors.push('B');
-        if (manaCost.includes('R')) colors.push('R');
-        if (manaCost.includes('G')) colors.push('G');
-      }
-
-      // Create new card
-      const newCard: Card = {
-        id: `manual-${Date.now()}`,
-        name: cardName,
-        typeLine: typeLine,
-        manaCost: manaCost,
-        colors: colors,
-        rarity: rarity as any,
-        quantity: quantity
-      };
-
-      this.collection.cards.push(newCard);
-      this.setCollection(this.collection);
-      this.showImportStatus(`Added ${quantity}x ${cardName}`);
+      existingCard.quantity = (existingCard.quantity || 1) + entry.quantity;
+      return;
     }
 
-    // Save to persistent storage
-    this.saveCollection();
-
-    // Close modal
-    this.closeModal();
+    this.collection.cards.push({
+      ...entry,
+      id: `card-${Date.now()}-${this.nextCardId++}`,
+      typeLine: entry.typeLine || 'Unknown',
+      manaCost: entry.manaCost || '',
+      colors: entry.colors ?? ['W', 'U', 'B', 'R', 'G'].filter(color => entry.manaCost?.includes(color)),
+      rarity: entry.rarity || 'common'
+    });
   }
 
-  private showModal(title: string, content: string): void {
-    const modal = document.getElementById('modal') as HTMLElement;
-    const modalTitle = document.getElementById('modal-title') as HTMLElement;
-    const modalContent = document.getElementById('modal-content') as HTMLElement;
-
-    if (modal && modalTitle && modalContent) {
-      modalTitle.textContent = title;
-      modalContent.innerHTML = content;
-      modal.classList.remove('hidden');
-    }
-  }
-
-  private closeModal(): void {
-    const modal = document.getElementById('modal') as HTMLElement;
-    if (modal) {
-      modal.classList.add('hidden');
-    }
-  }
-
-  private generateCSVContent(): string {
-    const headers = ['Card Name', 'Quantity', 'Mana Cost', 'Type', 'Rarity', 'Colors'];
-    const rows = [headers.join(',')];
-    
-    for (const card of this.filteredCards) {
-      const row = [
-        `"${card.name}"`,
-        card.quantity?.toString() || '1',
-        `"${card.manaCost || ''}"`,
-        `"${card.typeLine || ''}"`,
-        card.rarity,
-        `"${card.colors?.join('') || ''}"`
-      ];
-      rows.push(row.join(','));
-    }
-    
-    return rows.join('\n');
-  }
-
-  private showImportStatus(message: string): void {
-    // Show status in the status bar or a temporary message
-    console.log('Status:', message);
-    
-    // You could also show this in the UI temporarily
-    const statusElement = document.querySelector('#status-message');
-    if (statusElement) {
-      statusElement.textContent = message;
-      // Clear after 3 seconds
-      setTimeout(() => {
-        statusElement.textContent = 'Ready';
-      }, 3000);
-    }
+  // Re-renders, persists and reports after the collection has been modified
+  private async commitCollectionChanges(statusMessage: string): Promise<void> {
+    this.setCollection(this.collection);
+    await this.saveCollection();
+    setStatus(statusMessage);
   }
 
   // Enhanced loading method with better UX
@@ -1094,7 +877,7 @@ export class CollectionTab extends BaseComponent {
         grid.innerHTML = `
           <div class="error-state">
             <p>⚠️ Error loading collection</p>
-            <button class="btn btn-secondary" onclick="window.decksmithApp?.components?.collection?.loadCollectionData?.();">
+            <button class="btn btn-secondary" onclick="window.app?.components?.collection?.loadCollectionData?.();">
               Retry
             </button>
           </div>
@@ -1303,24 +1086,6 @@ export class CollectionTab extends BaseComponent {
     // Exit selection mode
     this.toggleSelectionMode();
     
-    this.showImportStatus(`Deleted ${deletedCount} card(s)`);
-  }
-
-  async deleteCard(cardId: string): Promise<void> {
-    const card = this.collection.cards.find(c => c.id === cardId);
-    if (!card) return;
-
-    if (!confirm(`Are you sure you want to delete ${card.name}?`)) {
-      return;
-    }
-
-    // Remove the card
-    this.collection.cards = this.collection.cards.filter(c => c.id !== cardId);
-    
-    // Save and refresh
-    await this.saveCollection();
-    this.setCollection(this.collection);
-    
-    this.showImportStatus(`Deleted ${card.name}`);
+    setStatus(`Deleted ${deletedCount} card(s)`);
   }
 }

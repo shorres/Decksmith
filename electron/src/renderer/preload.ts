@@ -1,44 +1,55 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+interface FileFilter {
+  name: string;
+  extensions: string[];
+}
+
+// Channels the main process sends when a menu item is clicked
+const MENU_CHANNELS = [
+  'menu:new-collection',
+  'menu:import-collection',
+  'menu:export-collection',
+  'menu:new-deck',
+  'menu:import-deck',
+  'menu:export-deck',
+  'menu:about',
+];
+
 // Define the API that will be available in the renderer process
 const electronAPI = {
-  // File operations
-  openFileDialog: (options: any) => ipcRenderer.invoke('dialog:openFile', options),
-  saveFileDialog: (options: any) => ipcRenderer.invoke('dialog:saveFile', options),
+  // File operations (dialog + read/write happen in the main process)
+  saveTextFile: (options: {
+    title?: string;
+    defaultPath?: string;
+    filters?: FileFilter[];
+    content: string;
+    contentByExtension?: Record<string, string>; // written instead of `content` when the chosen file has that extension
+  }):
+    Promise<{ canceled: boolean; filePath?: string }> => ipcRenderer.invoke('file:saveText', options),
+  openTextFile: (options: { title?: string; filters?: FileFilter[] }):
+    Promise<{ canceled: boolean; filePath?: string; content?: string }> => ipcRenderer.invoke('file:openText', options),
 
   // Store operations (persistent data storage)
   store: {
     get: (key: string) => ipcRenderer.invoke('store:get', key),
     set: (key: string, value: any) => ipcRenderer.invoke('store:set', key, value),
-    delete: (key: string) => ipcRenderer.invoke('store:delete', key),
-    clear: () => ipcRenderer.invoke('store:clear'),
   },
 
   // App info
-  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
-  getAppName: () => ipcRenderer.invoke('app:getName'),
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
 
   // Shell operations
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   },
 
-  // Menu events (from main process)
+  // Menu events (from main process) - the callback receives the channel name
   onMenuAction: (callback: (action: string) => void) => {
-    const handler = (event: any, action: string) => callback(action);
-    ipcRenderer.on('menu:new-collection', handler);
-    ipcRenderer.on('menu:import-collection', handler);
-    ipcRenderer.on('menu:export-collection', handler);
-    ipcRenderer.on('menu:new-deck', handler);
-    ipcRenderer.on('menu:import-deck', handler);
-    ipcRenderer.on('menu:export-deck', handler);
-    ipcRenderer.on('menu:about', handler);
+    MENU_CHANNELS.forEach(channel => {
+      ipcRenderer.on(channel, () => callback(channel));
+    });
   },
-
-  // Remove listeners
-  removeAllListeners: (channel: string) => {
-    ipcRenderer.removeAllListeners(channel);
-  }
 };
 
 // Safely expose the API to the renderer process

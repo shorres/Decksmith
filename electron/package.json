@@ -39,7 +39,6 @@
     "html-webpack-plugin": "^5.5.3",
     "mini-css-extract-plugin": "^2.7.6",
     "rimraf": "^5.0.1",
-    "style-loader": "^3.3.3",
     "ts-loader": "^9.4.4",
     "typescript": "^5.1.6",
     "wait-on": "^7.0.1",
@@ -48,8 +47,7 @@
     "webpack-dev-server": "^4.15.1"
   },
   "dependencies": {
-    "electron-store": "^8.1.0",
-    "node-fetch": "^3.3.2"
+    "electron-store": "^8.1.0"
   },
   "build": {
     "appId": "com.shorres.deckmaster",
