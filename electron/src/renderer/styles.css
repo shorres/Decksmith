@@ -1,4 +1,4 @@
-/* Modern Deckmaster Styles */
+/* Modern Decksmith Styles */
 :root {
   /* Color Palette */
   --primary-color: #2563eb;
@@ -1963,6 +1963,13 @@ body {
   border-radius: var(--radius-sm);
 }
 
+/* Foil copy count on collection tiles */
+.card-quantity-foil {
+  color: #6d28d9;
+  background: linear-gradient(135deg, #fdf4ff, #e0f2fe);
+  border: 1px solid #ddd6fe;
+}
+
 .mana-cost {
   font-size: 0.7rem;
   font-weight: 500;
@@ -2163,6 +2170,19 @@ body {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Checkbox + label on one line (e.g. the Add Card "Foil" option) */
+.form-group-inline label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.form-group-inline input[type="checkbox"] {
+  width: auto;
+  margin: 0;
 }
 
 .modal-actions {
@@ -2408,22 +2428,6 @@ body {
   margin-bottom: 1rem;
 }
 
-.card-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-top: auto;
-}
-
-.card-actions input[type="number"] {
-  width: 60px;
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-}
-
 .card-details-right {
   flex: 1;
   padding: 1.5rem;
@@ -2527,6 +2531,12 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
+}
+
+.price-item.price-item-owned {
+  border-color: var(--primary-color);
+  font-weight: 600;
+  gap: var(--spacing-sm);
 }
 
 .price-item {

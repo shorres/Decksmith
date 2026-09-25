@@ -47,8 +47,8 @@ electron/release/
 ```
 
 **Generated files:**
-- **Deckmaster Setup X.X.X.exe** - Windows NSIS installer (distributable)
-- **Deckmaster-X.X.X.exe** - Unpacked executable
+- **Decksmith Setup X.X.X.exe** - Windows NSIS installer (distributable)
+- **Decksmith-X.X.X.exe** - Unpacked executable
 - **win-unpacked/** - Unpacked application directory
 
 ## 🔧 Build Configuration
@@ -58,8 +58,8 @@ The build is configured in `electron/package.json` under the `build` section:
 ```json
 {
   "build": {
-    "appId": "com.shorres.deckmaster",
-    "productName": "Deckmaster",
+    "appId": "com.shorres.decksmith",
+    "productName": "Decksmith",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -231,7 +231,7 @@ Use the `-SkipInstall` flag if dependencies haven't changed:
 5. Release is created with all installers attached
 
 ### Manual Distribution
-Distribute the **Deckmaster Setup X.X.X.exe** file from `electron/release/`
+Distribute the **Decksmith Setup X.X.X.exe** file from `electron/release/`
 
 Users can:
 1. Download the installer

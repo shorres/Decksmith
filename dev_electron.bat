@@ -1,9 +1,9 @@
 @echo off
-echo 🚀 Launching Deckmaster 2.0
+echo 🚀 Launching Decksmith 2.0
 echo ===========================
 
 cd electron
 
 echo.
-echo 🔧 Starting Deckmaster...
+echo 🔧 Starting Decksmith...
 call npm run electron

@@ -10,7 +10,7 @@
             window.global = window;
         }
     </script>
-    <link rel="stylesheet" href="app.css">
+    <!-- app.css and app.js are injected by HtmlWebpackPlugin -->
 </head>
 <body>
     <div id="app">
@@ -19,14 +19,14 @@
             <div class="header-content">
                 <div class="app-title">
                     <h1>🃏 Decksmith</h1>
-                    <span class="version">v2.0.0</span>
+                    <span class="version" id="app-version"></span>
                 </div>
             </div>
         </header>
 
         <!-- Main Content -->
         <main class="app-main">
-            <!-- Navigation Tabs -->
+            <!-- Navigation Tabs (the AI Recommendations tab is added by app.ts when enabled) -->
             <nav class="tab-nav">
                 <button class="tab-btn active" data-tab="collection">
                     <span class="tab-icon">📚</span>
@@ -36,12 +36,6 @@
                     <span class="tab-icon">🏗️</span>
                     Decks
                 </button>
-                <!-- Temporarily hidden - AI Recommendations tab
-                <button class="tab-btn" data-tab="ai-recommendations">
-                    <span class="tab-icon">🤖</span>
-                    AI Recommendations
-                </button>
-                -->
             </nav>
 
             <!-- Tab Content -->
@@ -55,12 +49,6 @@
                 <div id="decks-tab" class="tab-panel">
                     <!-- Content will be rendered by DecksTab component -->
                 </div>
-
-                <!-- Temporarily hidden - AI Recommendations Tab
-                <div id="ai-recommendations-tab" class="tab-panel">
-                    <!-- Content will be rendered by AIRecommendationsTab component -->
-                </div>
-                -->
             </div>
         </main>
 
@@ -83,8 +71,5 @@
             </div>
         </div>
     </div>
-
-    <!-- Scripts -->
-    <script src="app.js"></script>
 </body>
 </html>

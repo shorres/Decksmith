@@ -1,4 +1,4 @@
-// Shared type definitions for Deckmaster
+// Shared type definitions for Decksmith
 
 export interface Card {
   id: string;
@@ -20,7 +20,8 @@ export interface Card {
   scryfallUri?: string;
   legalities?: { [format: string]: string };
   prices?: { [type: string]: string };
-  quantity?: number;
+  quantity?: number;      // regular (non-foil) copies; use the copy-count helpers in utils.ts to read it
+  quantityFoil?: number;  // foil copies (collection only)
 }
 
 export interface Deck {
@@ -42,9 +43,9 @@ export interface Collection {
   lastModified: string;
 }
 
-// Global window type extension
+// Global window type extension - the app instance, used by inline onclick handlers
 declare global {
   interface Window {
-    decksmithApp?: any;
+    app?: any;
   }
 }

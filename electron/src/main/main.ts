@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Menu, ipcMain, dialog, shell } from 'electron';
 import * as path from 'path';
+import { promises as fs } from 'fs';
 import Store from 'electron-store';
 
 // Initialize electron store for persistent data
@@ -182,7 +183,7 @@ class DecksmithApp {
           },
           {
             label: 'GitHub Repository',
-            click: () => shell.openExternal('https://github.com/shorres/Magic-Tool')
+            click: () => shell.openExternal('https://github.com/shorres/Decksmith')
           }
         ]
       }
@@ -193,15 +194,35 @@ class DecksmithApp {
   }
 
   private setupIpcHandlers(): void {
-    // File operations
-    ipcMain.handle('dialog:openFile', async (event, options) => {
-      const result = await dialog.showOpenDialog(this.mainWindow!, options);
-      return result;
+    // File operations - the dialog and the read/write both happen here, so the
+    // renderer can only touch files the user explicitly picked.
+    // `contentByExtension` lets the renderer offer several formats (e.g. { csv: '...' });
+    // the one matching the chosen file's extension is written, falling back to `content`.
+    ipcMain.handle('file:saveText', async (event, options: {
+      title?: string;
+      defaultPath?: string;
+      filters?: Electron.FileFilter[];
+      content: string;
+      contentByExtension?: Record<string, string>;
+    }) => {
+      const { content, contentByExtension, ...dialogOptions } = options;
+      const result = await dialog.showSaveDialog(this.mainWindow!, dialogOptions);
+      if (result.canceled || !result.filePath) {
+        return { canceled: true };
+      }
+      const extension = path.extname(result.filePath).slice(1).toLowerCase();
+      await fs.writeFile(result.filePath, contentByExtension?.[extension] ?? content, 'utf8');
+      return { canceled: false, filePath: result.filePath };
     });
 
-    ipcMain.handle('dialog:saveFile', async (event, options) => {
-      const result = await dialog.showSaveDialog(this.mainWindow!, options);
-      return result;
+    ipcMain.handle('file:openText', async (event, options: { title?: string; filters?: Electron.FileFilter[] }) => {
+      const result = await dialog.showOpenDialog(this.mainWindow!, { ...options, properties: ['openFile'] });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { canceled: true };
+      }
+      const filePath = result.filePaths[0];
+      const content = await fs.readFile(filePath, 'utf8');
+      return { canceled: false, filePath, content };
     });
 
     // Store operations
@@ -214,30 +235,15 @@ class DecksmithApp {
       return true;
     });
 
-    ipcMain.handle('store:delete', (event, key) => {
-      store.delete(key);
-      return true;
-    });
-
-    ipcMain.handle('store:clear', () => {
-      store.clear();
-      return true;
-    });
-
     // App info
     ipcMain.handle('app:getVersion', () => {
       return app.getVersion();
-    });
-
-    ipcMain.handle('app:getName', () => {
-      return app.getName();
     });
 
     // Shell operations
     ipcMain.handle('shell:openExternal', async (event, url) => {
       await shell.openExternal(url);
     });
-
   }
 
   private sendToRenderer(channel: string, ...args: any[]): void {

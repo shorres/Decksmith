@@ -5,10 +5,10 @@
   "main": "dist/main/main.js",
   "author": "shorres",
   "license": "MIT",
-  "homepage": "https://github.com/shorres/Magic-Tool",
+  "homepage": "https://github.com/shorres/Decksmith",
   "repository": {
     "type": "git",
-    "url": "https://github.com/shorres/Magic-Tool.git"
+    "url": "https://github.com/shorres/Decksmith.git"
   },
   "scripts": {
     "dev": "concurrently \"npm run build:watch\" \"npm run electron:dev\"",
@@ -33,27 +33,25 @@
     "@typescript-eslint/parser": "^6.4.0",
     "concurrently": "^8.2.0",
     "css-loader": "^6.8.1",
-    "electron": "^25.3.0",
-    "electron-builder": "^24.6.3",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "eslint": "^8.47.0",
     "html-webpack-plugin": "^5.5.3",
     "mini-css-extract-plugin": "^2.7.6",
     "rimraf": "^5.0.1",
-    "style-loader": "^3.3.3",
     "ts-loader": "^9.4.4",
     "typescript": "^5.1.6",
     "wait-on": "^7.0.1",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^4.15.1"
+    "webpack-dev-server": "^6.0.0"
   },
   "dependencies": {
-    "electron-store": "^8.1.0",
-    "node-fetch": "^3.3.2"
+    "electron-store": "^8.1.0"
   },
   "build": {
-    "appId": "com.shorres.deckmaster",
-    "productName": "Deckmaster",
+    "appId": "com.shorres.decksmith",
+    "productName": "Decksmith",
     "directories": {
       "output": "release",
       "buildResources": "build"
