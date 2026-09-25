@@ -1,9 +1,10 @@
-import { ScryfallAPI } from '../utils';
+import { ScryfallAPI, regularCopies, foilCopies, copiesValue } from '../utils';
 import type { Card } from '../types';
 
 export class CardDetailsModal {
   private modal: HTMLElement | null = null;
   private isLoading = false;
+  private ownedCard: Card | null = null; // the collection entry, when opened from the collection
 
   constructor() {
     this.createModal();
@@ -64,6 +65,10 @@ export class CardDetailsModal {
                   <span class="info-label">Power/Toughness:</span>
                   <span class="info-value" id="modal-card-pt">-</span>
                 </div>
+                <div class="info-row" id="modal-owned-row">
+                  <span class="info-label">Your Copies:</span>
+                  <span class="info-value" id="modal-card-owned">-</span>
+                </div>
               </div>
             </div>
             
@@ -110,14 +115,23 @@ export class CardDetailsModal {
     modal.style.display = 'none';
   }
 
-  async show(cardName: string): Promise<void> {
+  // `ownedCard` is the collection entry, if any; its regular/foil copies are shown with their value
+  async show(cardName: string, ownedCard?: Card): Promise<void> {
     if (this.isLoading || !this.modal) return;
 
     this.isLoading = true;
+    this.ownedCard = ownedCard ?? null;
     this.modal.style.display = 'flex';
 
     // Reset content
     this.resetContent();
+
+    const ownedRow = this.modal.querySelector('#modal-owned-row') as HTMLElement | null;
+    if (ownedRow) ownedRow.style.display = this.ownedCard ? '' : 'none';
+    if (this.ownedCard) {
+      this.setTextContent('#modal-card-owned',
+        `${regularCopies(this.ownedCard)} regular, ${foilCopies(this.ownedCard)} foil`);
+    }
     
     // Set initial title
     const title = this.modal.querySelector('#card-modal-title');
@@ -246,6 +260,17 @@ export class CardDetailsModal {
           <span class="price-value">$${parseFloat(prices[type.key]).toFixed(2)}</span>
         </div>
       `);
+
+    // What the user's own copies are worth, foils at the foil price
+    const ownedValue = this.ownedCard ? copiesValue(this.ownedCard, prices) : null;
+    if (ownedValue !== null) {
+      priceItems.push(`
+        <div class="price-item price-item-owned">
+          <span class="price-label">Your copies:</span>
+          <span class="price-value">$${ownedValue.toFixed(2)}</span>
+        </div>
+      `);
+    }
 
     if (priceItems.length === 0) {
       pricingInfo.innerHTML = '<p>No pricing data available</p>';

@@ -1,6 +1,9 @@
 import { BaseComponent } from './BaseComponent';
 import { CardDetailsModal } from './CardDetailsModal';
-import { ScryfallAPI, CSVHandler, CardCache, type ParsedCard } from '../utils';
+import {
+  ScryfallAPI, CSVHandler, CardCache, type ParsedCard,
+  regularCopies, foilCopies, totalCopies, copiesValue
+} from '../utils';
 import { openModal, closeModal, setStatus, setCardCount, escapeHtml } from '../ui';
 import type { Card, Collection } from '../types';
 
@@ -12,6 +15,8 @@ export class CollectionTab extends BaseComponent {
   private selectionMode: boolean = false;
   private selectedCards: Set<string> = new Set();
   private nextCardId = 0;
+  private priceFetchInFlight = false;
+  private pricesRequested = new Set<string>(); // names already sent to Scryfall this session - don't re-ask
 
   constructor() {
     super('#collection-tab');
@@ -105,6 +110,10 @@ export class CollectionTab extends BaseComponent {
             <div class="stat-row">
               <span class="stat-label">Total Cards:</span>
               <span class="stat-value" id="sidebar-total-cards">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Foil Copies:</span>
+              <span class="stat-value" id="sidebar-foil-cards">0</span>
             </div>
             <div class="stat-row">
               <span class="stat-label">Unique Cards:</span>
@@ -377,7 +386,8 @@ export class CollectionTab extends BaseComponent {
                 <div class="card-type" title="${typeLine}">${typeLine || 'Unknown'}</div>
                 <div class="card-meta">
                   <span class="card-rarity ${escapeHtml(card.rarity || 'common')}">${this.formatRarity(card.rarity || 'common')}</span>
-                  <span class="card-quantity">×${card.quantity || 1}</span>
+                  ${regularCopies(card) > 0 ? `<span class="card-quantity" title="Regular copies">×${regularCopies(card)}</span>` : ''}
+                  ${foilCopies(card) > 0 ? `<span class="card-quantity card-quantity-foil" title="Foil copies">✦×${foilCopies(card)}</span>` : ''}
                   ${card.manaCost ? `<span class="mana-cost" title="Mana Cost">${escapeHtml(card.manaCost)}</span>` : ''}
                 </div>
                 ${card.colors && card.colors.length > 0 ? 
@@ -415,10 +425,7 @@ export class CollectionTab extends BaseComponent {
     const card = this.collection.cards.find(c => c.id === cardId);
     if (!card) return;
 
-    console.log('Showing card details for:', card.name);
-    
-    // Open the card details modal
-    this.cardModal.show(card.name);
+    this.cardModal.show(card.name, card);
   }
 
   private updateStats(): void {
@@ -428,11 +435,15 @@ export class CollectionTab extends BaseComponent {
     }
 
     // Update sidebar stats
-    const totalCards = this.filteredCards.reduce((sum, card) => sum + (card.quantity || 1), 0);
+    const totalCards = this.filteredCards.reduce((sum, card) => sum + totalCopies(card), 0);
     const totalElement = this.element.querySelector('#sidebar-total-cards');
     if (totalElement) totalElement.textContent = totalCards.toString();
 
-    setCardCount(this.collection.cards.reduce((sum, card) => sum + (card.quantity || 1), 0));
+    const foilCards = this.filteredCards.reduce((sum, card) => sum + foilCopies(card), 0);
+    const foilElement = this.element.querySelector('#sidebar-foil-cards');
+    if (foilElement) foilElement.textContent = foilCards.toString();
+
+    setCardCount(this.collection.cards.reduce((sum, card) => sum + totalCopies(card), 0));
     
     const uniqueCards = new Set(this.filteredCards.map(card => card.name)).size;
     const uniqueElement = this.element.querySelector('#sidebar-unique-cards');
@@ -457,18 +468,55 @@ export class CollectionTab extends BaseComponent {
     const mythicsElement = this.element.querySelector('#sidebar-mythics');
     if (mythicsElement) mythicsElement.textContent = rarityCount.mythic.toString();
     
-    // Calculate collection value (simplified calculation)
-    const collectionValue = this.filteredCards.reduce((total, card) => {
-      // Basic price estimation based on rarity
-      const priceEstimate = card.rarity === 'mythic' ? 5.00 :
-                           card.rarity === 'rare' ? 1.50 :
-                           card.rarity === 'uncommon' ? 0.25 : 0.10;
-      const quantity = card.quantity ?? 1;
-      return total + (priceEstimate * quantity);
-    }, 0);
-    
-    const valueElement = this.element.querySelector('#sidebar-collection-value');
-    if (valueElement) valueElement.textContent = `$${collectionValue.toFixed(2)}`;
+    this.updateCollectionValue();
+  }
+
+  // Shows the value of the shown cards using Scryfall prices (cached for a day), then fetches
+  // prices for any cards in the collection that don't have them yet and updates again.
+  private updateCollectionValue(): void {
+    const valueElement = this.element.querySelector('#sidebar-collection-value') as HTMLElement | null;
+    if (!valueElement) return;
+
+    const prices = CardCache.getPriceDataBulk(this.collection.cards.map(card => card.name));
+
+    let value = 0;
+    let unpriced = 0;
+    for (const card of this.filteredCards) {
+      const cardValue = copiesValue(card, prices.get(card.name.toLowerCase()));
+      if (cardValue === null) {
+        unpriced++;
+      } else {
+        value += cardValue;
+      }
+    }
+
+    const missing = this.collection.cards
+      .map(card => card.name)
+      .filter(name => !prices.has(name.toLowerCase()) && !this.pricesRequested.has(name.toLowerCase()));
+    const updating = this.priceFetchInFlight || missing.length > 0;
+
+    valueElement.textContent = `$${value.toFixed(2)}${updating ? '…' : ''}`;
+    valueElement.title = 'Scryfall USD prices for each card\'s default printing; foil copies use the foil price.' +
+      (updating ? '\nFetching prices…' : '') +
+      (unpriced > 0 && !updating ? `\n${unpriced} card(s) have no price and aren't counted.` : '');
+
+    if (missing.length > 0 && !this.priceFetchInFlight) {
+      this.fetchMissingPrices(missing);
+    }
+  }
+
+  private async fetchMissingPrices(names: string[]): Promise<void> {
+    names.forEach(name => this.pricesRequested.add(name.toLowerCase()));
+    this.priceFetchInFlight = true;
+    try {
+      await ScryfallAPI.fetchPrices(names);
+    } catch (error) {
+      // Offline or Scryfall unavailable - show what's cached; it's retried next session
+      console.error('Error fetching card prices:', error);
+    } finally {
+      this.priceFetchInFlight = false;
+    }
+    this.updateCollectionValue();
   }
 
   clearAllFilters(): void {
@@ -546,7 +594,10 @@ export class CollectionTab extends BaseComponent {
 
       // Accepts deck-list style lines: "4 Lightning Bolt" or "Lightning Bolt"
       const parsed = CSVHandler.parseArenaFormat(clipboardText);
-      parsed.forEach(({ sideboard, ...card }) => this.addOrMergeCard(card));
+      // "*F*"-marked lines are foils
+      parsed.forEach(({ sideboard, foil, ...card }) => this.addOrMergeCard(
+        foil ? { ...card, quantity: 0, quantityFoil: card.quantity } : card
+      ));
       await this.commitCollectionChanges(`Added ${parsed.length} card entries from clipboard`);
     } catch (error) {
       console.error('Error importing from clipboard:', error);
@@ -571,6 +622,7 @@ export class CollectionTab extends BaseComponent {
 
       // Invalidate all caches to force refresh
       CardCache.invalidateCache();
+      this.pricesRequested.clear();
 
       let updatedCount = 0;
       const uniqueCards = Array.from(new Set(this.collection.cards.map(c => c.name)));
@@ -589,6 +641,7 @@ export class CollectionTab extends BaseComponent {
       }
 
       const statsAfter = CardCache.getCacheStats();
+      this.updateStats();
       setStatus(`✓ Updated ${updatedCount} cards! Cache now contains ${statsAfter.cardCount} cards, ${statsAfter.priceCount} prices.`);
     } catch (error) {
       console.error('Error refreshing card data:', error);
@@ -608,6 +661,12 @@ export class CollectionTab extends BaseComponent {
           <div class="form-group">
             <label for="card-quantity-input">Quantity:</label>
             <input type="number" id="card-quantity-input" value="1" min="1" required>
+          </div>
+          <div class="form-group form-group-inline">
+            <label for="card-foil-input">
+              <input type="checkbox" id="card-foil-input">
+              Foil
+            </label>
           </div>
           <div class="form-group">
             <label for="card-type-input">Type (optional):</label>
@@ -783,9 +842,11 @@ export class CollectionTab extends BaseComponent {
     const typeInput = document.getElementById('card-type-input') as HTMLInputElement;
     const manaCostInput = document.getElementById('card-mana-cost-input') as HTMLInputElement;
     const rarityInput = document.getElementById('card-rarity-input') as HTMLSelectElement;
+    const foilInput = document.getElementById('card-foil-input') as HTMLInputElement;
 
     const cardName = nameInput?.value?.trim();
     const quantity = parseInt(quantityInput?.value || '1');
+    const isFoil = !!foilInput?.checked;
 
     if (!cardName) {
       alert('Card name is required');
@@ -797,38 +858,42 @@ export class CollectionTab extends BaseComponent {
       return;
     }
 
-    this.addOrMergeCard({
+    const card = this.addOrMergeCard({
       name: cardName,
-      quantity,
+      quantity: isFoil ? 0 : quantity,
+      quantityFoil: isFoil ? quantity : undefined,
       typeLine: typeInput?.value?.trim() || undefined,
       manaCost: manaCostInput?.value?.trim() || undefined,
       rarity: rarityInput?.value || undefined
     });
 
     closeModal();
-    const total = this.collection.cards.find(c => c.name.toLowerCase() === cardName.toLowerCase())?.quantity ?? quantity;
-    await this.commitCollectionChanges(
-      total > quantity ? `Added ${quantity}x ${cardName} (now ${total} total)` : `Added ${quantity}x ${cardName}`
-    );
+    const added = `Added ${quantity}x ${cardName}${isFoil ? ' (foil)' : ''}`;
+    const total = totalCopies(card);
+    await this.commitCollectionChanges(total > quantity ? `${added} (now ${total} total)` : added);
   }
 
-  // Adds a card to the collection, or increases the quantity if a card with that name already exists.
-  // Callers should follow up with commitCollectionChanges().
-  private addOrMergeCard(entry: ParsedCard): void {
+  // Adds a card to the collection, or increases the regular and foil counts if a card with that name
+  // already exists. Returns the collection's card. Callers should follow up with commitCollectionChanges().
+  private addOrMergeCard(entry: ParsedCard): Card {
     const existingCard = this.collection.cards.find(c => c.name.toLowerCase() === entry.name.toLowerCase());
     if (existingCard) {
-      existingCard.quantity = (existingCard.quantity || 1) + entry.quantity;
-      return;
+      const foil = foilCopies(existingCard) + (entry.quantityFoil ?? 0);
+      existingCard.quantity = regularCopies(existingCard) + entry.quantity;
+      if (foil > 0) existingCard.quantityFoil = foil;
+      return existingCard;
     }
 
-    this.collection.cards.push({
+    const newCard: Card = {
       ...entry,
       id: `card-${Date.now()}-${this.nextCardId++}`,
       typeLine: entry.typeLine || 'Unknown',
       manaCost: entry.manaCost || '',
       colors: entry.colors ?? ['W', 'U', 'B', 'R', 'G'].filter(color => entry.manaCost?.includes(color)),
       rarity: entry.rarity || 'common'
-    });
+    };
+    this.collection.cards.push(newCard);
+    return newCard;
   }
 
   // Re-renders, persists and reports after the collection has been modified

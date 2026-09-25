@@ -20,7 +20,8 @@ export interface Card {
   scryfallUri?: string;
   legalities?: { [format: string]: string };
   prices?: { [type: string]: string };
-  quantity?: number;
+  quantity?: number;      // regular (non-foil) copies; use the copy-count helpers in utils.ts to read it
+  quantityFoil?: number;  // foil copies (collection only)
 }
 
 export interface Deck {
