@@ -5,10 +5,10 @@
   "main": "dist/main/main.js",
   "author": "shorres",
   "license": "MIT",
-  "homepage": "https://github.com/shorres/Magic-Tool",
+  "homepage": "https://github.com/shorres/Decksmith",
   "repository": {
     "type": "git",
-    "url": "https://github.com/shorres/Magic-Tool.git"
+    "url": "https://github.com/shorres/Decksmith.git"
   },
   "scripts": {
     "dev": "concurrently \"npm run build:watch\" \"npm run electron:dev\"",

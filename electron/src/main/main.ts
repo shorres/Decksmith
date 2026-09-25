@@ -183,7 +183,7 @@ class DecksmithApp {
           },
           {
             label: 'GitHub Repository',
-            click: () => shell.openExternal('https://github.com/shorres/Magic-Tool')
+            click: () => shell.openExternal('https://github.com/shorres/Decksmith')
           }
         ]
       }
