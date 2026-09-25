@@ -62,17 +62,17 @@
 ### Windows Build
 - Runs on: `windows-latest`
 - Creates: NSIS installer with custom install directory
-- Output: `Deckmaster Setup X.X.X.exe`
+- Output: `Decksmith Setup X.X.X.exe`
 
 ### macOS Build
 - Runs on: `macos-latest`
 - Creates: DMG disk image
-- Output: `Deckmaster-X.X.X.dmg`
+- Output: `Decksmith-X.X.X.dmg`
 
 ### Linux Build
 - Runs on: `ubuntu-latest`
 - Creates: AppImage portable executable
-- Output: `Deckmaster-X.X.X.AppImage`
+- Output: `Decksmith-X.X.X.AppImage`
 
 ## 📝 Tag Naming Convention
 

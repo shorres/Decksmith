@@ -1,5 +1,5 @@
 @echo off
-echo 🚀 Setting up Deckmaster Electron App
+echo 🚀 Setting up Decksmith Electron App
 echo ====================================
 
 echo.
@@ -19,4 +19,4 @@ echo   npm run dev     - Start development server
 echo   npm run build   - Build for production  
 echo   npm run dist    - Create distributable
 echo.
-echo 🚀 Ready to launch Deckmaster 2.0!
+echo 🚀 Ready to launch Decksmith 2.0!

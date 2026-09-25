@@ -1,4 +1,4 @@
-# 🚀 Deckmaster 2.0 - Electron Migration
+# 🚀 Decksmith 2.0 - Electron Migration
 
 Modern Magic: The Gathering collection and deck manager built with Electron, TypeScript, and modern web technologies.
 
@@ -10,7 +10,7 @@ The original Python/Tkinter version had some performance limitations:
 - **Threading issues** with GUI updates
 - **Large bundle sizes** (50MB+ with PyInstaller)
 
-Deckmaster 2.0 with Electron delivers:
+Decksmith 2.0 with Electron delivers:
 - **Lightning-fast startup** (2-3 seconds)
 - **Modern, responsive UI** with smooth animations
 - **Better performance** with V8 JavaScript engine
@@ -110,7 +110,7 @@ electron/
 
 ## 🚢 Distribution
 
-Deckmaster uses **electron-builder** for creating platform-specific installers.
+Decksmith uses **electron-builder** for creating platform-specific installers.
 
 ### Build Output
 - **Windows**: NSIS installer with custom install directory

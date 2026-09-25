@@ -1,4 +1,4 @@
-// Shared type definitions for Deckmaster
+// Shared type definitions for Decksmith
 
 export interface Card {
   id: string;

@@ -50,8 +50,8 @@
     "electron-store": "^8.1.0"
   },
   "build": {
-    "appId": "com.shorres.deckmaster",
-    "productName": "Deckmaster",
+    "appId": "com.shorres.decksmith",
+    "productName": "Decksmith",
     "directories": {
       "output": "release",
       "buildResources": "build"
